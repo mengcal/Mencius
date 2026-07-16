@@ -67,6 +67,7 @@ class Pipe:
         )
         TEMPERATURE: float = Field(default=0.8, description="温度")
         MAX_TOKENS: int = Field(default=2000, description="每次发言最大token")
+        MODERATOR_MAX_TOKENS: int = Field(default=4000, description="主持人总结最大token（需要更大）")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -143,8 +144,41 @@ class Pipe:
             "provider": provider_key,
         }
 
-    def _call_model(self, p, prompt, system_prompt="") -> str:
+    def _strip_thinking(self, text: str) -> str:
+        """剥离推理模型的思维链输出。"""
+        # 剥离 <think>...</think> 块
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        # 剥离 <thinking>...</thinking> 块
+        text = re.sub(r'<thinking>.*?</thinking>', '', text, flags=re.DOTALL)
+        # 剥离开头的思维链（在正式回答前的大段英文推理）
+        # 模式：连续多行包含 "I should/I need/Let me/Given that" 等推理用语
+        lines = text.strip().split('\n')
+        if lines:
+            # 如果前5行有3行以上是英文推理语句，跳过到第一个中文行或第一个"方案"行
+            reasoning_keywords = ['i should', 'i need', 'let me', 'given that', 'i will',
+                                  'so the', 'this means', 'however', 'therefore',
+                                  'on the other hand', 'but the user', 'the instruction']
+            first_chinese = 0
+            for i, line in enumerate(lines[:20]):
+                line_lower = line.strip().lower()
+                if line_lower and not any(line_lower.startswith(k) for k in reasoning_keywords) and not line_lower.startswith('#'):
+                    # 检查是否包含中文
+                    if re.search(r'[\u4e00-\u9fff]', line):
+                        first_chinese = i
+                        break
+            else:
+                first_chinese = 0
+            # 只在确认有思维链时剥离（前几行都是英文推理）
+            reasoning_count = sum(1 for line in lines[:10]
+                                  if any(line.strip().lower().startswith(k) for k in reasoning_keywords))
+            if reasoning_count >= 3 and first_chinese > 0:
+                text = '\n'.join(lines[first_chinese:])
+        return text.strip()
+
+    def _call_model(self, p, prompt, system_prompt="", max_tokens=None) -> str:
         """直连模型API调用。p 是 participant dict。"""
+        if max_tokens is None:
+            max_tokens = self.valves.MAX_TOKENS
         url = f"{p['base_url'].rstrip('/')}/chat/completions"
         msgs = []
         if system_prompt:
@@ -162,13 +196,13 @@ class Pipe:
                 "messages": msgs,
                 "stream": False,
                 "temperature": self.valves.TEMPERATURE,
-                "max_tokens": self.valves.MAX_TOKENS,
+                "max_tokens": max_tokens,
             },
             headers=headers,
             timeout=120,
         )
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        return self._strip_thinking(resp.json()["choices"][0]["message"]["content"])
 
     def _parallel_call(self, participants, prompt, system_prompt):
         """并发调用多个模型，按完成顺序返回结果。"""
@@ -525,12 +559,21 @@ class Pipe:
             "3. 每个方案标注：支持者、核心观点、风险点、备选路径\n"
             "4. 至少给出2个方案，如果只有1个共识也要给出2条执行路径\n"
             "5. 末尾输出【纪要】标签，包含简明纪要供下次会议参考\n"
-            "用中文。"
+            "用中文。\n\n"
+            "重要：直接输出方案矩阵，不要输出思考过程、推理步骤、内心独白、"
+            "对指令的分析。第一行就应该是「方案一」。"
         )
-        MOD_SYS = "你是圆桌会议主持人/参谋。你负责归纳多方观点，整理方案矩阵，不替用户做决定。用中文。"
+        MOD_SYS = (
+            "你是圆桌会议主持人/参谋。你负责归纳多方观点，整理方案矩阵，"
+            "不替用户做决定。用中文。"
+            "直接输出结果，不要展示任何思考过程。"
+        )
 
         try:
-            mod_text = self._call_model(moderator, MOD_PROMPT, MOD_SYS)
+            mod_text = self._call_model(
+                moderator, MOD_PROMPT, MOD_SYS,
+                max_tokens=self.valves.MODERATOR_MAX_TOKENS,
+            )
             yield mod_text
         except Exception as e:
             yield f"[主持人调用失败: {e}]"
