@@ -1,0 +1,27 @@
+{
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "agent": "./agent.py:agent",
+    "dept_0": "./cow_graphs.py:dept_0",
+    "dept_1": "./cow_graphs.py:dept_1",
+    "dept_2": "./cow_graphs.py:dept_2",
+    "dept_3": "./cow_graphs.py:dept_3",
+    "gm": "./cow_graphs.py:gm"
+  },
+  "env": ".env",
+  "checkpointer": {
+    "path": "./checkpointer.py:make_checkpointer"
+  },
+  "store": {
+    "path": "./store.py:make_store"
+  },
+  "http": {
+    "app": "./office.py:app"
+  },
+  "auth": {
+    "path": "./auth.py:auth",
+    "disable_studio_auth": true
+  }
+}

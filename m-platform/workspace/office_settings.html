@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理员面板 · 助手工作平台</title>
+<style>
+:root{--bg:#1a1a1e;--panel:#212126;--panel2:#2a2a30;--border:#3a3a42;--txt:#e8e8ec;--sub:#9a9aa5;--accent:#7c5cff;--ok:#4caf7d;--warn:#e6a23c;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);display:flex;height:100vh;overflow:hidden;}
+/* ===== 侧栏（参考 open-webui 管理员面板设计）===== */
+.sidebar{width:230px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+.sidebar h1{font-size:15px;padding:18px 16px 12px;color:var(--txt);display:flex;align-items:center;gap:8px;}
+.sidebar h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
+.nav{flex:1;overflow-y:auto;padding:4px 8px;}
+.nav .group{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;padding:12px 10px 4px;}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--sub);text-decoration:none;font-size:13.5px;cursor:pointer;}
+.nav a:hover{background:var(--panel2);color:var(--txt);}
+.nav a.active{background:var(--accent);color:#fff;}
+.nav a .ico{width:18px;text-align:center;opacity:.9;}
+/* ===== 主区 ===== */
+.main{flex:1;overflow-y:auto;padding:28px 36px;}
+.main h2{font-size:20px;margin-bottom:4px;}
+.main .desc{color:var(--sub);font-size:13px;margin-bottom:22px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;max-width:860px;}
+.card h3{font-size:15px;margin-bottom:4px;}
+.card .hint{font-size:12.5px;color:var(--sub);margin-bottom:14px;}
+.row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:16px;}
+.row:last-child{border-bottom:none;}
+.row .label{font-size:13.5px;}
+.row .label small{display:block;color:var(--sub);font-size:12px;margin-top:2px;}
+input[type=text],input[type=password],select{background:var(--panel2);border:1px solid var(--border);color:var(--txt);border-radius:8px;padding:8px 12px;font-size:13px;min-width:280px;}
+input:focus,select:focus{outline:none;border-color:var(--accent);}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle .slider{position:absolute;inset:0;background:var(--border);border-radius:22px;cursor:pointer;transition:.2s;}
+.toggle .slider:before{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.2s;}
+.toggle input:checked+.slider{background:var(--ok);}
+.toggle input:checked+.slider:before{transform:translateX(18px);}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13.5px;cursor:pointer;}
+.btn:hover{opacity:.9;}
+.btn.ghost{background:var(--panel2);border:1px solid var(--border);color:var(--txt);}
+.btn.mini{padding:5px 12px;font-size:12px;}
+.tag{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);color:var(--sub);}
+.tag.ok{color:var(--ok);border-color:var(--ok);}
+.tag.build{color:var(--warn);border-color:var(--warn);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);}
+th{color:var(--sub);font-weight:500;font-size:12px;}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ok);color:#fff;padding:10px 20px;border-radius:8px;font-size:13.5px;display:none;}
+/* ===== 顶栏 ===== */
+.topbar{position:sticky;top:-28px;margin:-28px -36px 20px;padding:14px 36px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;z-index:5;}
+.topbar .who{font-size:13px;color:var(--sub);}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;background:var(--panel2);font-size:12px;color:var(--sub);margin-left:8px;}
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <h1><span class="dot"></span>管理员面板</h1>
+  <div class="nav" id="nav">
+    <div class="group">设置</div>
+    <a data-p="general" class="active"><span class="ico">⚙️</span>通用</a>
+    <a data-p="external"><span class="ico">🔗</span>外部连接</a>
+    <a data-p="models"><span class="ico">🧠</span>模型</a>
+    <a data-p="agents"><span class="ico">🐎</span>工人岗矩阵</a>
+    <a data-p="scribe"><span class="ico">📖</span>记录器</a>
+    <a data-p="memory"><span class="ico">💾</span>记忆</a>
+    <div class="group">管理</div>
+    <a data-p="api"><span class="ico">🔑</span>API 密钥</a>
+    <a data-p="interface"><span class="ico">🖥️</span>接口</a>
+    <a data-p="eval"><span class="ico">📊</span>评估</a>
+    <a data-p="about"><span class="ico">ℹ️</span>关于</a>
+  </div>
+</nav>
+
+<main class="main" id="main"></main>
+<div class="toast" id="toast">已保存 ✓</div>
+
+<script>
+const S = {general:{}, external:{providers:[]}, models:{}, agents:{}, scribe:{}, memory:{}, api:{}, interface:{}, eval:{}, about:{}};
+let page = "general";
+
+async function loadAll(){
+  try{ const r = await fetch("/settings"); Object.assign(S, await r.json()); }catch(e){ console.warn("settings load fail",e); }
+  render();
+}
+function toast(){ const t=document.getElementById("toast"); t.style.display="block"; setTimeout(()=>t.style.display="none",1600); }
+async function save(section, data){
+  const r = await fetch("/settings/"+section, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+  if(r.ok) toast(); else alert("保存失败 "+r.status);
+}
+async function fetchModels(name, baseUrl, keyInputId){
+  const key = document.getElementById(keyInputId)?.value || "";
+  const r = await fetch("/providers/fetch_models", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name, base_url:baseUrl, key})});
+  const j = await r.json();
+  alert(j.ok ? (name+" 拉到 "+j.count+" 个模型：\n"+j.models.slice(0,15).join("\n")) : ("失败："+JSON.stringify(j)));
+}
+
+/* ============ 各页渲染（open-webui 管理员面板结构，功能逐块接入） ============ */
+const P = {};
+
+P.general = () => `
+<h2>通用</h2><div class="desc">工作平台基础设置</div>
+<div class="card"><h3>身份</h3><div class="hint">平台对外的主身份</div>
+  <div class="row"><div class="label">主助手名称<small>前端名牌与 system prompt 主体</small></div><input type="text" id="g_name" value="${S.general.assistant_name||"Mia"}"></div>
+  <div class="row"><div class="label">语言<small>界面与回复语言</small></div><select><option>中文（简体）</option></select></div>
+</div>
+<div class="card"><h3>聊天</h3>
+  <div class="row"><div class="label">新对话默认进入后台任务队列<small>组长先拆派再干活</small></div><label class="toggle"><input type="checkbox" checked onchange="S.general.boss_first=this.checked"><span class="slider"></span></label></div>
+  <div class="row"><div class="label">流式输出</div><label class="toggle"><input type="checkbox" checked disabled><span class="slider"></span></label></div>
+  <button class="btn" onclick='save("general",{assistant_name:document.getElementById("g_name").value})'>保存</button>
+</div>`;
+
+P.external = () => `
+<h2>外部连接</h2><div class="desc">OpenAI 兼容服务商（open-webui 同款：连接 + 拉模型 + key 打码存储）</div>
+<div class="card"><h3>服务商</h3><div class="hint">点"拉取模型"验证连通并缓存模型列表</div>
+  <table><tr><th>名称</th><th>Base URL</th><th>Key</th><th>模型缓存</th><th></th></tr>
+  ${(S.external.providers||[]).map((p,i)=>`<tr>
+    <td>${p.name||""}</td><td style="font-size:12px">${p.base_url||""}</td>
+    <td class="tag">${p.key_masked||"••••"}</td>
+    <td class="tag ${(p.models_cache||[]).length?"ok":""}">${(p.models_cache||[]).length||0} 个</td>
+    <td><button class="btn ghost mini" onclick="reFetch(${i})">拉取模型</button></td></tr>`).join("") || `<tr><td colspan=5 style="color:var(--sub)">暂无服务商</td></tr>`}
+  </table>
+  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+    <input type="text" id="np_name" placeholder="名称（如 魔搭/书生/智谱）" style="min-width:150px">
+    <input type="text" id="np_url" placeholder="https://.../v1" style="min-width:260px">
+    <input type="password" id="np_key" placeholder="API Key（选填，已存则留空）" style="min-width:200px">
+    <button class="btn" onclick='addProvider()'>添加连接</button>
+  </div>
+</div>`;
+async function addProvider(){
+  const p = {name:np_name.value, base_url:np_url.value};
+  const k = np_key.value; if(k) p.key = k;
+  S.external.providers.push(p);
+  await save("external", S.external); loadAll();
+}
+async function reFetch(i){
+  const p = S.external.providers[i];
+  await fetchModels(p.name, p.base_url, null);
+  loadAll();
+}
+
+P.models = () => `
+<h2>模型</h2><div class="desc">默认模型与各角色映射（改完保存进 agents_config.json 生效需重建容器）</div>
+<div class="card"><h3>角色 → 模型映射</h3><div class="hint">boss=主助手 / 其余为工人岗；provider: ms=魔搭 ss=书生 ds=智谱</div>
+  <table><tr><th>角色</th><th>服务商</th><th>模型</th></tr>
+  ${Object.entries({boss:"助手(组长)",coder:"代码工人岗",researcher:"研究工人岗",planner:"策划工人岗",archivist:"档案工人岗",visual:"识图工人岗",scribe:"记录器"}).map(([k,v])=>`
+  <tr><td>${v}</td>
+  <td><select id="m_${k}" style="min-width:90px">${["ms","ss","ds"].map(x=>`<option ${(S.agents?.[k]?.provider||"ms")===x?"selected":""}>${x}</option>`).join("")}</select></td>
+  <td><input type="text" id="mm_${k}" value="${S.agents?.[k]?.model||""}" style="min-width:280px"></td></tr>`).join("")}
+  </table>
+  <div style="margin-top:14px"><button class="btn" onclick='saveModels()'>保存映射</button>
+  <span class="badge">保存后需 docker build 重启生效</span></div>
+</div>`;
+async function saveModels(){
+  const keys=["boss","coder","researcher","planner","archivist","visual","scribe"], out={};
+  keys.forEach(k=>out[k]={provider:document.getElementById("m_"+k).value, model:document.getElementById("mm_"+k).value});
+  await save("agents", out);
+}
+
+P.agents = () => `
+<h2>工人岗矩阵</h2><div class="desc">SubAgent 团队（deepagents）</div>
+<div class="card"><h3>在编工人岗（1 组长 + 6）</h3>
+  <table><tr><th>名字</th><th>职责</th><th>状态</th></tr>
+  <tr><td>助手 (boss)</td><td>组长：守铁律、拆派、汇总；记录器的主人</td><td class="tag ok">在编</td></tr>
+  <tr><td>coder</td><td>代码/文件/表格</td><td class="tag ok">在编</td></tr>
+  <tr><td>researcher</td><td>秘塔/博查/Tavily 搜索调研</td><td class="tag ok">在编</td></tr>
+  <tr><td>planner</td><td>方案/文章</td><td class="tag ok">在编</td></tr>
+  <tr><td>archivist</td><td>记忆/归档</td><td class="tag ok">在编</td></tr>
+  <tr><td>visual</td><td>识图（书生多模态）</td><td class="tag ok">在编</td></tr>
+  <tr><td>scribe</td><td>助手专属记录器：查笔记提醒+随手记账</td><td class="tag ok">在编</td></tr>
+  </table>
+  <div class="hint" style="margin-top:10px">添加/修改工人岗：改 agents_config.json + agent_multimodel.py（功能块后续接入此页）</div>
+</div>`;
+
+P.scribe = () => `
+<h2>记录器</h2><div class="desc">助手的铁律守门人</div>
+<div class="card"><h3>行为开关</h3>
+  <div class="row"><div class="label">动手前强制查笔记<small>每次任务先 scribe search</small></div><label class="toggle"><input type="checkbox" ${S.scribe.remind_read!==false?"checked":""} onchange="S.scribe.remind_read=this.checked;save('scribe',S.scribe)"><span class="slider"></span></label></div>
+  <div class="row"><div class="label">干完活随手记时间线<small>notes tl 自动触发</small></div><label class="toggle"><input type="checkbox" ${S.scribe.auto_tl!==false?"checked":""} onchange="S.scribe.auto_tl=this.checked;save('scribe',S.scribe)"><span class="slider"></span></label></div>
+  <div class="row"><div class="label">故障四要素日记<small>现象/报错/根因/修复 缺一不存</small></div><label class="toggle"><input type="checkbox" checked disabled><span class="slider"></span></label></div>
+</div>
+<div class="card"><h3>共享账本位置</h3><div class="row"><div class="label">notes 根目录</div><input type="text" value="mia_home/notes/" disabled style="min-width:260px"></div></div>`;
+
+P.memory = () => `
+<h2>记忆</h2><div class="desc">持久化存储</div>
+<div class="card"><h3>后端</h3>
+  <div class="row"><div class="label">Checkpointer（对话历史）</div><span class="tag ok">PostgreSQL m 库</span></div>
+  <div class="row"><div class="label">Store（长期记忆）</div><span class="tag ok">PostgreSQL m 库</span></div>
+  <div class="row"><div class="label">永久记忆落盘</div><span class="tag ok">mia_home/memories/</span></div>
+  <div class="row"><div class="label">Redis 队列</div><span class="tag ok">已连接</span></div>
+</div>
+<div class="card"><h3>笔记库</h3><div class="hint">与 open-terminal 共享，随镜像构建进 mia_home/notes/</div>
+  <div class="row"><div class="label">config 篇数</div><span class="tag">45+（持续同步）</span></div>
+</div>`;
+
+P.api = () => `
+<h2>API 密钥</h2><div class="desc">平台级密钥（容器环境变量注入，此处只读展示）</div>
+<div class="card">
+  <div class="row"><div class="label">LangSmith API Key<small>可选服务（自行配置）</small></div><span class="tag ok">已配置（lsv2_pt_••••••）</span></div>
+  <div class="row"><div class="label">智谱 OPENAI_API_KEY</div><span class="tag ok">已配置（••••••••）</span></div>
+  <div class="row"><div class="label">秘塔 / 博查 / Tavily</div><span class="tag">经 search_tools.py 管理</span></div>
+</div>
+<div class="card"><h3>说明</h3><div class="hint">改密钥 = 改 docker-compose.yml environment 后 docker compose up -d（不用 build）</div></div>`;
+
+P.interface = () => `
+<h2>接口</h2><div class="desc">端口与端点</div>
+<div class="card">
+  <div class="row"><div class="label">平台 API</div><span class="tag">localhost:2024（/docs 车间）</span></div>
+  <div class="row"><div class="label">办公室设置页</div><span class="tag">2024/settings_page</span></div>
+  <div class="row"><div class="label">前端</div><span class="tag">localhost:3000</span></div>
+  <div class="row"><div class="label">SearXNG</div><span class="tag">18080</span></div>
+  <div class="row"><div class="label">n8n</div><span class="tag">15678</span></div>
+</div>`;
+
+P.eval = () => `
+<h2>评估</h2><div class="desc">工人岗绩效与任务回放</div>
+<div class="card"><h3>建设中</h3><div class="hint">规划：每次 run 记录（谁干的/耗时/模型/结果），此页出统计排行。功能后补。</div><span class="tag build">🚧 BUILDING</span></div>`;
+
+P.about = () => `
+<h2>关于</h2>
+<div class="card">
+  <div class="row"><div class="label">平台</div><span class="tag">助手工作平台 · 后台任务队列（langgraph-api + deepagents）</span></div>
+  <div class="row"><div class="label">构建</div><span class="tag">m-platform:latest（2026-08-28 通关版）</span></div>
+  <div class="row"><div class="label">运行模式</div><span class="tag ok">LangSmith lite mode</span></div>
+  <div class="row"><div class="label">运维笔记</div><span class="tag">config/0033 五小时战役全录</span></div>
+</div>`;
+
+/* ============ 路由 ============ */
+document.getElementById("nav").addEventListener("click", e=>{
+  const a = e.target.closest("a"); if(!a) return;
+  document.querySelectorAll(".nav a").forEach(x=>x.classList.remove("active"));
+  a.classList.add("active"); page = a.dataset.p; render();
+});
+function render(){ document.getElementById("main").innerHTML = (P[page]||P.general)(); }
+loadAll();
+</script>
+</body>
+</html>

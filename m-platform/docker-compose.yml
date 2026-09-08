@@ -1,0 +1,173 @@
+# ============================================================
+# 助手办公室 · 全家桶 compose v2（2026-08-28）
+# 部署位置：D:\m\docker-compose.yml
+# ============================================================
+
+services:
+
+  # ── ① 办公室+工作平台：镜像可由 workspace/Dockerfile 本地构建 ──
+  workplatform:
+    image: m-platform:latest
+    build:
+      context: ./workspace
+    # R10.5（评审C P2 运维级兜底）：即使代码层体积闸漏了，OOM 只死本容器，宿主和邻居无感
+    mem_limit: 2g
+    ports:
+      - "127.0.0.1:2024:8000"   # R68 P0：只绑回环（五家评审同锤"局域网可达"根因），助手/内部走 docker 网不受影响
+    environment:
+      # R10.5c（管理员抓的时区 bug）：容器默认 UTC，审计/账本时间戳比北京慢 8 小时——统一本地时区
+      - TZ=Asia/Shanghai
+      # R10.6 守卫外置：管理员钥匙真源=m-guard（宿主 SYSTEM/用户 DPAPI，只答验证不外发明文）
+      - M_GUARD_URL=http://host.docker.internal:9101
+      # guard communication key (M_GUARD_KEY) — requests without it are rejected; see SECURITY.md
+      - M_GUARD_KEY=${M_GUARD_KEY}
+      - DATABASE_URI=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/m
+      - REDIS_URI=redis://redis:6379
+      # 密钥一律从同目录 .env 读取（compose 自动加载），文件里不再写死任何密钥
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      # R65：OPENAI_* 托底已废（配置页 external 节=唯一服务商源），compose 不再注入
+      - SEARXNG_URL=http://searxng:8080
+      # R76 execute 沙箱：SandboxedShellBackend 用它连沙箱执行服务（.env 里同值，两端配对）
+      - SANDBOX_TOKEN=${SANDBOX_TOKEN}
+      # R80（评审C P1）：沙箱已出 mia 网，runner 改经宿主回环（127.0.0.1:9090 发布）调用
+      - SANDBOX_EXEC_URL=http://host.docker.internal:9090/exec
+      # R82 CodeBuddy 代理层：真 key 只进本进程（沙箱工人岗走 /codebuddy + 代理钥匙，见 office.py）
+      - CODEBUDDY_BASE_URL=${CODEBUDDY_BASE_URL}
+      - CODEBUDDY_API_KEY=${CODEBUDDY_API_KEY}
+      - CODEBUDDY_PROXY_TOKEN=${CODEBUDDY_PROXY_TOKEN}
+      # R10：/vision 二级钥匙——office 是校验方必须有它（沙箱带钥匙来，office 拿钥匙验）
+      - VISION_PROXY_TOKEN=${VISION_PROXY_TOKEN}
+      # R10.2（评审C P2）：/rag/query 二级钥匙——三扇门之一从"说开实际锁"改成真开（工人岗带它检索）
+      - RAG_PROXY_TOKEN=${RAG_PROXY_TOKEN}
+      # R79（hy4 复检）：/tasks/webhook 内部回调钥匙——langgraph 服务端按 dispatch 给的 URL 原样回调，
+      # 沙箱/助手无此 env=伪造不了"自动汇报"消息注入管理员对话
+      - WEBHOOK_TOKEN=${WEBHOOK_TOKEN}
+      # langgraph 原生 API 鉴权：custom auth 经 LANGGRAPH_AUTH 启用（AuthConfig JSON 必填，
+      # 格式见 .env.example——缺了原生口裸奔，只剩 office 门）。
+      - LANGGRAPH_AUTH_TYPE=custom
+      - LANGGRAPH_AUTH=${LANGGRAPH_AUTH}   # AuthConfig JSON 在 .env（含空格不便直接写 YAML）
+      # R79②：明文密钥文件挪出 src 面 → /data/secrets（宿主 D:\m\secrets，沙箱不挂此目录）
+      - MIA_SECRETS_PATH=/data/secrets/.settings_secrets
+      # R64 图注册（含调度 gm）——compose 覆盖镜像 ENV，加图不用 rebuild 镜像
+      - LANGSERVE_GRAPHS={"agent":"/deps/outer-workspace/src/agent.py:agent","dept_0":"/deps/outer-workspace/src/cow_graphs.py:dept_0","dept_1":"/deps/outer-workspace/src/cow_graphs.py:dept_1","dept_2":"/deps/outer-workspace/src/cow_graphs.py:dept_2","dept_3":"/deps/outer-workspace/src/cow_graphs.py:dept_3","gm":"/deps/outer-workspace/src/cow_graphs.py:gm"}
+    volumes:
+      - D:\m\workspace:/deps/outer-workspace/src:ro   # R75 物理墙：源码只读——助手 execute 混淆也改不动自己的"脑"（四家评审同锤应用层自锁可绕，此处上物理层）
+      - D:\m\workspace\settings.json:/deps/outer-workspace/src/settings.json          # 运行时确需写的少数文件，逐个开 rw 口子（:ro 父挂载之上的子绑定）
+      # R79②：.settings_secrets 挂载已撤——密钥挪 D:\m\secrets（下一行），src 面上不再有明文密钥可读/可写
+      - D:\m\secrets:/data/secrets
+      - D:\m\workspace\providers.json:/deps/outer-workspace/src/providers.json
+      - D:\m\workspace\departments_config.json:/deps/outer-workspace/src/departments_config.json
+      - D:\m\workspace\mia_home:/deps/outer-workspace/src/mia_home                     # 数据区（记忆/任务/用量/文件）整目录读写=助手该写的都在这
+      - D:\m\skills:/deps/outer-workspace/src/mia_home/skills:ro                       # R80 skills 洞：技能真源挪 D:\m\skills，只读视图挂回原位（SkillsMiddleware 零改动照常读；写=EROFS）
+      # R79④：control/:ro 挂载与 MIA_TIER_FILE 已随"带外档位地板"退役（_level 单源=settings.general.confirmLevel）；
+      # 宿主 D:\m\control\mia_tier 文件保留作历史档案，不再被任何代码读取
+      # R75 已撤 /var/run/docker.sock 裸挂载（评审C/评审B 实测=docker run -v 挂 control 改档位的"第三条路"+宿主逃逸）；容器管理待范围轴用只读代理再给
+    depends_on:
+      - postgres
+      - redis
+      - sandbox
+    networks: [mia]
+    restart: unless-stopped
+
+  # ──  沙箱：干活执行环境（重权限层）──
+  # R76：沙箱兼作 execute 的隔离执行场——只挂数据区 /data/mia_home，**没有** settings/源码/control，
+  # 助手的 shell 物理上碰不到平台的"锁和脑"。执行服务由 sandbox_runner.py 提供（:ro 挂入）。
+  # R78：sandbox 镜像=固化了 CodeBuddy CLI（BYOK 魔搭免登录），容器里 -y 全权模式安全（笼中 root）。
+  # R80（评审C P1 终审·langgraph 原生 API 全裸案）：沙箱物理摘出 mia 网——它对本平台的合法 HTTP 需求是零
+  # （runner 只收不发、CodeBuddy 走外网 NAT）。此前同网=原生路由（/threads·/runs·store 等，不经 office
+  # token 中间件）全裸：沙箱一条 curl 可枚举/读管理员全部对话、向任意线程注入消息、store 投毒。
+  # 出网后整族物理死；runner 改经宿主回环发布，workplatform 走 host.docker.internal 调用（保持执行能力）。
+  sandbox:
+    image: mia-sandbox:local
+    build:
+      context: ./sandbox
+    command: python3 /runner.py
+    ports:
+      - "127.0.0.1:9090:9000"   # R80：runner 执行服务仅宿主回环发布（X-Token 鉴权照旧）
+    volumes:
+      - D:\m\workspace\sandbox_runner.py:/runner.py:ro
+      - D:\m\workspace\mia_home:/data/mia_home
+      # R10.11（评审E P0-1）：memory 沙箱侧只读——MEMORY.md 每轮进 system prompt，沙箱可写=持久化注入正门
+      # （对照 skills 同款双层防护：本行 :ro + 写入只走主进程 edit_memory/记录器，有确认门与结构）
+      - D:\m\workspace\mia_home\memory:/data/mia_home/memory:ro
+      - D:\m\skills:/data/mia_home/skills:ro    # R80 skills 注入洞（评审A/评审C 方案）：技能只读视图（真源=D:\m\skills），写=EROFS
+      - D:\sandbox-workspace\cli-home:/data/cli-home   # R78：CLI 助手的持久工作区（产出/配置不随容器销毁）
+      # R82 编程合法区：工人岗写代码的项目工作区（宿主草稿区，读写自由；与宿主真文件和平台源码物理隔离）
+      - D:\sandbox-workspace\projects:/data/projects
+    environment:
+      - TZ=Asia/Shanghai   # R10.5c：runner 审计时间戳同 UTC 坑
+      - SANDBOX_TOKEN=${SANDBOX_TOKEN}
+      - SANDBOX_DATA_DIR=/data/mia_home
+      # R80（评审C P1 复检：R78 自伤）——CODEBUDDY_* 三 env 撤出沙箱：BYOK key 之前挂在 execute 笼子的
+      # env 墙上（助手 printenv 即读走，实测实锤）。容器 CLI 仍留镜像；要用时
+      # docker exec -e CODEBUDDY_API_KEY=... 临时注入，或走宿主 codebuddy（hy3/hy4 免费档=09-04 主力）
+      # R82 工人岗编程正门：CLI 指到 workplatform 代理层——BASE_URL 走宿主回环（沙箱出网后唯一可达路），
+      # API_KEY 填【代理钥匙】（只值调 /codebuddy 的额度，真魔搭 key 不在笼内）
+      - CODEBUDDY_BASE_URL=http://host.docker.internal:2024/codebuddy
+      - CODEBUDDY_API_KEY=${CODEBUDDY_PROXY_TOKEN}
+      - CODEBUDDY_MODEL=${CODEBUDDY_MODEL}
+      # R10（评审A C'）：识图二级钥匙——工人岗经宿主回环带它调 /vision，只值识图额度，无任何管理权限
+      - VISION_PROXY_TOKEN=${VISION_PROXY_TOKEN}
+      # R10.2（评审C P2）：检索二级钥匙——工人岗经宿主回环带它调 /rag/query（X-Proxy-Key 头）
+      - RAG_PROXY_TOKEN=${RAG_PROXY_TOKEN}
+    networks: [sandbox-isolated]
+    restart: unless-stopped
+
+  # ── ③ SearXNG：搜索（六引擎优化版）──
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "127.0.0.1:18080:8080"   # R73（评审D低危）：绑回环，局域网不再可达；8081/8082被Hyper-V保留段(8041-8140)占用,用18080(实测空闲)
+    volumes:
+      - D:\m\searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:18080/
+    networks: [mia]
+    restart: unless-stopped
+
+  # ── ④ n8n：工作流自动化 ──
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "127.0.0.1:15678:5678"   # R73（评审D低危）：绑回环，局域网不再可达；挪到高位防以后撞车
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:15678/
+      - GENERIC_TIMEZONE=Asia/Shanghai
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks: [mia]
+    restart: unless-stopped
+
+  # ── ⑤ PostgreSQL：对话历史/线程持久化 + pgvector（RAG 向量检索，R43 升级）──
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=m
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks: [mia]
+    restart: unless-stopped
+
+  # ── ⑥ Redis：队列/缓存 ──
+  redis:
+    image: redis:7-alpine
+    networks: [mia]
+    restart: unless-stopped
+
+  # ── Ollama 说明（2026-08-30）：管理员 Windows 本机已装 Ollama（11434），容器不再重复起。
+  # 平台容器内访问本机 Ollama 用 http://host.docker.internal:11434（mxbai/bge/qwen2.5 都在本机）。
+
+volumes:
+  pg_data:
+  n8n_data:
+
+networks:
+  mia:
+    driver: bridge
+  # R80：沙箱独立网（与 mia 零互通）——出站 NAT 照常（CodeBuddy/pip 可用），入站仅宿主回环 9090
+  sandbox-isolated:
+    driver: bridge
