@@ -1,0 +1,182 @@
+# ══════════════════════════════════════════════════════════════
+# SearXNG 优化版 settings.yml（无代理/VPN 友好版）
+# 生成：助手 2026-08-23 | 基于管理员原配置 + 实测可达性
+#
+# 改动要点：
+#   1. default_lang: zh-CN → "all"（英文查询不再被强制中文）
+#   2. request_timeout: 3.0 → 10.0（国内网络别太急）
+#   3. 新增 6 个国内无代理实测可达引擎（百度/搜狗/Yandex/GitHub/StackOverflow/Mojeek）
+#   4. GitHub/StackOverflow 归入 general 类别，普通查询也能搜到技术站
+#   5. 界面默认中文
+#
+# ⚠️ 千万别加这些引擎（无代理必挂，会拖慢/ban）：
+#   google, duckduckgo, brave, qwant, startpage, wikipedia,
+#   reddit, youtube, twitter, facebook, instagram, ecosia
+# ══════════════════════════════════════════════════════════════
+
+general:
+  debug: false
+  instance_name: "my-searxng"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: true
+  open_metrics: ''
+
+brand:
+  new_issue_url: https://github.com/searxng/searxng/issues/new
+  docs_url: https://docs.searxng.org/
+  public_instances: https://searx.space
+  wiki_url: https://github.com/searxng/searxng/wiki
+  issue_url: https://github.com/searxng/searxng/issues
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  autocomplete_min: 4
+  favicon_resolver: ""
+  default_lang: "all"            # ← 改：不再强制中文，英文查询能出英文
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 600      # ← 改：容错更高
+  suspended_times:
+    SearxEngineAccessDenied: 86400
+    SearxEngineCaptcha: 86400
+    SearxEngineTooManyRequests: 3600
+    cf_SearxEngineCaptcha: 1296000
+    cf_SearxEngineAccessDenied: 86400
+    recaptcha_SearxEngineCaptcha: 604800
+  formats:
+    - html
+    - json
+
+server:
+  port: 8888
+  bind_address: "0.0.0.0"
+  base_url: http://localhost:8080/
+  limiter: false
+  public_instance: false
+  secret_key: "CHANGE-ME-random-64-hex"   # 生成：python -c "import secrets;print(secrets.token_hex(32))"
+  image_proxy: false
+  http_protocol_version: "1.0"
+  method: "POST"
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-Download-Options: noopen
+    X-Robots-Tag: noindex, nofollow
+    Referrer-Policy: no-referrer
+
+ui:
+  static_path: ""
+  static_use_hash: false
+  templates_path: ""
+  query_in_title: false
+  infinite_scroll: false
+  default_theme: simple
+  center_alignment: false
+  default_locale: ""  # R44 修复：新版 SearXNG 不认 zh-CN，留空跟随浏览器
+  search_on_category_select: true
+  hotkeys: default
+  url_formatting: pretty
+  theme_args:
+    simple_style: auto
+
+outgoing:
+  request_timeout: 10.0          # ← 改：3秒太短，国内网络容易超时
+  useragent_suffix: ""
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+
+doi_resolvers:
+  oadoi.org: 'https://oadoi.org/'
+  doi.org: 'https://doi.org/'
+  doai.io: 'https://dissem.in/'
+  sci-hub.se: 'https://sci-hub.se/'
+  sci-hub.st: 'https://sci-hub.st/'
+  sci-hub.ru: 'https://sci-hub.ru/'
+default_doi_resolver: 'oadoi.org'
+
+categories_as_tabs:
+  general:
+  images:
+  videos:
+  news:
+  it:                            # ← 新增：技术分类
+
+engines:
+  # ───────── 必应系列（管理员原有，保留）─────────
+  - name: bing
+    engine: bing
+    shortcut: bi
+    categories: [general]
+    disabled: false
+    base_url: "https://cn.bing.com/search"
+    timeout: 5.0
+  - name: bing images
+    engine: bing_images
+    shortcut: bii
+    categories: [images]
+    disabled: false
+    base_url: "https://cn.bing.com/images/search"
+  - name: bing news
+    engine: bing_news
+    shortcut: bin
+    categories: [news]
+    disabled: false
+    base_url: "https://cn.bing.com/news/search"
+  - name: bing videos
+    engine: bing_videos
+    shortcut: biv
+    categories: [videos]
+    disabled: false
+    base_url: "https://cn.bing.com/videos/search"
+
+  # ───────── 新增：无代理实测可达引擎 ─────────
+
+  # 百度 - 中文网页搜索（国内最强中文源）
+  - name: baidu
+    engine: baidu
+    shortcut: bd
+    categories: [general]
+    disabled: false
+    timeout: 5.0
+
+  # 搜狗 - 中文网页 + 微信文章
+  - name: sogou
+    engine: sogou
+    shortcut: sg
+    categories: [general]
+    disabled: false
+    timeout: 5.0
+
+  # Yandex - 俄系引擎，中英都能搜，无代理可达（英文备用主力）
+  - name: yandex
+    engine: yandex
+    shortcut: ya
+    categories: [general, images, videos, news]
+    disabled: false
+    timeout: 8.0
+
+  # GitHub - 搜仓库/代码（技术英文王牌）
+  - name: github
+    engine: github
+    shortcut: gh
+    categories: [general, it]
+    disabled: false
+    timeout: 8.0
+
+  # StackOverflow - 技术问答
+  - name: stackoverflow
+    engine: stackoverflow
+    shortcut: so
+    categories: [general, it]
+    disabled: false
+    timeout: 8.0
+
+  # Mojeek - 独立英文搜索引擎（无代理可达）
+  - name: mojeek
+    engine: mojeek
+    shortcut: mj
+    categories: [general]
+    disabled: false
+    timeout: 8.0

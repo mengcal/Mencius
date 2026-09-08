@@ -1,0 +1,44 @@
+# ---- 密钥与凭证（绝不入库）----
+.env
+*.token
+secrets/
+.settings_secrets
+*.pem
+*.key
+
+# ---- 用户数据 ----
+mia_home/
+backups/
+*.db
+*.sqlite*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.eslintcache
+
+# ---- 日志与临时 ----
+*.log
+logs/
+tmp/
+.cache/
+
+# ---- IDE / 系统 ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---- 评审随附信件（发包用，永不入库）----
+00-*.txt
+01-预检*.md
