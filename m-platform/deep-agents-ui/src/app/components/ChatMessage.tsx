@@ -73,6 +73,18 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     const hasContent = messageContent && messageContent.trim() !== "";
     const hasToolCalls = toolCalls.length > 0;
     const [toolsOpen, setToolsOpen] = useState(false); // R54 工人岗进程折叠：默认收起，想看才展开
+    // 确认门拦截组：组内有 ⛔ 拦截 → 标题亮"待批准"并自动展开一次，批准按钮不再藏在折叠层后
+    const blockedCount = useMemo(
+      () =>
+        toolCalls.filter(
+          (t: ToolCall) =>
+            t.name !== "task" && typeof t.result === "string" && t.result.includes("⛔")
+        ).length,
+      [toolCalls]
+    );
+    useEffect(() => {
+      if (blockedCount > 0) setToolsOpen(true);
+    }, [blockedCount]);
     // R46 工具显隐即时生效：状态化 + 监听 storage/自定义事件（原先每渲染直读 localStorage，切开关不刷新就无效）
     const [showTools, setShowTools] = useState(
       typeof window !== "undefined" ? localStorage.getItem("mia.showToolCalls") !== "false" : true
@@ -247,7 +259,11 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                       <span>{toolsOpen ? "▾" : "▸"}</span>
                       <span>
                         🔧 工人岗执行了 {visible.length} 个工具调用
-                        {done === visible.length ? "（已完成）" : "（进行中）"}
+                        {blockedCount > 0
+                          ? "（⛔ 待批准）"
+                          : done === visible.length
+                            ? "（已完成）"
+                            : "（进行中）"}
                         {!toolsOpen && names.length > 0 && (
                           <span className="ml-1 opacity-70">
                             {names.join(" / ")}

@@ -99,6 +99,24 @@ skills/               技能目录（放入你的 .md 技能文件，compose 只
 searxng/              元搜索引擎配置
 ```
 
+## 国内网络加速（可选，强烈建议）
+
+本平台是"全家桶"，部署时要拉三类材料：Docker 镜像（六个容器）、npm 包（前端）、pip 包（后端）。
+国内直连都慢，一次配好：
+
+1. **Docker Hub 加速**：Docker Desktop → Settings → Docker Engine，加入
+   `"registry-mirrors": ["https://docker.m.daocloud.io"]`
+   （公共加速源时效性强，失效就换一个，或自备代理）。compose 要拉的
+   langgraph-api / pgvector / redis / n8n / searxng 全走这里，省九成等待。
+2. **npm 走 npmmirror**（淘宝源）：
+   ```bash
+   npm install --registry=https://registry.npmmirror.com
+   ```
+3. **pip/apt 不用操心**：`workspace/Dockerfile` 已内置清华 TUNA 镜像源，构建镜像时自动生效。
+
+> 注：本 README 的"码云/Gitee"没有任何作用——Gitee 是代码托管不是软件源，
+> 装东西快慢取决于上面三件事，不是 clone 地址。
+
 ## 安全模型
 
 详见 [SECURITY.md](SECURITY.md)。要点：密钥 DPAPI 落盘不出宿主、五级密钥隔离、

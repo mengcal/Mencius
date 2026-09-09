@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useQueryState } from "nuqs";
 import { API, apiFetch } from "@/lib/apiBase";
 import { authHeaders } from "@/lib/providerApi";  // R10（评审E P1-1）：/approvals 在 token 门内，批准按钮必须带 Bearer
@@ -62,7 +62,22 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
       };
     }, [toolCall]);
 
+    // 确认门拦截卡自动展开修复：isExpanded 是挂载时初始值，历史线程加载时 result 尚未挂上、
+    // 拦截内容到达后不会重算，批准按钮会藏在折叠层里。result 含 ⛔ 时补一次强制展开。
+    const blocked = typeof result === "string" && result.includes("⛔");
+    useEffect(() => {
+      if (blocked) setIsExpanded(true);
+    }, [blocked]);
+
     const statusIcon = useMemo(() => {
+      if (blocked) {
+        return (
+          <StopCircle
+            size={14}
+            className="text-orange-500"
+          />
+        );
+      }
       switch (status) {
         case "completed":
           return <CircleCheckBigIcon />;
@@ -95,7 +110,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
             />
           );
       }
-    }, [status]);
+    }, [status, blocked]);
 
     const toggleExpanded = useCallback(() => {
       setIsExpanded((prev) => !prev);
@@ -131,6 +146,11 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
               {statusIcon}
               <span className="text-[15px] font-medium tracking-[-0.6px] text-foreground">
                 {name}
+                {blocked && (
+                  <span className="ml-2 rounded bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-medium text-orange-500">
+                    ⛔ 待批准
+                  </span>
+                )}
               </span>
             </div>
             {hasContent &&
