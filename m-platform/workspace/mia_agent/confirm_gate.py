@@ -211,19 +211,17 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         return str(name).strip().lower() in ConfirmGateMiddleware._NEEDS_EXTERNAL
 
     @staticmethod
-    def _watch_launch(tc: dict, result):
-        """r25（军事链断点3）：start_async_task 放行成功=部门线程开张——
-        把 {部门tid→主线程tid} 登记给 dept_watch，跑完/卡住时它负责唤醒主线程汇报。"""
+    def _watch_launch(tc: dict, result, main_tid: str = ""):
+        """r25（军事链断点3）：start_async_task 放行成功=部门即将开张——登记发起主线程，
+        dept_watch 轮询发现该时刻后新建的部门线程（graph_id ∈ dept_*/gm）run 结束就唤醒主线程。
+        v2 简化（v11/v12 实锤）：不再从工具返回抽 task_id（Command 结构+uuid 前缀撞值不可靠），
+        扫描式按 graph_id 认部门线程，天然支持一次派多部门。"""
         try:
-            if str(tc.get("name")) == "start_async_task":
-                import re as _re
-                m = _re.search(r"task_id:\s*([0-9a-fA-F-]{8,})", str(getattr(result, "content", "") or ""))
-                if m:
-                    from mia_agent import dept_watch
-                    dept_watch.register(m.group(1), ConfirmGateMiddleware._tid(),
-                                        str((tc.get("args") or {}).get("description") or ""))
-        except Exception:
-            pass
+            if str(tc.get("name")) == "start_async_task" and main_tid:
+                from mia_agent import dept_watch
+                dept_watch.register(main_tid, str((tc.get("args") or {}).get("description") or ""))
+        except Exception as _e:
+            print(f"[dept-watch] 登记钩子异常: {_e}", flush=True)
         return result
 
     def _gate(self, request, handler):
@@ -233,7 +231,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         level = self._level()
         dec = self._decision(name, level, tc.get("args"))
         if dec == "pass":
-            return self._watch_launch(tc, handler(request))
+            return self._watch_launch(tc, handler(request), self._tid())
         from langchain_core.messages import ToolMessage
         if dec == "selflock":
             return ToolMessage(content=self._block_msg(name, level, "selflock"), tool_call_id=tc.get("id", ""))
@@ -244,11 +242,16 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         tid = self._tid()
         fp = self._args_fp(tc.get("args"))
         if _ap.consume(tid, name, fp):  # 外部批准（按钮/token）+ 参数指纹一致才放行（R10.2 hy4 ①-1）
-            return self._watch_launch(tc, handler(request))
-        # r25（军事链 v5 实锤）：子层组长派活在编工人岗=其职责本分（军事纪律已限"只准派在编"，
-        # 工人岗的 execute 等危险动作另有严格门兜底）——sub_mode 的 task 降级为口头重试路径，
-        # 不再要外部批准（否则组长派活也要管理员批 fp，而 fp 埋子线程上不来=死锁）。
-        ext_gate = self._needs_external(name) and not (self.sub_mode and name == "task")
+            return self._watch_launch(tc, handler(request), self._tid())
+        # r25（军事链全链大考定稿）：子层"派活"（task 派在编工人岗 / start_async_task 派部门）
+        # =职责本分直接放行——请示门只留给末端危险动作（execute/delete/email/编制）。
+        # 派活拦"外部批准"死在 fp 埋子线程，拦"口头重试"死在子 run 结束无人推进——两头无益。
+        # r25 补（v7 链B 实锤）：子层软写（write_file/edit_file/edit_memory=墙内可逆写）同理
+        # 直接放行——子层没人对它说"我同意"，口头门=死门；物理墙（root_dir=mia_home+沙箱）才是它的笼子。
+        if self.sub_mode and name in ("task", "start_async_task",
+                                      "write_file", "edit_file", "edit_memory"):
+            return self._watch_launch(tc, handler(request), self._tid())
+        ext_gate = self._needs_external(name)
         if ext_gate or self._is_mcp(name):
             # 危险工具/MCP 工具：无外部批准=不放行，重试也没用（批准权在管理员手里）；
             # 指纹登记进 approvals（全局共享，封 ①-4 跨实例锚点分裂）。
@@ -263,7 +266,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         passed = self._pass_once.setdefault(self._tid(), {})
         if passed.get(name) == fp:
             passed.pop(name)
-            return self._watch_launch(tc, handler(request))
+            return self._watch_launch(tc, handler(request), self._tid())
         passed[name] = fp
         self._prune()
         return ToolMessage(content=self._block_msg(name, level, "ask", tc.get("args")), tool_call_id=tc.get("id", ""))
@@ -275,7 +278,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         level = self._level()
         dec = self._decision(name, level, tc.get("args"))
         if dec == "pass":
-            return self._watch_launch(tc, await handler(request))
+            return self._watch_launch(tc, await handler(request), self._tid())
         from langchain_core.messages import ToolMessage
         if dec in ("selflock", "deny"):
             return ToolMessage(content=self._block_msg(name, level, dec), tool_call_id=tc.get("id", ""))
@@ -283,11 +286,12 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         tid = self._tid()
         fp = self._args_fp(tc.get("args"))
         if _ap.consume(tid, name, fp):  # R10.2 与同步门同构：外部批准+参数指纹一致才放行
-            return self._watch_launch(tc, await handler(request))
-        # r25（军事链 v5 实锤）：子层组长派活在编工人岗=其职责本分（军事纪律已限"只准派在编"，
-        # 工人岗的 execute 等危险动作另有严格门兜底）——sub_mode 的 task 降级为口头重试路径，
-        # 不再要外部批准（否则组长派活也要管理员批 fp，而 fp 埋子线程上不来=死锁）。
-        ext_gate = self._needs_external(name) and not (self.sub_mode and name == "task")
+            return self._watch_launch(tc, await handler(request), self._tid())
+        # r25：子层派活/墙内软写直接放行（与同步门同构，危险动作仍请示）
+        if self.sub_mode and name in ("task", "start_async_task",
+                                      "write_file", "edit_file", "edit_memory"):
+            return self._watch_launch(tc, await handler(request), self._tid())
+        ext_gate = self._needs_external(name)
         if ext_gate or self._is_mcp(name):
             _ap.set_blocked(tid, name, fp)
             return ToolMessage(content=self._block_msg(name, level, "ask", tc.get("args"))
@@ -296,7 +300,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         passed = self._pass_once.setdefault(self._tid(), {})
         if passed.get(name) == fp:
             passed.pop(name)
-            return self._watch_launch(tc, await handler(request))
+            return self._watch_launch(tc, await handler(request), self._tid())
         passed[name] = fp
         self._prune()
         return ToolMessage(content=self._block_msg(name, level, "ask", tc.get("args")), tool_call_id=tc.get("id", ""))
