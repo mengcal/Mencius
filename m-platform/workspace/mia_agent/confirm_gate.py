@@ -19,8 +19,10 @@ from langchain.agents.middleware.types import AgentMiddleware  # 原 L213
 class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
     _pass_once: dict
     # 只读白名单（plan 档也只放行这些）；其余按"变更"处理。email 是读/写混合，按 args.action 细分。
+    # 查/列表异步任务是纯读语义（strict 下查进度不该被当变更拦）
     _READONLY = {"ls", "read_file", "glob", "grep", "search_knowledge_base",
-                 "web_search", "web_search_metaso", "web_search_bocha", "web_search_tavily"}
+                 "web_search", "web_search_metaso", "web_search_bocha", "web_search_tavily",
+                 "check_async_task", "list_async_tasks"}
     # auto_edit 档额外放行的"墙内可逆写"（编辑记忆/写工作文件），执行/发信/编制/派活/删除不放。
     _SOFTWRITE = {"write_file", "edit_file", "edit_memory"}
     # 自锁：这些路径/文件=她的"脑"和"锁"，任何档位（含 full/off）都不许她的工具写。纵深防御，
@@ -225,7 +227,10 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         fp = self._args_fp(tc.get("args"))
         if _ap.consume(tid, name, fp):  # 外部批准（按钮/token）+ 参数指纹一致才放行（R10.2 hy4 ①-1）
             return handler(request)
-        if self._needs_external(name) or self._is_mcp(name):
+        # 子层主管派活在编牛马=职责本分（牛马危险动作另有严格门）——sub_mode 的 task
+        # 降级口头重试，不索外部批准（fp 埋子线程上不来=死锁，链测 v5 实锤）
+        ext_gate = self._needs_external(name) and not (self.sub_mode and name == "task")
+        if ext_gate or self._is_mcp(name):
             # 危险工具/MCP 工具：无外部批准=不放行，重试也没用（批准权在管理员手里）；
             # 指纹登记进 approvals（全局共享，封 ①-4 跨实例锚点分裂）。
             # R10.3（评审B 🟡A）：fp 全文用〔fp:…〕机器可解析标记随消息给出——前端批准按钮
@@ -260,7 +265,10 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         fp = self._args_fp(tc.get("args"))
         if _ap.consume(tid, name, fp):  # R10.2 与同步门同构：外部批准+参数指纹一致才放行
             return await handler(request)
-        if self._needs_external(name) or self._is_mcp(name):
+        # 子层主管派活在编牛马=职责本分（牛马危险动作另有严格门）——sub_mode 的 task
+        # 降级口头重试，不索外部批准（fp 埋子线程上不来=死锁，链测 v5 实锤）
+        ext_gate = self._needs_external(name) and not (self.sub_mode and name == "task")
+        if ext_gate or self._is_mcp(name):
             _ap.set_blocked(tid, name, fp)
             return ToolMessage(content=self._block_msg(name, level, "ask", tc.get("args"))
                 + f"\n（本次调用指纹〔fp:{fp}〕：批准与参数绑定——换参数重试=批准作废、重新请示）",
