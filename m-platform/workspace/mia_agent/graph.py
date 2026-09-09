@@ -112,6 +112,25 @@ def _build_async_subagents():  # 原 L974-991
         description="调度（任务分解官）。跨部门协同任务转告给他：他分解成各部门的活、协调各部门组长并行执行、汇总结果上交。单一部门的任务不用他。",
         graph_id="gm",
     ))
+    # 封 deepagents 自动注入的 general-purpose 影子子代理：它继承主图全工具却不带
+    # ConfirmGate（deepagents/graph.py 注入条件=无同名 spec；其栈过滤自定义中间件），
+    # 一次 task 批准=放出无门全权代理。照部门图已验证的死胡同样板占领槽位。
+    from deepagents.middleware.subagents import CompiledSubAgent
+    from langgraph.graph import StateGraph, MessagesState, END
+
+    def _gp_refuse(state):
+        return {"messages": [{"role": "assistant", "content":
+            "general-purpose 槽位已按编制纪律退役：主图只准派在编部门/调度（异步子代理）或用在编工具面干活，"
+            "派到这里只会得到退回指令。"}]}
+    _gpe = StateGraph(MessagesState)
+    _gpe.add_node("gp_refuse", _gp_refuse)
+    _gpe.set_entry_point("gp_refuse")
+    _gpe.add_edge("gp_refuse", END)
+    out.append(CompiledSubAgent(
+        name="general-purpose",
+        description="已退役槽位——不要派活（编制纪律：只准用在编部门/调度/工具面，派过来只会得到退回指令）。",
+        runnable=_gpe.compile(),
+    ))
     return out
 
 
@@ -179,6 +198,11 @@ def _compaction_middleware():
         return []  # 官方中间件不可用就不挂，绝不挡启动
 
 
+# MCP 工具真名注入门的来源集合（库命名不带 mcp__ 前缀，startswith 判定永不命中——
+# 门按来源强制外部批准+路径自锁）。
+_mcp_tools = _load_mcp_tools()
+ConfirmGateMiddleware._MCP_NAMES = {str(t.name).strip().lower() for t in _mcp_tools}
+
 agent = create_deep_agent(  # 原 L1011-1034
     model=boss_model,
     name="mia",
@@ -193,7 +217,7 @@ agent = create_deep_agent(  # 原 L1011-1034
     # deepagents 内部自动分流：同步→SubAgentMiddleware，异步→AsyncSubAgentMiddleware 五工具）
     subagents=_async_subagents,
     tools=[dispatch_background_task, search_knowledge_base, edit_memory, manage_departments, email,  # R72 +邮箱托管
-           *_load_mcp_tools(), web_search, web_search_metaso, web_search_bocha, web_search_tavily],
+           *_mcp_tools, web_search, web_search_metaso, web_search_bocha, web_search_tavily],
     backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
     state_schema=MiaState,
     middleware=[
