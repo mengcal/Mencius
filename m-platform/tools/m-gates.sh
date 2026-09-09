@@ -55,8 +55,8 @@ echo "── vision fail-closed（401/401/200/200）──"
 expect 401 -X POST http://127.0.0.1:2024/vision -H 'Content-Type: application/json' -d '{"image_path":"/data/files/none.png","question":"x"}'
 expect 401 -X POST http://127.0.0.1:2024/vision -H 'Content-Type: application/json' -H 'X-Proxy-Key: wrongkey' -d '{"image_path":"/data/files/none.png","question":"x"}'
 if [ "$LIVE" = "1" ]; then
-  expect 200 -X POST http://127.0.0.1:2024/vision -H 'Content-Type: application/json' -H "Authorization: Bearer $TOK" -d '{"image_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==","question":"说一个字"}'
-  expect 200 -X POST http://127.0.0.1:2024/vision -H 'Content-Type: application/json' -H "X-Proxy-Key: $VT" -d '{"image_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==","question":"说一个字"}'
+  expect 200 -X POST http://127.0.0.1:2024/vision -H 'Content-Type: application/json' -H "Authorization: Bearer $TOK" -d '{"image_b64":"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFUlEQVR4nGP8z8Dwn4EIwASEmBlkGgAAdg4BAa6vJBYAAAAASUVORK5CYII=","question":"图里什么颜色？一个词回答"}'
+  expect 200 -X POST http://127.0.0.1:2024/vision -H 'Content-Type: application/json' -H "X-Proxy-Key: $VT" -d '{"image_b64":"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFUlEQVR4nGP8z8Dwn4EIwASEmBlkGgAAdg4BAa6vJBYAAAAASUVORK5CYII=","question":"图里什么颜色？一个词回答"}'
 else
   echo "（--offline：跳过两条 vision 200 活链断言）"
 fi
