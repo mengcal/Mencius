@@ -24,7 +24,7 @@ MEMORY_FILE = BASE / "mia_home" / "memory" / "MEMORY.md"
 MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 if not MEMORY_FILE.exists():
     MEMORY_FILE.write_text(
-        "# 工作平台·后台任务队列记忆\n\n## 最近任务\n\n## 踩坑记录\n",
+        "# 工作平台·工作者车间记忆\n\n## 最近任务\n\n## 踩坑记录\n",
         encoding="utf-8",
     )
 
@@ -68,7 +68,7 @@ from mia_agent.sandbox import SandboxedShellBackend  # 原 L67-117
 from mia_agent.confirm_gate import ConfirmGateMiddleware  # 原 L212-464
 from mia_agent.store import MiaState, _STORE  # 原 L120-122/L165-168/L804-854
 from mia_agent.models import _interrupt_on, boss_model  # 原 L124/L858-908
-from mia_agent.tools import (_load_mcp_tools, dispatch_background_task, edit_memory, email,  # 原 L171-210/L466-802
+from mia_agent.tools import (_load_mcp_tools, dispatch_to_xiaoquan, edit_memory, email,  # 原 L171-210/L466-802
                              manage_departments, search_knowledge_base)
 
 # ── 包外：搜索/中间件（原 L125-127）──
@@ -109,18 +109,18 @@ def _build_async_subagents():  # 原 L974-991
     # R64 调度层（管理员的军事层级）：跨部门协同任务助手转告调度，调度分解协调各部门
     out.append(AsyncSubAgent(
         name="调度",
-        description="调度（任务分解官）。跨部门协同任务转告给他：他分解成各部门的活、协调各部门组长并行执行、汇总结果上交。单一部门的任务不用他。",
+        description="调度（任务分解官）。跨部门协同任务转告给他：他分解成各部门的活、协调各部门并行执行、汇总结果上交。单一部门的任务不用他。",
         graph_id="gm",
     ))
-    # 封 deepagents 自动注入的 general-purpose 影子子代理：它继承主图全工具却不带
-    # ConfirmGate（deepagents/graph.py 注入条件=无同名 spec；其栈过滤自定义中间件），
-    # 一次 task 批准=放出无门全权代理。照部门图已验证的死胡同样板占领槽位。
+    # r25（hy4 A2.1 P1 修复）：主图此前没封 deepagents 自动注入的 general-purpose 影子子代理——
+    # 它继承主图全工具却不带 ConfirmGate（deepagents/graph.py:751 注入条件 / :777 过滤自定义中间件），
+    # 一次 task 批准=放出无门全权代理。照 cow_graphs 已验证的死胡同样板占领槽位（官方跳过条件=自带同名 spec）。
     from deepagents.middleware.subagents import CompiledSubAgent
     from langgraph.graph import StateGraph, MessagesState, END
 
     def _gp_refuse(state):
         return {"messages": [{"role": "assistant", "content":
-            "general-purpose 槽位已按编制纪律退役：主图只准派在编部门/调度（异步子代理）或用在编工具面干活，"
+            "general-purpose 槽位已按军事纪律退役：主图只准派在编部门/调度（异步子代理）或用在编工具面干活，"
             "派到这里只会得到退回指令。"}]}
     _gpe = StateGraph(MessagesState)
     _gpe.add_node("gp_refuse", _gp_refuse)
@@ -128,7 +128,7 @@ def _build_async_subagents():  # 原 L974-991
     _gpe.add_edge("gp_refuse", END)
     out.append(CompiledSubAgent(
         name="general-purpose",
-        description="已退役槽位——不要派活（编制纪律：只准用在编部门/调度/工具面，派过来只会得到退回指令）。",
+        description="已退役槽位——不要派活（军事纪律：只准用在编部门/调度/工具面，派过来只会得到退回指令）。",
         runnable=_gpe.compile(),
     ))
     return out
@@ -198,8 +198,9 @@ def _compaction_middleware():
         return []  # 官方中间件不可用就不挂，绝不挡启动
 
 
-# MCP 工具真名注入门的来源集合（库命名不带 mcp__ 前缀，startswith 判定永不命中——
-# 门按来源强制外部批准+路径自锁）。
+# r25（hy4 A1.3 实证修复）：langchain_mcp_adapters 的 get_tools() 命名不带 mcp__ 前缀
+# （库源码：原名或 server_name_tool.name）——门的 startswith 判定永不命中，MCP 工具会
+# 降级为"口头重试放行"（潜在 P0）。修=装配时把 MCP 工具真名注入门的来源集合，按来源判定。
 _mcp_tools = _load_mcp_tools()
 ConfirmGateMiddleware._MCP_NAMES = {str(t.name).strip().lower() for t in _mcp_tools}
 
@@ -216,7 +217,7 @@ agent = create_deep_agent(  # 原 L1011-1034
     # R59：AsyncSubAgent 对象直接放进官方 subagents 参数（0.5.0 起同步/异步合并为单一参数，
     # deepagents 内部自动分流：同步→SubAgentMiddleware，异步→AsyncSubAgentMiddleware 五工具）
     subagents=_async_subagents,
-    tools=[dispatch_background_task, search_knowledge_base, edit_memory, manage_departments, email,  # R72 +邮箱托管
+    tools=[dispatch_to_xiaoquan, search_knowledge_base, edit_memory, manage_departments, email,  # R72 +邮箱托管
            *_mcp_tools, web_search, web_search_metaso, web_search_bocha, web_search_tavily],
     backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
     state_schema=MiaState,
@@ -227,3 +228,8 @@ agent = create_deep_agent(  # 原 L1011-1034
         RunConfigMiddleware(),  # 输入框的模型选择/联网开关在这里生效
     ],
 )
+
+# r25（军事链断点3修复）：部门任务完工/受阻推送监视器——门放行 start_async_task 时登记
+# {部门线程→主线程}，本监视器轮询到部门 run 结束就唤醒主线程转呈汇报（daemon 线程，幂等只启一次）。
+from mia_agent import dept_watch as _dept_watch
+_dept_watch.start()
