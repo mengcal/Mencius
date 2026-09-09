@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """mia_agent/confirm_gate.py —— R74 权限门（参考成熟 agent 平台：范围×谨慎两轴，档位锁在带外）
-拆分期注记：原 L212-464（拆分方案 #3）。
+拆分来源：D:\\m\\workspace\\agent_multimodel.py 原 L212-464（拆分方案 #3）。
 依赖：langchain（AgentMiddleware）；approvals / settings_mgr / langgraph.config /
 langchain_core.messages 均在方法内懒加载（与原实现一致）。无包内依赖（独立中间件类）。
 被引用：mia_agent/graph.py（middleware 列表，主层 new 一份；cow_graphs.py 经
-agent_multimodel 兼容转发亦可取到本类——
+agent_multimodel 兼容转发亦可取到本类——见 REFACTOR_NOTES.md 桩文件一节）。
 差异注记：原 L214 的 `import os as _os` 在该段内从未被使用，拆分时删除。
 """
 from langchain.agents.middleware.types import AgentMiddleware  # 原 L213
@@ -15,11 +15,12 @@ from langchain.agents.middleware.types import AgentMiddleware  # 原 L213
 #   strict    变更前确认：一切变更**软门**（每次改动停一下请示，管理员同意后重试放行一次）
 #   auto_edit 自动编辑：改文件放行；执行代码/发信/动容器/编制等"越界级"变更仍软门请示
 #   full      完全访问：不再请示（＝未来管理员开给助手的"管整机"档），但**自锁守卫仍在**——
-#             她任何时候都改不动平台源码与档位文件本身（对标"我 full 访问 ZCode 却关不掉 ZCode 的完全访问"）
+#             她任何时候都改不动平台源码与档位文件本身（对标"我 full 访问 zcode 却关不掉 zcode 的完全访问"）
 class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
     _pass_once: dict
     # 只读白名单（plan 档也只放行这些）；其余按"变更"处理。email 是读/写混合，按 args.action 细分。
-    # 查/列表异步任务是纯读语义（strict 下查进度不该被当变更拦）
+    # r25（军事链大考实锤）：查/列表异步任务是纯读语义，补进白名单——此前 strict 下"查任务进度"
+    # 也被当变更拦、且口头分支拦截不带 fp，链就僵在"请示看进度"上。
     _READONLY = {"ls", "read_file", "glob", "grep", "search_knowledge_base",
                  "web_search", "web_search_metaso", "web_search_bocha", "web_search_tavily",
                  "check_async_task", "list_async_tasks"}
@@ -40,7 +41,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         # R10.9（hy4 P1-3）：拆分后真实门代码在 office/ 包与 mia_agent/ 包里——
         # "office.py" 子串盖不住 office/app.py 等，"agent_multimodel.py" 只剩 17 行桩
         "office/", "office\\", "mia_agent",
-        # 鉴权/内部钥匙/技能锁本体入自锁名单（物理 :ro 之外的逻辑层补位）
+        # r25（hy4 A7.1 P2）：鉴权/内部钥匙/技能锁本体入自锁名单（物理 :ro 之外的逻辑层补位）
         "auth.py", "internal_key.py", "skills_lock.py",
     )
     _WRITE_TOOLS = {"write_file", "edit_file", "execute", "delete"}
@@ -59,8 +60,8 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
             from langgraph.config import get_config
             return str((get_config().get("configurable") or {}).get("thread_id", ""))
         except Exception:
-            # fail-closed：取不到 tid 绝不返回 ""（空串=全图共享一个批准桶，A线程批准可被B线程消费）。
-            # 每次失败给独立随机桶，该调用事实上不可被批准。
+            # r25（hy4 A4.3 P1）：取不到 tid 绝不返回 ""——空串=全图共享一个批准桶（A线程的批准
+            # 能被B线程消费）。fail-closed：每次失败给独立随机桶，该调用事实上不可被批准。
             import secrets as _s
             return "NO-TID-" + _s.token_hex(8)
 
@@ -74,7 +75,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         try:
             from settings_mgr import load_settings
             v = str((load_settings().get("general", {}) or {}).get("confirmLevel", "") or "").strip().lower()
-            # 四档=文档承诺的四档；历史遗留 "off" 已移除，写 off 回落 strict（fail-closed）
+            # r25（hy4 A1.4 P2）：移除隐藏第五档 "off"——四档=文档承诺的四档，写 off 回落 strict
             return v if v in ("plan", "strict", "auto_edit", "full") else "strict"
         except Exception:
             return "strict"
@@ -82,7 +83,8 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
     @staticmethod
     def _path_locked(name: str, args: dict | None) -> bool:
         """自锁守卫：写类工具若指向平台源码/档位/密钥=拦（任何档位，含 full）。
-        MCP 工具不在 _WRITE_TOOLS 名单但能力不可控——一律按"可写"对待路径。"""
+        r25（hy4 A1.3 已确证半条）：MCP 工具不在 _WRITE_TOOLS 名单、自锁对其原本失效——
+        一律按"可写"对待（MCP server 能干什么我们不可控，宁可多查一次路径）。"""
         if name not in ConfirmGateMiddleware._WRITE_TOOLS and not ConfirmGateMiddleware._is_mcp(name):
             return False
         blob = " ".join(str(v) for v in (args or {}).values()).lower()
@@ -165,8 +167,8 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         # R73（评审B🔴1）：工具名用「」框死——前端批准按钮正则靠括号取词。
         if kind == "selflock":
             return (f"🔒 「{name}」指向平台自身的守卫源码/档位/密钥——这是助手的「锁和脑」，"
-                    "任何权限档都不允许她改（对标：作者 full 访问也关不掉 ZCode 的完全访问）。"
-                    "需要改平台代码/档位，只能管理员或 ZCode 侧作者在宿主上动手。已拒绝。")
+                    "任何权限档都不允许她改（对标：作者 full 访问也关不掉 zcode 的完全访问）。"
+                    "需要改平台代码/档位，只能管理员或 zcode 侧作者在宿主上动手。已拒绝。")
         if kind == "deny":
             head = f"⛔ 计划模式：变更类工具「{name}」被硬拦（此档只读，不出手）。"
         else:
@@ -176,8 +178,8 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
             head += f"\n【要执行的内容】{self._args_preview(name, args)}"
         if self.sub_mode:
             return (head + "你在军事链条内：立刻停止执行，把「要做什么/为什么/影响」写进工作结果"
-                    "**上报上级请示**，由上级逐级转达管理员。（授权只有【管理端批准】一条通道——"
-                    "管理员点批准按钮或 token 打 /approvals，带上本线程 tid；不存在"
+                    "**上报上级请示**，由上级逐级转达管理员。（r25 文案纠偏 hy4 A3.1：授权只有【管理端批准】"
+                    "一条通道——管理员点批准按钮或 token 打 /approvals，带上本线程 tid；不存在"
                     "『上级口头授权即放行』，你自行重试不会放行。）")
         if kind == "deny":
             return head + "请只出计划、不要动手；管理员切换档位后再来。"
@@ -190,12 +192,12 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
     # （管理员点拦截消息上的『批准』按钮 / token 打 /approvals），模型自己重试**不放行**——
     # 否则"重试即放"=批准权还在模型手里。数据区写（write_file/edit_file/edit_memory）仍可用口头重试放行。
     _NEEDS_EXTERNAL = {"execute", "delete", "email", "manage_departments",
-                       "start_async_task", "dispatch_background_task", "task",
-                       # 改/停运行中异步任务=扩大批准面，同需外部批准
+                       "start_async_task", "dispatch_to_xiaoquan", "task",
+                       # r25（hy4 A1.4/A3.1 P2）：改/停运行中异步任务=扩大批准面，补进外部批准名单
                        "update_async_task", "cancel_async_task"}
-    # langchain_mcp_adapters 的 get_tools() 工具名不带 mcp__ 前缀（库源码：原名或
-    # server_name_tool.name）——startswith 判定永不命中。修=graph 装配时把 MCP 工具真名
-    # 注入本集合，门按【来源】判定；startswith("mcp__") 仅作兜底保留。
+    # r25（hy4 A1.3 实证 P0 级）：langchain_mcp_adapters 的 get_tools() 工具名【不带 mcp__ 前缀】
+    # （库源码 tools.py:516-518：原名或 server_name_tool.name）——startswith("mcp__") 永不命中，
+    # MCP 工具会落"口头重试放行"。修=graph 装配时把 MCP 工具真名注入本集合，门按【来源】判定。
     _MCP_NAMES: set = set()
 
     @staticmethod
@@ -205,8 +207,24 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
 
     @staticmethod
     def _needs_external(name: str) -> bool:
-        # 归一化比对，防大小写/空白变形名绕名单
+        # r25（hy4 A1.1 P2）：归一化比对，防大小写/空白变形名绕名单
         return str(name).strip().lower() in ConfirmGateMiddleware._NEEDS_EXTERNAL
+
+    @staticmethod
+    def _watch_launch(tc: dict, result):
+        """r25（军事链断点3）：start_async_task 放行成功=部门线程开张——
+        把 {部门tid→主线程tid} 登记给 dept_watch，跑完/卡住时它负责唤醒主线程汇报。"""
+        try:
+            if str(tc.get("name")) == "start_async_task":
+                import re as _re
+                m = _re.search(r"task_id:\s*([0-9a-fA-F-]{8,})", str(getattr(result, "content", "") or ""))
+                if m:
+                    from mia_agent import dept_watch
+                    dept_watch.register(m.group(1), ConfirmGateMiddleware._tid(),
+                                        str((tc.get("args") or {}).get("description") or ""))
+        except Exception:
+            pass
+        return result
 
     def _gate(self, request, handler):
         """同步门。"""
@@ -215,7 +233,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         level = self._level()
         dec = self._decision(name, level, tc.get("args"))
         if dec == "pass":
-            return handler(request)
+            return self._watch_launch(tc, handler(request))
         from langchain_core.messages import ToolMessage
         if dec == "selflock":
             return ToolMessage(content=self._block_msg(name, level, "selflock"), tool_call_id=tc.get("id", ""))
@@ -226,9 +244,10 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         tid = self._tid()
         fp = self._args_fp(tc.get("args"))
         if _ap.consume(tid, name, fp):  # 外部批准（按钮/token）+ 参数指纹一致才放行（R10.2 hy4 ①-1）
-            return handler(request)
-        # 子层主管派活在编牛马=职责本分（牛马危险动作另有严格门）——sub_mode 的 task
-        # 降级口头重试，不索外部批准（fp 埋子线程上不来=死锁，链测 v5 实锤）
+            return self._watch_launch(tc, handler(request))
+        # r25（军事链 v5 实锤）：子层组长派活在编工人岗=其职责本分（军事纪律已限"只准派在编"，
+        # 工人岗的 execute 等危险动作另有严格门兜底）——sub_mode 的 task 降级为口头重试路径，
+        # 不再要外部批准（否则组长派活也要管理员批 fp，而 fp 埋子线程上不来=死锁）。
         ext_gate = self._needs_external(name) and not (self.sub_mode and name == "task")
         if ext_gate or self._is_mcp(name):
             # 危险工具/MCP 工具：无外部批准=不放行，重试也没用（批准权在管理员手里）；
@@ -244,7 +263,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         passed = self._pass_once.setdefault(self._tid(), {})
         if passed.get(name) == fp:
             passed.pop(name)
-            return handler(request)
+            return self._watch_launch(tc, handler(request))
         passed[name] = fp
         self._prune()
         return ToolMessage(content=self._block_msg(name, level, "ask", tc.get("args")), tool_call_id=tc.get("id", ""))
@@ -256,7 +275,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         level = self._level()
         dec = self._decision(name, level, tc.get("args"))
         if dec == "pass":
-            return await handler(request)
+            return self._watch_launch(tc, await handler(request))
         from langchain_core.messages import ToolMessage
         if dec in ("selflock", "deny"):
             return ToolMessage(content=self._block_msg(name, level, dec), tool_call_id=tc.get("id", ""))
@@ -264,9 +283,10 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         tid = self._tid()
         fp = self._args_fp(tc.get("args"))
         if _ap.consume(tid, name, fp):  # R10.2 与同步门同构：外部批准+参数指纹一致才放行
-            return await handler(request)
-        # 子层主管派活在编牛马=职责本分（牛马危险动作另有严格门）——sub_mode 的 task
-        # 降级口头重试，不索外部批准（fp 埋子线程上不来=死锁，链测 v5 实锤）
+            return self._watch_launch(tc, await handler(request))
+        # r25（军事链 v5 实锤）：子层组长派活在编工人岗=其职责本分（军事纪律已限"只准派在编"，
+        # 工人岗的 execute 等危险动作另有严格门兜底）——sub_mode 的 task 降级为口头重试路径，
+        # 不再要外部批准（否则组长派活也要管理员批 fp，而 fp 埋子线程上不来=死锁）。
         ext_gate = self._needs_external(name) and not (self.sub_mode and name == "task")
         if ext_gate or self._is_mcp(name):
             _ap.set_blocked(tid, name, fp)
@@ -276,7 +296,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         passed = self._pass_once.setdefault(self._tid(), {})
         if passed.get(name) == fp:
             passed.pop(name)
-            return await handler(request)
+            return self._watch_launch(tc, await handler(request))
         passed[name] = fp
         self._prune()
         return ToolMessage(content=self._block_msg(name, level, "ask", tc.get("args")), tool_call_id=tc.get("id", ""))
