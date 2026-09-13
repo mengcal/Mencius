@@ -3,7 +3,8 @@
 # R10.4（评审C P3-1/评审A）：硬断言化——expect() 不符打 ✗ 并计数，结尾 FAILURES>0 则 exit 1；
 # 门禁的价值就在于会喊红，不再靠人眼比对"期待401 实得200"。
 # 用法: m-gates.sh   （exit 0=ALL GREEN / exit 1=有红灯）
-# r24 起本文件=唯一维护源（PATH 侧同名件已是转发桩，双拷贝漂移断根）。
+# R10.12（评审B ⚪1 修正）：本文件=打包与执行的【唯一真源】；D:\Tools\bin\m-gates.sh 自 r24 起
+# 已是转发桩（只 exec 本文件），不再是第二份拷贝——历史"说修未修"双拷贝漂移已断根。
 M_ROOT="${M_ROOT:-/d/m}"
 PT=$(grep -o 'CODEBUDDY_PROXY_TOKEN=.*' "$M_ROOT/.env" | cut -d= -f2 | tr -d ' \r')
 VT=$(grep -o 'VISION_PROXY_TOKEN=.*' "$M_ROOT/.env" | cut -d= -f2 | tr -d ' \r')

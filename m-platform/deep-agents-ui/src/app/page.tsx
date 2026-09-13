@@ -5,6 +5,7 @@ import { useQueryState } from "nuqs";
 import { getConfig, saveConfig, StandaloneConfig } from "@/lib/config";
 import { ConfigDialog } from "@/app/components/ConfigDialog";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Assistant } from "@langchain/langgraph-sdk";
 import { ClientProvider, useClient } from "@/providers/ClientProvider";
 import { Settings, MessagesSquare, SquarePen, Bot } from "lucide-react";
@@ -19,26 +20,33 @@ import { ChatInterface } from "@/app/components/ChatInterface";
 import { getSettings, postSettings, tokenStatus } from "@/lib/providerApi";
 import { SetupWizard, LoginGate } from "@/app/components/SetupWizard";
 
-/** 顶栏快捷开关：确认分档 / 助手管工人岗 / 工具显隐——不进设置页直接切（2026-08-30 作者） */
+/** 顶栏快捷开关：确认分档 / 米娅管牛马 / 工具显隐——不进设置页直接切（2026-08-30 知夏）
+ *  r35（爸爸点名"循环四档要点半天不科学"+逮到 off/full 枚举错位 bug）：
+ *  循环按钮改下拉直选；档位值对齐后端合法四档 plan/strict/auto_edit/full
+ *  （旧前端写 "off" 后端不认→fail-closed 回落 strict，按钮显示一直在撒谎）。 */
+const CONFIRM_LEVELS = [
+  { v: "plan", label: "🛡 计划模式（只出计划）" },
+  { v: "strict", label: "🛡 变更前确认（都先问）" },
+  { v: "auto_edit", label: "🛡 自动编辑（跑代码先问）" },
+  { v: "full", label: "🛡 完全访问（全自动）" },
+];
 function QuickToggles() {
-  const [confirmLevel, setConfirmLevel] = useState<string>("…");
+  const [confirmLevel, setConfirmLevel] = useState<string>("strict");
   const [miaManage, setMiaManage] = useState<boolean>(true);
   const [tools, setTools] = useState<boolean>(true);
 
   useEffect(() => {
     getSettings().then((s) => {
-      setConfirmLevel(s?.general?.confirmLevel || "auto_edit");
+      // 后端 _level() 对未配置/非法值 fail-closed 回落 strict——前端默认同步，不再谎报 auto_edit
+      setConfirmLevel(s?.general?.confirmLevel || "strict");
       setMiaManage(s?.permissions?.miaManageAgents !== false);
     }).catch(() => {});
     setTools(localStorage.getItem("mia.showToolCalls") !== "false");
   }, []);
 
-  const cycleConfirm = () => {
-    // R47 四档（对齐 ZCode）：off 完全访问 → auto_edit 自动编辑 → strict 变更前确认 → plan 计划模式
-    const order = ["off", "auto_edit", "strict", "plan"];
-    const next = order[(order.indexOf(confirmLevel) + 1) % order.length];
-    setConfirmLevel(next);
-    postSettings("general", { confirmLevel: next });  // R66：分档挪家到 通用 节（旧默认值"standard"不是合法档，一并修正）
+  const pickConfirm = (v: string) => {
+    setConfirmLevel(v);
+    postSettings("general", { confirmLevel: v });  // 即时生效无需重启（门每轮现读）
   };
   const toggleMia = () => {
     const next = !miaManage;
@@ -51,17 +59,20 @@ function QuickToggles() {
     localStorage.setItem("mia.showToolCalls", String(next));
     window.dispatchEvent(new CustomEvent("mia-tool-visibility")); // R46 即时生效
   };
-  const label =
-    confirmLevel === "off" ? "🛡 完全访问" :
-    confirmLevel === "strict" ? "🛡 变更前确认" :
-    confirmLevel === "plan" ? "🛡 计划模式" : "🛡 自动编辑";
   return (
     <>
-      <Button variant="outline" size="sm" onClick={cycleConfirm} title="确认分档（点击循环四档；改完即时生效，无需重启）">
-        {label}
-      </Button>
-      <Button variant="outline" size="sm" onClick={toggleMia} title="允许助手管理工人岗（即时生效）">
-        {miaManage ? "👑 助手有权" : "👑 助手无权"}
+      <Select value={confirmLevel} onValueChange={pickConfirm}>
+        <SelectTrigger className="h-8 w-52 gap-1 border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900" title="确认分档（下拉直选四档；改完即时生效，无需重启）">
+          <SelectValue placeholder="🛡 确认分档" />
+        </SelectTrigger>
+        <SelectContent>
+          {CONFIRM_LEVELS.map((l) => (
+            <SelectItem key={l.v} value={l.v} className="text-xs">{l.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button variant="outline" size="sm" onClick={toggleMia} title="允许米娅管理牛马（即时生效）">
+        {miaManage ? "👑 米娅有权" : "👑 米娅无权"}
       </Button>
       <Button variant="outline" size="sm" onClick={toggleTools} title="对话里显示/隐藏工具调用卡片（刷新对话页生效）">
         {tools ? "🛠 工具:显" : "🛠 工具:隐"}
@@ -72,12 +83,16 @@ function QuickToggles() {
 
 interface HomePageInnerProps {
   config: StandaloneConfig;
+  // r39（NOVA R37-P0 统一修法）：URL 助手 id 独立传递，不回灌 config 本体——
+  // config 永远保持 localStorage 态，围炉/圆桌链接永不进保存链/回写链。
+  urlAssistantId?: string | null;
   configDialogOpen: boolean;
   setConfigDialogOpen: (open: boolean) => void;
   handleSaveConfig: (config: StandaloneConfig) => void;
 }
 function HomePageInner({
   config,
+  urlAssistantId,
   configDialogOpen,
   setConfigDialogOpen,
   handleSaveConfig,
@@ -97,21 +112,23 @@ function HomePageInner({
   const [mutateThreads, setMutateThreads] = useState<(() => void) | null>(null);
   const [interruptCount, setInterruptCount] = useState(0);
   const [assistant, setAssistant] = useState<Assistant | null>(null);
+  // r39（NOVA 统一修法）：有效助手=URL 值优先，否则 localStorage 配置值；config 本体不再被回灌
+  const effAssistantId = urlAssistantId || config.assistantId;
   const fetchAssistant = useCallback(async () => {
     const isUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        config.assistantId
+        effAssistantId
       );
     if (isUUID) {
       // We should try to fetch the assistant directly with this UUID
       try {
-        const data = await client.assistants.get(config.assistantId);
+        const data = await client.assistants.get(effAssistantId);
         setAssistant(data);
       } catch (error) {
         console.error("Failed to fetch assistant:", error);
         setAssistant({
-          assistant_id: config.assistantId,
-          graph_id: config.assistantId,
+          assistant_id: effAssistantId,
+          graph_id: effAssistantId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           config: {},
@@ -126,7 +143,7 @@ function HomePageInner({
         // We should try to list out the assistants for this graph, and then use the default one.
         // TODO: Paginate this search, but 100 should be enough for graph name
         const assistants = await client.assistants.search({
-          graphId: config.assistantId,
+          graphId: effAssistantId,
           limit: 100,
         });
         const defaultAssistant = assistants.find(
@@ -142,19 +159,19 @@ function HomePageInner({
           error
         );
         setAssistant({
-          assistant_id: config.assistantId,
-          graph_id: config.assistantId,
+          assistant_id: effAssistantId,
+          graph_id: effAssistantId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           config: {},
           metadata: {},
           version: 1,
-          name: config.assistantId,
+          name: effAssistantId,
           context: {},
         });
       }
     }
-  }, [client, config.assistantId]);
+  }, [client, effAssistantId]);
   useEffect(() => {
     fetchAssistant();
   }, [fetchAssistant]);
@@ -190,7 +207,12 @@ function HomePageInner({
           <div className="flex items-center gap-2">
             <div className="text-sm text-muted-foreground">
               <span className="font-medium">Assistant:</span>{" "}
-              助手
+              {/* 页头随图显示（r38 小瑕；r39 换 effAssistantId 与入口同一供体） */}
+              {effAssistantId === "hearth"
+                ? "围炉夜话"
+                : effAssistantId === "roundtable"
+                  ? "圆桌"
+                  : "米娅"}
             </div>
             <Button
               variant="outline"
@@ -273,16 +295,16 @@ function HomePageInner({
 }
 function HomePageContent() {
   const [config, setConfig] = useState<StandaloneConfig | null>(null);
-  // R10.7（管理员："发布后要有管理员注册页面，这个一定要有"）：未配置密钥时全屏展示注册向导
+  // R10.7（爸爸："发布后要有管理员注册页面，这个一定要有"）：未配置密钥时全屏展示注册向导
   const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null);
-  // R10.8e（管理员："401 死锁，找回入口在进不去的设置页里"）：已配置但本浏览器无有效凭证 → 登录层
+  // R10.8e（爸爸："401 死锁，找回入口在进不去的设置页里"）：已配置但本浏览器无有效凭证 → 登录层
   // r24 lint 清账：AuthGate 全局闸门（layout 层）接管后，本地登录层只读不再置位——setter 是死变量
   const [loginNeeded] = useState(false);
   useEffect(() => {
     console.log("[gate] probe start");
     tokenStatus().then((s) => {
       console.log("[gate] tokenStatus:", JSON.stringify(s));
-      // R10.8g（管理员登录后黑屏真凶）：configured=true 分支此前不落定 setupNeeded——
+      // R10.8g（爸爸登录后黑屏真凶）：configured=true 分支此前不落定 setupNeeded——
       // 它永远卡 null，被下方 `if (setupNeeded === null) return null` 永久挡住，登录成功也黑屏。
       if (s.configured) { setSetupNeeded(false); return; }
       setSetupNeeded(true);
@@ -291,9 +313,9 @@ function HomePageContent() {
   useEffect(() => {
     console.log("[gate] render state:", JSON.stringify({ setupNeeded, loginNeeded, hasConfig: !!config }));
   }, [setupNeeded, loginNeeded, config]);
-  // 界面字号（管理员老花眼友好）：读 interface.uiZoom（百分比），应用到 body zoom
+  // 界面字号（爸爸老花眼友好）：读 interface.uiZoom（百分比），应用到 body zoom
   useEffect(() => {
-    // R10（评审E P1-1）：GET /settings 在 token 门内——裸 fetch 换统一封装 getSettings（自带 Bearer），
+    // R10（千问 P1-1）：GET /settings 在 token 门内——裸 fetch 换统一封装 getSettings（自带 Bearer），
     // 全前端不再留第二把门把手
     getSettings().then((s: any) => {
       const z = Number(s?.interface?.uiZoom ?? 100);
@@ -322,6 +344,9 @@ function HomePageContent() {
       setAssistantId(config.assistantId);
     }
   }, [config, assistantId, setAssistantId]);
+  // r36→r39：URL 权威入口改由 urlAssistantId prop 直供 HomePageInner（NOVA P0-1/P0-2 根治），
+  // 不再 setConfig 回灌——旧回灌与上方回写 effect 相咬（删 URL 逃不出围炉）、
+  // 且 ConfigDialog 保存会把内存态 hearth 写进 localStorage（裸开默认被劫）。
   const handleSaveConfig = useCallback((newConfig: StandaloneConfig) => {
     saveConfig(newConfig);
     setConfig(newConfig);
@@ -330,7 +355,7 @@ function HomePageContent() {
     config?.langsmithApiKey || process.env.NEXT_PUBLIC_LANGSMITH_API_KEY || "";
   // R10.7：管理员注册向导（未配置密钥=首部署 → 全屏引导；检测中短暂空白）
   // R10.8e（bug 修复）：loginNeeded=true 时 setupNeeded 仍是 null（configured=true 从不设置它）——
-  // 空值检查必须放 loginNeeded 之后，否则登录层永远被 return null 挡住（管理员"页面看不到"真凶）。
+  // 空值检查必须放 loginNeeded 之后，否则登录层永远被 return null 挡住（爸爸"页面看不到"真凶）。
   if (loginNeeded) return <LoginGate onDone={() => window.location.reload()} />;
   if (setupNeeded === null) return null;
   if (setupNeeded) return <SetupWizard onDone={() => window.location.reload()} />;
@@ -366,6 +391,7 @@ function HomePageContent() {
     >
       <HomePageInner
         config={config}
+        urlAssistantId={assistantId}
         configDialogOpen={configDialogOpen}
         setConfigDialogOpen={setConfigDialogOpen}
         handleSaveConfig={handleSaveConfig}

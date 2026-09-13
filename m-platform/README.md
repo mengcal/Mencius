@@ -1,133 +1,95 @@
-# M 平台（助手工作平台）
+# M 平台 —— 在你自己电脑里，养一个会干活的 AI 团队
 
-> 本目录是 [Mencius](../README.md) 仓库中的独立项目：单机自托管 AI 工作平台。
+## 这是干什么的？
 
-单机自托管的 AI 工作平台：一位主理智能体（助手）带着一支军事化编制的智能体团队，
-在完全跑在自己电脑上的 Docker 栈里干活——聊天、调研、写代码、跑脚本、管知识库、收发邮件、定时任务。
+一句话：**给 AI 在你自家电脑里盖了栋"办公室"，你当老板，AI 当员工。**
 
-> 这是「个人自用优先」的项目：部署目标是**一台你信得过的 Windows 机器**，不是公网服务。
-> 安全设计的出发点：防平台内的智能体越权、防宿主上的其他进程摸密钥。信任边界=你（机器管理员）本人+平台守卫；不防"已经拿到你 Windows 管理员权限的人"（那是操作系统的地盘）。
+市面上的 AI 助手大多在别人的服务器上：你跟它说过的话、它替你碰过的文件、你给它
+的密钥，厂商都看得见。这个项目反着来——整套系统跑在你自己的电脑上（Docker 容器），
+聊天记录、文件、密钥全留在本地，模型你接哪家自己定（OpenAI 兼容协议的都行，
+国内的免费额度端点也完全够用）。
 
-## 架构一图流
+它的来历很朴素：作者想找个 AI 帮忙处理家里的杂务——整理资料、盯邮件、写点小脚本。
+试用了几家云服务后，始终过不了"把钥匙交给别人"这道坎，索性自己搭了一套。
+搭着搭着，AI 从一个人干活变成了一群人干活，就有了这个"办公室"。现在把它开源出来。
 
-```
-┌─ Windows 宿主 ──────────────────────────────────────────────┐
-│  浏览器 localhost:3000 (Next.js 前端, deep-agents-ui 魔改)     │
-│      │  同源 /lg 代理(rewrites→2024, Cookie HttpOnly)         │
-│  ┌───▼──────────────┐   m-guard 守卫服务(127.0.0.1:9101)     │
-│  │ workplatform:8000 │←── DPAPI 加密 token.bin/password.bin  │
-│  │ FastAPI+langgraph │    管理密钥/密码 只存宿主加密存储        │
-│  │  office/  = 网关层 │    (写端点 401 门 / 限频 / 64KB 体帽)   │
-│  │  mia_agent/ = 引擎 │                                      │
-│  └───┬──────┬───────┘                                        │
-│  postgres   redis     n8n      searxng    sandbox           │
-│  (pgvector  (缓存/   (自动化)  (元搜索)   (execute 沙箱)      │
-│   RAG+记忆)  队列)                                          │
-└─────────────────────────────────────────────────────────────┘
-```
+## 它会干什么？（用人话说）
 
-## 核心特性
+**🗣 围炉夜话** —— 脑子里有个模糊的想法，说不清楚？打开炉子，两位"朋友"
+（可以是你挑的不同 AI 模型）陪你闲聊：一位顺着你的思路帮你查缺补漏，
+一位专门往别的方向引。聊完，你的助手把这场闲话整理成一张"包袱皮"笔记存好。
+不干活、不评判，纯帮你理思路。
 
-- **军事化智能体编制**：助手（主理）→ 调度 → 部门组长 → 工人岗，逐级派活/汇报。
-  编制唯一真源在设置页 `settings.agents`，改配置即生效，不用改代码。
-- **四档确认门**（对标主流编码智能体的权限档）：`plan` 只读 / `strict` 变更前请示 /
-  `auto_edit` 墙内写放行 / `full` 完全访问。危险工具（执行/删除/发信/派活）只认**外部批准**，
-  且批准绑定**参数指纹**——批完换参数=重新拦截。模型自己反复重试不放行。
-- **自锁守卫**：任何档位下，智能体的写工具都碰不了平台源码、档位文件、密钥路径。
-- **密钥五级隔离**：Admin / WEBHOOK / SANDBOX / PROXY / GUARD 各自独立，桶不串。
-- **m-guard 宿主守卫**：管理密钥与登录密码用 DPAPI（用户态）加密落盘 `token.bin` / `password.bin`，
-  平台容器里没有任何明文；守卫带审计日志（三代轮转）、限频、防重放。
-- **RAG 知识库**：pgvector 向量检索 + 重排，助手可 `search_knowledge_base` 直查。
-- **技能锁**（skills_lock）：技能目录哈希基线，挂载回归即整体停用，宁可不带技能不裸奔。
-- **后台任务队列**：`dispatch_background_task`（自研长任务派发，完成后自动回对话线程汇报；与 deepagents 内置 `start_async_task` 独立共存）；开关由 runner 注入，无独立设置项。
+**⚖️ 圆桌** —— 想法聊透了，摆上圆桌：一位朋友专挑"哪儿做不成"，
+一位专说"怎么做才顺"，吵完一轮，主持人给你出结论——可行/有条件可行/暂不可行；
+说一声"拆步骤"，它把方案拆成带验收标准的任务书，交给你的助手去派活。
 
-## 快速开始
+**👥 干活有编制** —— 助手（主理人）把任务派给"部门"：调研岗、写代码岗、
+做表岗……岗位逐级分工、干完自动汇报，你只在对话窗口里看结论。
+重活扔后台慢慢跑，跑完它自己回来敲你。
 
-前置：Windows 10/11、Docker Desktop、Node.js 20+、宿主 Python 3.12+（m-guard 用，默认经
-pyenv-win 定位 `pythonw.exe`，也可设环境变量 GUARD_PYTHONW 指向你的 Python）。
+**🔐 权力你说了算** —— 四档权限像水龙头：从"它干什么都先问你"到"放手自己干"，
+随时可拧。改文件、执行命令这类动作，批准时连"具体改哪个文件"都锁死——
+批了 A 文件它就碰不了 B 文件，想换目标必须重新问你。
+平台源码和密钥，任何档位下 AI 都碰不到（有专门的守卫程序看着）。
 
-> 路径约定：`docker-compose.yml` 以 `D:\m\`（平台）与 `D:\sandbox-workspace\`（沙箱草稿区）为部署示例路径——
-> 换盘符/目录时全文替换即可，代码不依赖魔法位置。
+**🛡 机器安全门** —— 助手动手之前（执行命令、写文件、派活），先过一道**不经 AI 脑子**的
+自动安检：格式化磁盘、偷读密钥、远程脚本管道执行这类危险形态直接拦下并记账——连批准卡
+都不弹，不给被话术灌了迷魂汤的 AI 求盖章的机会；可疑的会放行到你面前，但卡面上标着
+"机器意见"，你扣章时看得见风险点在哪。5 分钟内连撞两次高危，这条对话线自动冻结等你接管。
+这道门自己也挨过七轮独立评审（包括一个 AI 评审员拒签、要求"证据先于签字"），门头上挂着
+一份"已知挡不住清单"——它诚实交代自己看不见什么。
 
-```bash
-# ⓪ 先建环境变量文件（缺它 compose 会拿空值起栈，守卫直接 403 死锁——这是自家踩过的坑）
-#    Windows: copy .env.example .env  →  按文件内注释填好每一项
+**📤 对外派活** —— 活也能外包给平台外的 AI（比如免费的 CodeBuddy）：平台**永不外连**——
+派活只是记在待办账上，外面的"岗"自己来领、跑完交卷；交回来的东西先过机器门消毒、
+盖上"外部不可信文本"的戳才进账本。一岗一钥匙，钥匙泄露只伤单岗。
 
-# ① 起后端六个容器（workplatform / sandbox / postgres / redis / n8n / searxng）
-docker compose up -d
+**🚦 定档路由** —— 每个任务先按"动词性质+字面对象+规模"标一档（快活/常规/重活），
+为将来自动挑大小模型攒数据；现阶段只标不切，切不切你定。
 
-# ② 起前端（开发模式）
-cd deep-agents-ui && npm install && npm run dev
+**📚 有记性** —— 你自己的文档丢进知识库，它能按"意思"检索（不是死磕关键词）；
+聊过的东西记成笔记，下次接着用。
 
-# ③ 安装宿主守卫（管理员 PowerShell/cmd）
-guard\install_system_task.cmd
+**✉️ 能伸手** —— 收发邮件、定时任务（比如每天早上八点汇总昨天的事发给你）、
+网页调研、跑脚本，都可以通过你的批准去做。
 
-# ④ 浏览器打开 http://localhost:3000
-#    首次进入注册向导：设置管理员密钥 → 设置登录密码 → 完成
+## 我适合用吗？
 
-# ⑤ 部署自检（轻量、无需钥匙：容器状态+端口探活）
-bash tools/m-health.sh
-#    维护者深度门禁（需要本机真钥匙与内部路径，首次部署不必跑）：bash tools/m-gates.sh
-```
+适合，如果你：
+- 想认真用 AI 干活（不是聊天），但在意数据留在自己手里；
+- 有一台 Windows 电脑，肯花半小时装 Docker Desktop（装软件，不算折腾）；
+- 有一两个大模型的 API Key（国内免费额度的端点就能跑，不花钱也行）。
 
-模型接入：在设置页「服务商」里配你自己的 API Key（OpenAI 兼容协议均可），
-Key 只经平台代理层转发给模型厂商，不进任何智能体的工具面。
+不适合，如果你：
+- 想要注册即用、手机随时打开的云服务（这套东西就是为"不放云端"设计的）；
+- 需要企业级的多人协作和权限体系（这是个人/家庭自托管项目）。
 
-> RAG 知识库的嵌入向量默认走本机 [Ollama](https://ollama.com)（qwen3-embedding，端口 11434）——
-> 不启用 RAG 可完全忽略；启用请先拉起 Ollama 并拉取嵌入模型。
+## 怎么开始？
 
-## 项目结构
+部署手册在 **[DEPLOY.md](DEPLOY.md)**（约 15 分钟，Windows + Docker Desktop + 一条命令一条命令跟着抄就行）。
 
-```
-workspace/            后端（跑在 workplatform 容器）
-  office.py           转发桩（历史入口，实际实现在 office/）
-  office/             FastAPI 网关层：core(纯函数) + app(装配) + routers/
-    routers/gates.py      三扇代理门（识图/CodeBuddy/RAG）+ 体帽中间件
-    routers/token_admin.py 管理密钥/密码/找回（no-rotate 登录）
-    routers/tasks.py      后台任务与 webhook 汇报
-    routers/providers.py  服务商管理
-    routers/rag.py        知识库摄取/查询/重建
-  agent_multimodel.py 转发桩（历史入口，实际实现在 mia_agent/）
-  mia_agent/          助手引擎：graph(组图)/confirm_gate(确认门)/tools/
-                      sandbox(沙箱后端)/store(永久记忆)/prompts
-  cow_graphs.py       调度/部门/工人岗 各级图定义
-  skills_lock.py      技能清单哈希锁
-deep-agents-ui/       前端（基于 langchain-ai/deep-agents-ui 魔改，上游 MIT 归属见 NOTICE.md）
-guard/                宿主守卫服务 + 安装/保活/重置脚本 + 109 条 unittest 断言
-tools/                运维脚本：一键体检 m-health / 门禁回归 m-gates / 审计对账 m-audit-gates / 单测
-skills/               技能目录（放入你的 .md 技能文件，compose 只读挂载）
-searxng/              元搜索引擎配置
-```
+装好后浏览器打开 `http://localhost:3000`：第一次会让你设一个管理员密钥和一个
+登录密码（只有你拿得走，平台里没有任何明文）。然后就可以对你的助手说第一句话了。
 
-## 国内网络加速（可选，强烈建议）
+模型接入全部在网页"设置"里完成：填服务商地址和 Key 即可，换模型不用改代码。
 
-本平台是"全家桶"，部署时要拉三类材料：Docker 镜像（六个容器）、npm 包（前端）、pip 包（后端）。
-国内直连都慢，一次配好：
+> 正在开发：一键安装包 + "小秘书"引导部署（它替你检测环境、缺什么补什么，
+> 不让你读文档配环境）。在此之前，先照 DEPLOY.md 抄作业。
 
-1. **Docker Hub 加速**：Docker Desktop → Settings → Docker Engine，加入
-   `"registry-mirrors": ["https://docker.m.daocloud.io"]`
-   （公共加速源时效性强，失效就换一个，或自备代理）。compose 要拉的
-   langgraph-api / pgvector / redis / n8n / searxng 全走这里，省九成等待。
-2. **npm 走 npmmirror**（淘宝源）：
-   ```bash
-   npm install --registry=https://registry.npmmirror.com
-   ```
-3. **pip/apt 不用操心**：`workspace/Dockerfile` 已内置清华 TUNA 镜像源，构建镜像时自动生效。
+## 几句实话
 
-> 注：本 README 的"码云/Gitee"没有任何作用——Gitee 是代码托管不是软件源，
-> 装东西快慢取决于上面三件事，不是 clone 地址。
+- AI 会一本正经地犯错，所以**确认门默认是"凡事先问你"**——权限放多开，你自己选。
+- 别让它替你管钱、看病、签合同；让它干的是"费和功夫"的活，不是"责任"的活。
+- 这是个人项目，作者也是在使用中踩坑迭代（README 里每个功能都是自家先用顺了的）。
+- 安全问题请按 [SECURITY.md](SECURITY.md) 的方式私下报告，别开公开 Issue。
 
-## 安全模型
+## 给技术的人
 
-详见 [SECURITY.md](SECURITY.md)。要点：密钥 DPAPI 落盘不出宿主、五级密钥隔离、
-同源代理 + HttpOnly Cookie、写端点 401 门 + 限频 + 请求体 64KB 上限、
-批准绑定参数指纹、沙箱执行隔离、技能哈希锁、守卫审计日志。
-
-## 致谢
-
-- [langchain-ai/deep-agents-ui](https://github.com/langchain-ai/deep-agents-ui) —— 前端底座
-- [deepagents](https://github.com/langchain-ai/deepagents) / LangGraph —— 智能体运行时
+架构、安全模型、容器编排、测试门禁——全部在 **[DEPLOY.md](DEPLOY.md)** 和源码里。
+前端基于 [langchain-ai/deep-agents-ui](https://github.com/langchain-ai/deep-agents-ui)（MIT），
+运行时是 [LangGraph](https://github.com/langchain-ai/langgraph) + [deepagents](https://github.com/langchain-ai/deepagents)。
+致谢与归属详见 [NOTICE.md](NOTICE.md)。
 
 ## License
 
-[MIT](LICENSE) © 2026 zcode (Celia)
+[MIT](LICENSE) © 2026 Mencius (zcode/Celia)

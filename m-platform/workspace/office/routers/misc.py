@@ -14,6 +14,7 @@ office.routers.misc —— /skills、/usage、/context、/stats、/health、/app
 注：原 :1148 的 `import json as _json` 延迟导入提到顶部（/usage、/context 需要）。
 """
 import json as _json  # 原 :1148（提到顶部）
+import threading  # r51b reflect daemon 用（模块级统一）
 
 import skills_lock as _skills_lock  # 原 :240
 
@@ -46,7 +47,7 @@ async def skills_list():
 
 @router.post("/skills/rehash")
 async def skills_rehash():
-    """管理员在宿主改完 D:\\m\\skills 后重扫重建基线（管理员 token 门内）。
+    """爸爸在宿主改完 D:\\m\\skills 后重扫重建基线（管理员 token 门内）。
     注：图构建时校验的是启动快照——重建后如技能被停用状态未恢复，重启一次即生效。"""
     if not _skills_lock.enabled():
         return {"ok": False, "error": "skills_lock 未启用（设置页先开启）"}
@@ -75,7 +76,7 @@ async def usage_today():
                 for k in ("input", "output", "total"):
                     v = int(r.get(k, 0) or 0)
                     a[k] += v
-                    total[k] += v          # 累加本条增量，不是模型累计值（修 评审B#2/评审A 用量虚高）
+                    total[k] += v          # 累加本条增量，不是模型累计值（修 NOVA#2/Cora 用量虚高）
                 a["calls"] += 1
                 total["calls"] += 1
         except Exception as e:
@@ -140,16 +141,16 @@ async def stats():
 
 @router.get("/health")
 async def health():
-    return {"status": "ok", "service": "后台任务队列", "agent": "worker"}
+    return {"status": "ok", "service": "小全车间", "agent": "xiaoquan"}
 
 
 @router.post("/approvals")
 async def api_approve(req: dict = Body(...), request: Request = None):
-    """R69 确认门 v2（评审C A1）：管理员的外部批准——与模型重试不可辨的问题在此解耦：
+    """R69 确认门 v2（Eve A1）：爸爸的外部批准——与模型重试不可辨的问题在此解耦：
     批准只认【模型之外】的来源。本机 curl / 汇报卡按钮 → 该线程该工具下一次调用放行一次。
-    R10.3（评审B 🟡A 时窗调包）：请求须带拦截消息里的指纹 fp——与登记不符=拒（"参数已变"），
+    R10.3（NOVA 🟡A 时窗调包）：请求须带拦截消息里的指纹 fp——与登记不符=拒（"参数已变"），
     绝不静默重绑最新被拦的那条；无登记=拒（不覆盖已有批准，防误点/连点杀死有效批准）。
-    R10.12（管理员裁决）：X-By: admin 作废——常数头零熵（R69 时代无统一 token 的遗产），
+    R10.12（爸爸裁决）：X-By: admin 作废——常数头零熵（R69 时代无统一 token 的遗产），
     真锁=中间件 api_token_guard（/approvals 全程 token fail-closed），拆假锁不再给人双保险错觉。"""
     import approvals as _ap
     tid, tool = str(req.get("thread_id", "")), str(req.get("tool", ""))
@@ -159,13 +160,43 @@ async def api_approve(req: dict = Body(...), request: Request = None):
     _token_audit("approval_granted" if ok else "approval_denied", ok,
                  tool=tool, tid=tid[:8],
                  ip=(request.client.host if request and request.client else "?"),
-                 why=why)  # R10.5（评审B 遗留）：批准动作带来源标注入审计
+                 why=why)  # R10.5（NOVA 遗留）：批准动作带来源标注入审计
+    # r25（军事链最后一公里）：批准成功=立即下推唤醒被拦线程重试——
+    # 部门/总管 run 停在拦截处无人推进；主对话同理（点完批准不用再喊"继续"）。
+    # 进程内 SDK（X-Internal-Key=同进程钥匙），fire-and-forget 不阻塞响应。
+    if ok:
+        import threading as _th
+        def _nudge(_tid=tid):
+            try:
+                # r27（发现#12 实锤）：旧版用 get_sync_client+127.0.0.1 被 R80 纵深 403——
+                # "批准即唤醒"一直空转且被 pass 吞掉。改用与 webhook 汇报同构的 _sdk_client()
+                # （async get_client+localhost+X-Internal-Key），失败记审计不再静默。
+                import asyncio
+                from . import tasks as _tk
+                _sdk = _tk._sdk_client
+                async def _push():
+                    c = _sdk()
+                    th = await c.threads.get(_tid)
+                    aid = th.get("assistant_id") or "agent"
+                    await c.runs.create(_tid, aid,
+                        input={"messages": [{"role": "user", "content":
+                            "你被批准的那一步已通过（指纹已核对）。原样重试被拦的调用，继续完成任务；"
+                            "完成后按你的角色汇报（调度层汇总上报，主对话直接呈报管理员）。",
+                            # r44b（hy4 P1-5）：nudge=系统注入消息，gate 换任务判定
+                            # 必须排除它（否则一次批准=软告警清零一次，语义被捅穿）
+                            "additional_kwargs": {"system_nudge": True}}]},
+                        config={"configurable": {"user_id": "approve-nudge"}})
+                asyncio.run(_push())
+            except Exception as e:
+                _token_audit("approval_nudge_fail", False, tool=tool, tid=tid[:8],
+                             why=f"{type(e).__name__}: {str(e)[:120]}")
+        _th.Thread(target=_nudge, daemon=True).start()
     return {"ok": ok, "reason": why, "approved": f"{tid[:8]}…:{tool}" if ok else ""}
 
 
 @router.delete("/approvals")
 async def api_revoke(req: dict = Body(...), request: Request = None):
-    """R10.3（评审B ⚪E）：撤销未消费的批准/拦截登记——误点有后悔药，不再悬 24h 等助手兑现。
+    """R10.3（NOVA ⚪E）：撤销未消费的批准/拦截登记——误点有后悔药，不再悬 24h 等米娅兑现。
     r25：X-By 同 approve 作废，门=token（中间件）。"""
     import approvals as _ap
     tid, tool = str(req.get("thread_id", "")), str(req.get("tool", ""))
@@ -174,7 +205,39 @@ async def api_revoke(req: dict = Body(...), request: Request = None):
     return {"ok": _ap.revoke(tid, tool)}
 
 
-# ── R2.1（2026-08-29 作者）：旧配置系统已删除 ──
+@router.post("/approvals/reset")
+async def api_reset_budget(req: dict = Body(...), request: Request = None):
+    """r41（hy4 P1-2 补的口子）：重置该线程的网关批准卡预算——预算拒信里告诉爸爸
+    "可在管理端重置本任务预算"，落点就是这里（token 门内）。"""
+    import approvals as _ap
+    tid = str(req.get("thread_id", ""))
+    if not tid:
+        return {"error": "需要 thread_id"}
+    n = _ap.reset_task_cards(tid)
+    _token_audit("approval_budget_reset", True, tid=tid[:8], cleared=n)
+    return {"ok": True, "cleared_cards": n}
+
+
+@router.post("/approvals/guard_unlock")
+async def api_guard_unlock(req: dict = Body(...), request: Request = None):
+    """r61b（hy4 P1-1 闭环）：爸爸接管后手动提前解冻线程（TTL 30min 是兜底不是唯一路）。
+    {thread_id?}——不传=解全部。token 门内（/approvals 前缀）。"""
+    import approvals as _ap
+    from mia_agent.confirm_gate_c1 import ConfirmGateC1
+    tid = str(req.get("thread_id", ""))
+    cleared = 0
+    for g in ConfirmGateC1._GATE_INSTANCES:
+        for k in ([tid] if tid else list(g._guard_lock.keys())):
+            if k in g._guard_lock:
+                g._guard_lock.pop(k, None)
+                g._guard_streak.pop(k, None)
+                cleared += 1
+    _ap._audit("guard_unlock", thread_id=tid or "*", by="admin", cleared=cleared)
+    _token_audit("approval_guard_unlock", True, tid=tid[:8] or "*", cleared=cleared)
+    return {"ok": True, "cleared": cleared}
+
+
+# ── R2.1（2026-08-29 知夏）：旧配置系统已删除 ──
 # config.json / /config 接口 / office_settings.html 全部移除，统一走 /settings*（settings_mgr.py）。
 # 若有人访问旧路径，返回明确指引。
 
@@ -197,3 +260,198 @@ async def office_page():
 @router.get("/")
 async def root():
     return HTMLResponse('<meta http-equiv="refresh" content="0;url=/office">')
+
+
+# ── r49 双钮"批准并记住这类"（爸爸 09-13 拍板；护栏=精确键/设置页可删/命中全审计/米娅无权）──
+# 路径故意不放 /settings/ 下——/settings/{section} 通配会吞掉精确路由（token 教训同款），
+# 独立前缀 /remember-rules（app.py 两侧守卫列表已同步加门）。
+
+@router.get("/remember-rules")
+async def remember_rules_list():
+    from settings_mgr import load_settings
+    return {"rules": (load_settings().get("remember_rules") or [])}
+
+
+@router.post("/remember-rules")
+async def remember_rules_add(req: dict = Body(...)):
+    """批量卡"批准并记住"钮回调：存精确规则 (tool, key)。key 由 args 规范化提取，
+    提取不到（空 key）=拒绝——永不支持通配/全工具放行。"""
+    from settings_mgr import load_settings, SETTINGS_PATH
+    import json as _json
+    from mia_agent.remember_rules import rule_key
+    tool = str(req.get("tool") or "")
+    key = rule_key(tool, req.get("args") or {})
+    if not key:
+        return {"ok": False, "error": "该调用提取不到精确键（不接受通配规则）"}
+    s = load_settings()
+    rules = s.setdefault("remember_rules", [])
+    if any(str(r.get("key", "")).lower() == key for r in rules):
+        return {"ok": True, "key": key, "note": "规则已存在"}
+    rules.append({"key": key, "tool": tool,
+                  "note": str(req.get("note") or "")[:80],
+                  "created": str(req.get("created") or "")})
+    SETTINGS_PATH.write_text(_json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    _token_audit("remember_rule_add", True, tool=tool, key=key[:60])
+    return {"ok": True, "key": key}
+
+
+@router.delete("/remember-rules")
+async def remember_rules_del(req: dict = Body(...)):
+    from settings_mgr import load_settings, SETTINGS_PATH
+    import json as _json
+    key = str(req.get("key") or "").lower()
+    s = load_settings()
+    rules = s.get("remember_rules") or []
+    kept = [r for r in rules if str(r.get("key", "")).lower() != key]
+    s["remember_rules"] = kept
+    SETTINGS_PATH.write_text(_json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    _token_audit("remember_rule_del", True, key=key[:60], removed=len(rules) - len(kept))
+    return {"ok": True, "remaining": len(kept)}
+
+
+# ── r51 reflect 做梦作业（记忆升级 plan-memory；夜间 n8n 调用）──
+# 痛点实锤：facts-2026-09.md 4224 行里混着抽取事故（思维链整段入库）。
+# 流程：备份先行 → 规则预筛（机械判思维链/超长行）→ LLM 合并去重 → 写回+统计。
+# 幂等：每日只跑一次（.reflect_last 记日期）；写坏可从 backup 回滚。
+
+@router.post("/memory/reflect")
+async def memory_reflect():
+    import json as _json
+    import re as _re
+    import time as _t
+    from pathlib import Path as _P
+    from providers import make_model
+    from settings_mgr import load_agents_config
+
+    mem = _P(BASE) / "mia_home" / "memory"
+    today = _t.strftime("%Y-%m")
+    facts_file = mem / f"facts-{today}.md"
+    if not facts_file.exists():
+        return {"ok": True, "note": "本月无 facts 文件，无梦可做"}
+    stamp = _t.strftime("%Y%m%d")
+    last_f = mem / ".reflect_last"
+    if last_f.exists() and last_f.read_text(encoding="utf-8").strip() == stamp:
+        return {"ok": True, "note": "今日已 reflect（幂等跳过）"}
+
+    lines = [ln.rstrip("\n") for ln in facts_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    # 规则预筛：思维链/日志事故行机械判（比 LLM 便宜且稳）
+    _TRASH_PAT = _re.compile(
+        r"(Analyze the Request|Thinking Process|ModelResponse|prompt_tokens|"
+        r"^\s*\d+\.\s+\*\*(Analyze|Evaluate|Content|Task|Context)|Tool call:|Metadata:)", _re.I)
+    keep, trash = [], []
+    for ln in lines:
+        (trash if (_TRASH_PAT.search(ln) or len(ln) > 150) else keep).append(ln)
+
+    # ── r55 证据评分三坑修（五家提案全收）──
+    # 基数去重（Eve"次数会骗人，基数不会"）：同事实按 distinct 日期计数
+    _ANXIETY_PAT = _re.compile(r"(吗|没有|呢|？|\?)")   # Cora 焦虑分流：问句/待办不升 importance
+    _AUTH_PAT = _re.compile(r"(爸爸(说|定|教|要求|拍板)|铁律|红线)")  # NOVA 权威直通：一次话一级重要
+    date_seen = {}   # {归一化事实: set(日期)}
+    for ln in keep:
+        mm = _re.match(r"-\s*\[(\d{2}-\d{2})\]\s*(.+)", ln)
+        if mm:
+            date_seen.setdefault(mm.group(2).strip()[:60], set()).add(mm.group(1))
+    promoted, nag, plain = [], [], []
+    for ln in keep:
+        mm = _re.match(r"-\s*\[(\d{2}-\d{2})\]\s*(.+)", ln)
+        body = mm.group(2).strip() if mm else ln[2:].strip()
+        seen_days = len(date_seen.get(body[:60], set()))
+        if _ANXIETY_PAT.search(body):
+            nag.append(ln)            # 焦虑型：催办清单，不进 importance 升级（防记忆库被未解决问题污染）
+        elif _AUTH_PAT.search(body):
+            promoted.append(ln)       # 权威直通：不看 seen
+        elif seen_days >= 2:
+            promoted.append(ln)       # 基数升级：跨≥2天重现=真验证
+        else:
+            plain.append(ln)
+    # LLM 合并去重（keep 行批 60 行一次，防超上下文）
+    merged = []
+    _ac = load_agents_config()
+    _fc = _ac.get("archivist") or _ac.get("scribe") or _ac.get("boss") or {}
+    m = make_model(_fc.get("provider", ""), _fc.get("model", ""))
+    worklist = promoted + plain
+    for i in range(0, len(worklist), 60):
+        batch = worklist[i:i + 60]
+        prompt = (
+            "下面是智能体记忆库的候选事实清单。带 ★ 前缀的是已判定值得长期保留的"
+            "（权威原话或跨天重现），合并时务必保留并加 ★ 前缀。\n"
+            "请合并去重：同一主题多条合并成一条（保留最早的日期标记），删除过时或无信息量的条目，"
+            "输出清洗后的完整清单。\n"
+            "格式：每行 `- [MM-DD] 事实`（重要条目前加 ★）。只输出清单本身，不要解释。\n\n"
+            + "\n".join(("★ " + x if x in promoted else x) for x in batch))
+        r = m.invoke(prompt)
+        txt = str(getattr(r, "content", "")).strip()
+        for ln in txt.splitlines():
+            ln = ln.strip()
+            if ln.startswith("- ") and 8 < len(ln) <= 150:
+                merged.append(ln)
+    # 催办清单独立落盘（不混进事实库——Cora 坑1）
+    if nag:
+        (mem / f"nag-{today}.md").write_text("\n".join(nag) + "\n", encoding="utf-8")
+    # preview_mode（Cora 坑2：夜间自动改记忆=睡着时改，首夜只预览不动库）
+    preview_f = mem / ".reflect_preview"
+    if preview_f.exists():
+        (mem / f"reflect-preview-{stamp}.md").write_text(
+            "\n".join(merged) + "\n\n## 催办（未升 importance）\n" + "\n".join(nag), encoding="utf-8")
+        preview_f.unlink()  # 预览一晚，下一夜放开
+        return {"ok": True, "preview": True, "promoted": len(promoted),
+                "nag": len(nag), "note": "预览模式：结果已落 reflect-preview 文件，未动库"}
+    # 备份先行 → 写回
+    backup = mem / f"facts-{today}-backup-{stamp}.md"
+    backup.write_text(facts_file.read_text(encoding="utf-8"), encoding="utf-8")
+    facts_file.write_text("\n".join(merged) + "\n", encoding="utf-8")
+    last_f.write_text(stamp, encoding="utf-8")
+    _token_audit("memory_reflect", True, keep=len(keep), trash=len(trash),
+                 merged=len(merged), total=len(lines))
+    return {"ok": True, "total": len(lines), "rule_trash": len(trash),
+            "kept": len(keep), "merged": len(merged),
+            "backup": backup.name}
+
+
+def _reflect_nightly_daemon():
+    """r51b（爸爸 10:3x 指正）：凌晨定时是纸上谈兵——机器未必开着。
+    改双条件触发，每 30 分钟自检一次（幂等由 .reflect_last 日期戳兜底）：
+    ① 在线 ≥4 小时 且 距上次 reflect ≥12 小时（开机常态：上午开机，下午整理）
+    ② facts 累计 ≥800 行 且 距上次 ≥6 小时（写爆了就清，不等时长）
+    失败只 print，绝不影响主服务。"""
+    import asyncio
+    import time as _t2
+    from pathlib import Path as _P2
+
+    boot = _t2.time()
+
+    def _last_ts() -> float:
+        f = _P2(BASE) / "mia_home" / "memory" / ".reflect_last"
+        try:
+            d = f.read_text(encoding="utf-8").strip()  # YYYYMMDD
+            return _t2.mktime(_t2.strptime(d, "%Y%m%d")) if d else 0.0
+        except Exception:
+            return 0.0
+
+    def _facts_lines() -> int:
+        f = _P2(BASE) / "mia_home" / "memory" / f"facts-{_t2.strftime('%Y-%m')}.md"
+        try:
+            return sum(1 for _ in f.open(encoding="utf-8"))
+        except Exception:
+            return 0
+
+    def _loop():
+        while True:
+            _t2.sleep(1800)  # 30 分钟自检
+            try:
+                up_h = (_t2.time() - boot) / 3600
+                since_h = (_t2.time() - _last_ts()) / 3600
+                lines = _facts_lines()
+                cond_a = up_h >= 4 and since_h >= 12
+                cond_b = lines >= 800 and since_h >= 6
+                if not (cond_a or cond_b):
+                    continue
+                r = asyncio.run(memory_reflect())
+                print(f"[reflect] 触发（在线{up_h:.1f}h/距上次{since_h:.1f}h/{lines}行）：{r}", flush=True)
+            except Exception as e:
+                print(f"[reflect] 整理失败（下轮再战）：{type(e).__name__}: {e}", flush=True)
+
+    threading.Thread(target=_loop, daemon=True, name="reflect-nightly").start()
+
+
+threading.Thread(target=_reflect_nightly_daemon, daemon=True, name="reflect-kick").start()

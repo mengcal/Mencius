@@ -22,7 +22,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <NuqsAdapter>
-          {/* R10.8e（管理员："401 死锁，找回入口在进不去的设置页里"）：
+          {/* R10.8e（爸爸："401 死锁，找回入口在进不去的设置页里"）：
               全局登录闸门——所有页面（含 /settings）401 时弹登录层，凭证有效才放行 */}
           <AuthGate>{children}</AuthGate>
         </NuqsAdapter>

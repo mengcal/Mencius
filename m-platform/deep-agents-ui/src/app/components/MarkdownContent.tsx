@@ -24,7 +24,7 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           urlTransform={(url: string) => {
-            // r23（评审C P3）：危险协议杀死、相对/锚点放行——助手 GFM 目录 [标题](#sec) 不再被清成空串
+            // r23（Eve P3）：危险协议杀死、相对/锚点放行——米娅 GFM 目录 [标题](#sec) 不再被清成空串
             const u = url.trim().toLowerCase();
             if (u.startsWith("#") || u.startsWith("/") || !u.includes(":")) return url;
             return ["http:", "https:", "mailto:"].includes(u.slice(0, u.indexOf(":") + 1)) ? url : "";

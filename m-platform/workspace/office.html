@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>后台任务队列 · 观测台</title>
+<title>小全车间 · 观测台</title>
 <style>
   :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8b949e; --green:#3fb950; --blue:#58a6ff; --orange:#d29922; --red:#f85149; }
   * { box-sizing: border-box; margin: 0; }
@@ -36,15 +36,15 @@
 </style>
 </head>
 <body>
-<h1>🚀 后台任务队列 · 观测台</h1>
+<h1>🚀 小全车间 · 观测台</h1>
 <div class="sub">每 5 秒自动刷新 · <span id="lastRefresh">-</span> · <a href="/">回对话</a> · <a href="/docs">API 文档</a></div>
 <div class="grid">
   <div class="card"><h2>🏥 平台健康</h2><div id="health">加载中…</div></div>
   <div class="card"><h2>⚙️ 并发与队列</h2><div id="stats">加载中…</div></div>
   <div class="card"><h2>📚 RAG 知识库</h2><div id="rag">加载中…</div></div>
-  <div class="card"><h2>🏪 服务商（标签=助手派活参考）</h2><div id="providers">加载中…</div></div>
-  <div class="card"><h2>🐂 工人岗矩阵</h2><div id="agents">加载中…</div></div>
-  <div class="card"><h2>💰 今日 Token 消耗（助手平台）</h2><div id="usage">加载中…</div></div>
+  <div class="card"><h2>🏪 服务商（标签=米娅派活参考）</h2><div id="providers">加载中…</div></div>
+  <div class="card"><h2>🐂 牛马矩阵</h2><div id="agents">加载中…</div></div>
+  <div class="card"><h2>💰 今日 Token 消耗（米娅平台）</h2><div id="usage">加载中…</div></div>
   <div class="card" style="grid-column: 1 / -1;"><h2>📋 后台任务流水（📣=已自动汇报）</h2>
     <table><thead><tr><th>单号</th><th>状态</th><th>任务</th><th>结果摘要</th><th>发起对话</th></tr></thead><tbody id="tasks"><tr><td colspan="5" style="color:var(--muted)">加载中…</td></tr></tbody></table>
     <div id="dispatch">

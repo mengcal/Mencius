@@ -12,5 +12,5 @@ for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try { $r = In
 if "%PROBE%"=="200" exit /b 0
 :restart
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe'\" | Where-Object { $_.CommandLine -like '*D:\m\guard\m_guard.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
-start "" /b "%USERPROFILE%\.pyenv\pyenv-win\versions\3.12.0\pythonw.exe" "D:\m\guard\m_guard.py"
+start "" /b "C:\Users\wolfm\.pyenv\pyenv-win\versions\3.12.0\pythonw.exe" "D:\m\guard\m_guard.py"
 exit /b 0

@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * settings/rows/SkillsLockRow.tsx —— R10.3 skills_lock（评审A/评审B 方案落地）
+ * settings/rows/SkillsLockRow.tsx —— R10.3 skills_lock（Cora/NOVA 方案落地）
  * ------------------------------------------------------------------
  * 技能清单哈希锁 UI：文件级状态展示 + 重新登记（rehash）。
- * 助手系统提示词里的技能 = 管理员给的（D:\m\skills），启动时逐文件对哈希，
+ * 米娅系统提示词里的技能 = 爸爸给的（D:\m\skills），启动时逐文件对哈希，
  * 不符/未登记 = 停用整组（宁可不带技能不裸奔）。原 page.tsx L145-185 原样迁出。
  */
 
@@ -31,7 +31,7 @@ export default function SkillsLockRow() {
     } catch { setMsg('失败'); } finally { setBusy(false); }
   };
   return (
-    <Row label="技能清单（skills_lock）" description="助手系统提示词里的技能 = 管理员给的（D:\m\skills），启动时逐文件对哈希，不符/未登记=停用整组（宁可不带技能不裸奔）。此锁防的是挂载改版回归（正常情况永远全绿）。宿主改完技能后点「重新登记」，若此前被停用需重启平台一次。">
+    <Row label="技能清单（skills_lock）" description="米娅系统提示词里的技能 = 爸爸给的（D:\m\skills），启动时逐文件对哈希，不符/未登记=停用整组（宁可不带技能不裸奔）。此锁防的是挂载改版回归（正常情况永远全绿）。宿主改完技能后点「重新登记」，若此前被停用需重启平台一次。">
       <div className="w-full">
         {data ? (
           <div className="mb-2 text-xs text-gray-500">

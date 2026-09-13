@@ -2,7 +2,7 @@ import useSWRInfinite from "swr/infinite";
 import type { Thread } from "@langchain/langgraph-sdk";
 import { Client } from "@langchain/langgraph-sdk";
 import { getConfig } from "@/lib/config";
-import { getAdminToken } from "@/lib/providerApi";  // R10（评审E P1-3）：threads.search 走 langgraph 原生 API，auth 模块要 Bearer
+import { getAdminToken } from "@/lib/providerApi";  // R10（千问 P1-3）：threads.search 走 langgraph 原生 API，auth 模块要 Bearer
 
 export interface ThreadItem {
   id: string;
@@ -66,7 +66,7 @@ export function useThreads(props: {
       status?: Thread["status"];
     }) => {
       const _t = getAdminToken();
-      // R10.8e（管理员"401 死锁"）：裸 Client 也走同源 /lg 代理——Cookie 自动携带（same-origin），
+      // R10.8e（爸爸"401 死锁"）：裸 Client 也走同源 /lg 代理——Cookie 自动携带（same-origin），
       // 不再直连 2024 跨源（SameSite=Strict cookie 跨源 fetch 不发送=必 401）
       const client = new Client({
         apiUrl: `${window.location.origin}/lg`,
@@ -91,7 +91,7 @@ export function useThreads(props: {
         ...(isUUID ? { metadata: { assistant_id: assistantId } } : {}),
       });
 
-      // R57：工人岗任务线程（后台派活的执行线程）不进对话历史侧栏，在工人岗进程面板看
+      // R57：牛马任务线程（后台派活的执行线程）不进对话历史侧栏，在牛马进程面板看
       const normal = threads.filter(
         (t: any) => !((t.metadata as any)?.cow_task === true)
       );

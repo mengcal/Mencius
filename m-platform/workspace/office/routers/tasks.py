@@ -27,20 +27,20 @@ router = APIRouter()
 _lock = threading.Lock()
 
 
-# ── R69（评审 评审E二.2.5"无鉴权派活后门"）：/runs 三端点 + 线程池机器已退役下线 ──
+# ── R69（评审 Qianwen二.2.5"无鉴权派活后门"）：/runs 三端点 + 线程池机器已退役下线 ──
 # 派活唯一正门 = 官方 start_async_task（AsyncSubAgent 五工具）+ /tasks/dispatch webhook 汇报。
-# 前端与助手提示词均无调用方（grep 实锤），保留 = 白给的攻击面 + 死代码。
+# 前端与米娅提示词均无调用方（grep 实锤），保留 = 白给的攻击面 + 死代码。
 
 
-# ===== R3 第二阶段：独立线程后台长任务（2026-08-30 作者）=====
-# 助手把大活 dispatch 到全新线程上后台跑，对话线程完全不被占用；
-# 跑完后前端轮询发现，自动把结果喂回对话让助手汇报——"干完主动汇报"闭环。
+# ===== R3 第二阶段：独立线程后台长任务（2026-08-30 知夏）=====
+# 米娅把大活 dispatch 到全新线程上后台跑，对话线程完全不被占用；
+# 跑完后前端轮询发现，自动把结果喂回对话让米娅汇报——"干完主动汇报"闭环。
 # 机制全是官方的：langgraph SDK 的 threads.create + runs.create(background)。
 
 TASKS: dict[str, dict] = {}
 _TSEQ = 0
 _webhook_lock = asyncio.Lock()  # R59：webhook 重复投递并发竞态锁（防同一任务重复注入汇报刷屏）
-# R55：任务流水持久化（重启不丢，观测台/工人岗进程面板数据源）
+# R55：任务流水持久化（重启不丢，观测台/牛马进程面板数据源）
 _TASKS_FILE = BASE / "mia_home" / "tasks.json"
 
 
@@ -57,7 +57,7 @@ def _load_tasks_persisted():
 
 
 def _save_tasks():
-    """TASKS 变更后落盘（观测台与工人岗进程面板的历史记录来源）。
+    """TASKS 变更后落盘（观测台与牛马进程面板的历史记录来源）。
     R69（C 泄漏清理）：裁剪到最新 200 条（bk 号数值序），文件/内存都不无限胖。"""
     try:
         import json as _j
@@ -76,7 +76,7 @@ def _save_tasks():
 
 TASKS.update(_load_tasks_persisted())
 
-# 从已恢复的任务号推最大序号，防重启后新任务 bk_001 覆盖旧记录（评审B#6）
+# 从已恢复的任务号推最大序号，防重启后新任务 bk_001 覆盖旧记录（NOVA#6）
 for _k in list(TASKS.keys()):
     try:
         _n = int(str(_k).rsplit("_", 1)[-1])
@@ -87,9 +87,9 @@ for _k in list(TASKS.keys()):
 
 
 def _sdk_client():
-    # R80（评审C b 纵深）：langgraph 原生 API 已挂 auth 模块。
-    # R10.8（评审C P0-2）：guard 模式下本进程不持明文（get_api_token 恒空）——进程内合法调用
-    # 改带【进程身份钥匙】X-Internal-Key（internal_key 模块级内存变量，助手 shell 进程拿不到），
+    # R80（Eve b 纵深）：langgraph 原生 API 已挂 auth 模块。
+    # R10.8（Eve P0-2）：guard 模式下本进程不持明文（get_api_token 恒空）——进程内合法调用
+    # 改带【进程身份钥匙】X-Internal-Key（internal_key 模块级内存变量，米娅 shell 进程拿不到），
     # auth 豁免=回环+该钥匙双条件。未配置密钥时（首部署 bootstrap 期）同样由此豁免。
     from langgraph_sdk import get_client
     from settings_mgr import get_api_token
@@ -118,8 +118,8 @@ async def files_save(req: dict = Body(...)):
 
 _DISPATCH_HITS: list = []  # R10.5：/tasks/dispatch 派活限频窗（60s ≤20）
 
-# R79（hy4 复检：webhook 无鉴权=可伪造"自动汇报"跨线程注入管理员对话）：langgraph 服务端回调必须带
-# 内部钥匙 w（URL 由本进程拼装、回调原样带回）。沙箱/助手没有 WEBHOOK_TOKEN env=伪造不了；未配置=拒（fail-closed）。
+# R79（hy4 复检：webhook 无鉴权=可伪造"自动汇报"跨线程注入爸爸对话）：langgraph 服务端回调必须带
+# 内部钥匙 w（URL 由本进程拼装、回调原样带回）。沙箱/米娅没有 WEBHOOK_TOKEN env=伪造不了；未配置=拒（fail-closed）。
 _WHBK = os.environ.get("WEBHOOK_TOKEN", "")
 
 
@@ -133,21 +133,21 @@ async def tasks_dispatch(req: dict = Body(...), request: Request = None):
     task = (req.get("task") or "").strip()
     if not task:
         return {"error": "需要 task"}
-    # R80 续（评审B/评审C/hy3 三方同指）：/tasks/dispatch 无门=同网容器可白嫖派活+main_thread 回注。
+    # R80 续（NOVA/Eve/hy3 三方同指）：/tasks/dispatch 无门=同网容器可白嫖派活+main_thread 回注。
     # 双钥匙门（≤15 行）：Bearer 管理员密钥（浏览器/管理端）**或** X-Internal-Key=WEBHOOK_TOKEN
-    # （进程内 dispatch_background_task 工具自带）二认一；都验不过 401。沙箱没钥匙也没 env=死路。
+    # （进程内 dispatch_to_xiaoquan 工具自带）二认一；都验不过 401。沙箱没钥匙也没 env=死路。
     import hmac as _h2
     ah = request.headers.get("authorization", "") if request else ""
     ptok = ah[7:].strip() if ah.lower().startswith("bearer ") else (request.headers.get("x-token") or "" if request else "")
     ik = (request.headers.get("x-internal-key") or "") if request else ""
     if not (_token_ok(ptok) or (_WHBK and _h2.compare_digest(_WHBK.encode(), str(ik).encode()))):
         return _JSONResp({"ok": False, "error": "派活需要管理员密钥或内部钥匙（浏览器走 Bearer，工具走 X-Internal-Key）"}, status_code=401)
-    # R10.5（评审B 遗留清单·dispatch 限频）：滑动窗口 60s≤20——派活=起真线程烧真模型，
+    # R10.5（NOVA 遗留清单·dispatch 限频）：滑动窗口 60s≤20——派活=起真线程烧真模型，
     # 被刷爆=后台线程池+上游额度双烧；与三扇代理门独立计数（互不挤兑）。
     if not _rate_ok(_DISPATCH_HITS, 60.0, 20):
         return _JSONResp({"ok": False, "error": "派活限流：每 60 秒最多 20 单，稍后再试"}, status_code=429)
-    # R80（评审C P3）：回调钥匙未配置时直接拒绝派活——否则任务跑完回调 401、汇报静默丢
-    # （工人岗干完活才发现话送不回=最坏的失败时机；宁可派活时就说清）
+    # R80（Eve P3）：回调钥匙未配置时直接拒绝派活——否则任务跑完回调 401、汇报静默丢
+    # （牛马干完活才发现话送不回=最坏的失败时机；宁可派活时就说清）
     if not _WHBK:
         return {"error": "WEBHOOK_TOKEN 未配置：后台任务回调会失败。请在 .env 配好并重启后再派活。"}
     main_thread = (req.get("main_thread") or "").strip()  # R3：发起对话的线程，完成后自动回去汇报
@@ -162,13 +162,13 @@ async def tasks_dispatch(req: dict = Body(...), request: Request = None):
         assistants = await client.assistants.search(graph_id="agent", limit=1)
         assistant_id = assistants[0]["assistant_id"] if assistants else "agent"
         thread = await client.threads.create(metadata={
-            "cow_task": True,  # R57：工人岗任务线程标记（前端侧栏过滤）
+            "cow_task": True,  # R57：牛马任务线程标记（前端侧栏过滤）
             "custom_title": f"🐂 {task[:36]}" + ("…" if len(task) > 36 else ""),
         })
         run = await client.runs.create(
             thread["thread_id"], assistant_id,
             input={"messages": [{"role": "user", "content": task}]},
-            config={"configurable": {"background_task_enabled": True},  # R3 护栏：后台线程禁止再派活
+            config={"configurable": {"xiaoquan_background": True},  # R3 护栏：后台线程禁止再派活
                     "recursion_limit": 150},  # R45：深度调研多工具循环，默认 25 步必撞墙
             multitask_strategy="enqueue",
             # R3 官方 webhook：后台 run 一结束，langgraph 服务端主动 POST 这里（R79 带内部钥匙 w）
@@ -188,10 +188,10 @@ async def tasks_dispatch(req: dict = Body(...), request: Request = None):
 async def tasks_webhook(tid: str = "", main: str = "", request: Request = None):
     """R3 官方 webhook 接收端（runs.create 的 webhook 参数，服务端 run 结束后主动 POST）。
     支持两种来源：① /tasks/dispatch 派的单（tid 在 TASKS 里）② 直派 SDK 单（query 带 main=主线程，
-    报文里带 thread/run 信息）。更新任务状态；有主线程就 runs.create 唤醒助手主动汇报。"""
+    报文里带 thread/run 信息）。更新任务状态；有主线程就 runs.create 唤醒米娅主动汇报。"""
     # R79（hy4 复检）：内部回调钥匙校验，fail-closed——未配 token 或 w 不配对一律 401。
     # 旧版无鉴权+直派分支（main/body 里的 thread_id、run_id 全取自请求体）=沙箱内一条 curl
-    # 可把任意线程的最后一条消息洗成"[工作者调度·自动汇报]"注进管理员的主对话（跨线程提示注入）。
+    # 可把任意线程的最后一条消息洗成"[小全调度·自动汇报]"注进爸爸的主对话（跨线程提示注入）。
     # R80：w 比对改常数时间（与 sandbox_runner/main token 同一套 compare_digest，防时序侧信道）。
     w = ""
     try:
@@ -226,9 +226,18 @@ async def tasks_webhook(tid: str = "", main: str = "", request: Request = None):
         if run["status"] == "success":
             state = await client.threads.get_state(t["thread_id"])
             msgs = (state.get("values") or {}).get("messages", [])
-            _last = msgs[-1] if msgs else None
-            _content = (_last.get("content") if isinstance(_last, dict) else getattr(_last, "content", "")) if _last is not None else ""
-            t["result"] = str(_content or _last)[:2000] if _last is not None else "（无输出）"  # R68 修 评审A E2：dict 消息取 content，不再序列化整字典
+            # R10.30 隔离修复：取"最后一条非空文本"，绝不 str() 整个消息对象（原始 dict 残渣
+            # 混进米娅主线程记录=爸爸点名的隔离破口；finish_reason=length 截断时 content 为空高发）
+            _content = ""
+            for _m in reversed(msgs):
+                _c = _m.get("content") if isinstance(_m, dict) else getattr(_m, "content", "")
+                if isinstance(_c, list):
+                    _c = " ".join(str(p.get("text", "")) if isinstance(p, dict) else str(p) for p in _c)
+                _c = str(_c or "").strip()
+                if _c:
+                    _content = _c
+                    break
+            t["result"] = _content[:2000] if _content else "（任务跑完但没有留下文字结论——多半是输出被截断，请查部门线程）"
             t["status"] = "done"
         elif run["status"] in ("error", "timeout", "interrupted"):
             t["status"] = "error"
@@ -240,7 +249,7 @@ async def tasks_webhook(tid: str = "", main: str = "", request: Request = None):
     # R58 三重防重：① reported 先置位再注入（webhook 重投递不再重复）② 注入前扫目标线程
     #    已有同单汇报则跳过 ③ 注入异常也保留 reported（失败走 /tasks/list 补查，不刷屏）
     # R59 并发锁：webhook 网络重试可能多投递并发到达，"检查→置位→注入"必须原子化，
-    #    否则同一任务会被注入多次、助手重复汇报（2026-08-31 bk_001 实测复现）
+    #    否则同一任务会被注入多次、米娅重复汇报（2026-08-31 bk_001 实测复现）
     if mt and t["status"] in ("done", "error"):
         async with _webhook_lock:
             if t.get("reported"):
@@ -252,7 +261,7 @@ async def tasks_webhook(tid: str = "", main: str = "", request: Request = None):
                 # 先扫目标线程：已有同单汇报就不重复注入（webhook 至少投递一次语义的保险）
                 state = await client.threads.get_state(mt)
                 msgs = (state.get("values") or {}).get("messages", [])
-                marker = f"[工作者调度·自动汇报] 后台任务 {tid} "
+                marker = f"[小全调度·自动汇报] 后台任务 {tid} "
                 if any(str(getattr(m, "content", m.get("content") if isinstance(m, dict) else "")).startswith(marker) for m in msgs):
                     print(f"[webhook] {tid} 已有汇报记录，跳过重复注入", flush=True)
                     return {"ok": True, "skipped": "已存在"}
@@ -262,8 +271,8 @@ async def tasks_webhook(tid: str = "", main: str = "", request: Request = None):
                 await client.runs.create(
                     mt, aid,
                     input={"messages": [{"role": "user", "content":
-                        f"[工作者调度·自动汇报] 后台任务 {tid} {verdict}。\n成果/情况：\n{t.get('result', '')[:1500]}\n"
-                        f"请把结果要点汇报给管理员（别复述全文），然后继续陪他聊。"}]},
+                        f"[小全调度·自动汇报] 后台任务 {tid} {verdict}。\n成果/情况：\n{t.get('result', '')[:1500]}\n"
+                        f"请把结果要点汇报给爸爸（别复述全文），然后继续陪他聊。"}]},
                     multitask_strategy="enqueue",
                 )
             except Exception:
@@ -283,9 +292,19 @@ async def tasks_list():
                     if run["status"] == "success":
                         state = await client.threads.get_state(t["thread_id"])
                         msgs = (state.get("values") or {}).get("messages", [])
-                        _last = msgs[-1] if msgs else None
-                        _content = (_last.get("content") if isinstance(_last, dict) else getattr(_last, "content", "")) if _last is not None else ""
-                        t["result"] = str(_content or _last)[:2000] if _last is not None else "（无输出）"  # R68 修 评审A E2
+                        # R10.30 隔离修复：结论取"最后一条非空文本"，绝不 str() 整个消息对象
+                        # （旧代码 content 空时回退 dump 原始 dict=牛马进程残渣混进米娅对话记录；
+                        #   finish_reason=length 截断时 content 为空正是高发场景）
+                        _content = ""
+                        for _m in reversed(msgs):
+                            _c = _m.get("content") if isinstance(_m, dict) else getattr(_m, "content", "")
+                            if isinstance(_c, list):  # 多模态分段
+                                _c = " ".join(str(p.get("text", "")) if isinstance(p, dict) else str(p) for p in _c)
+                            _c = str(_c or "").strip()
+                            if _c:
+                                _content = _c
+                                break
+                        t["result"] = _content[:2000] if _content else "（任务跑完但没有留下文字结论——多半是输出被截断，请查部门线程）"
                         t["status"] = "done"
                     elif run["status"] in ("error", "timeout", "interrupted"):
                         t["status"] = "error"
@@ -301,7 +320,7 @@ async def tasks_list():
 @router.post("/threads/title")
 async def threads_title(req: dict = Body(...)):
     """R45 自动起名：新对话首轮结束后前端调用。已有 custom_title 或还没有用户消息则跳过。
-    标题用工人岗同款 glm-4.5-air（免费包，thinking off，一次 ~100 token），≤12 字写回 metadata。"""
+    标题用牛马同款 glm-4.5-air（免费包，thinking off，一次 ~100 token），≤12 字写回 metadata。"""
     try:
         tid = (req.get("thread_id") or "").strip()
         if not tid:
@@ -313,7 +332,7 @@ async def threads_title(req: dict = Body(...)):
             return {"ok": True, "title": meta["custom_title"], "skipped": "已有标题"}
         state = await client.threads.get_state(tid)
         msgs = (state.get("values") or {}).get("messages", [])
-        # R68 修 评审A E1/评审E三.2.1：get_state 的 messages 是 dict 列表，getattr 恒拿不到 type
+        # R68 修 Cora E1/Qianwen三.2.1：get_state 的 messages 是 dict 列表，getattr 恒拿不到 type
         _mt = lambda m: m.get("type") if isinstance(m, dict) else getattr(m, "type", "")
         _mc = lambda m: m.get("content") if isinstance(m, dict) else getattr(m, "content", "")
         human = next((m for m in msgs if _mt(m) == "human"), None)

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 服务商管理 API 客户端（2026-08-29 作者）
+ * 服务商管理 API 客户端（2026-08-29 知夏）
  * 全部请求发往本平台自己的后端固定地址（NEXT_PUBLIC_LANGGRAPH_URL），
  * 不存在用户可控的目标 URL；服务商地址只作为业务数据放进请求体，
  * 由后端（office.py）做协议校验后转发拉取模型列表。
@@ -53,7 +53,7 @@ export function tokenRotate(newToken?: string, bootstrapCode?: string): Promise<
   return apiFetch(`${API}/settings/token`, {
     method: 'POST',
     // R10.5 事故修复：首设（未配置态）必须带 X-Bootstrap 激活码（宿主 .token_bootstrap 文件里的值）——
-    // 此前前端没有激活码输入框，管理员清钥后 4 连 403（审计实锤），UI 断层当场爆发。
+    // 此前前端没有激活码输入框，爸爸清钥后 4 连 403（审计实锤），UI 断层当场爆发。
     headers: authHeaders({
       'Content-Type': 'application/json',
       ...(bootstrapCode ? { 'X-Bootstrap': bootstrapCode } : {}),
@@ -68,7 +68,7 @@ export function tokenClear(): Promise<{ ok?: boolean; error?: string }> {
   }).then((r) => r.json()).catch(() => ({ error: '无法连接后端' }));
 }
 
-/** 读取全量设置（打码版）。R80 续：读面收口后 GET /settings 也带 Bearer（浏览器=管理员有钥匙） */
+/** 读取全量设置（打码版）。R80 续：读面收口后 GET /settings 也带 Bearer（浏览器=爸爸有钥匙） */
 export function getSettings() {
   return apiFetch(`${API}/settings`, { headers: authHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -96,7 +96,7 @@ export function getBackgroundTasks(): Promise<{ tasks: any[] }> {
 }
 
 /** 上传文件落盘到平台（识图等按路径读取）。R79 补（hy4 自检）：/files/save 写共享卷已入 token 门，
- *  管理员的浏览器带 Bearer 上传正常；助手无钥匙=写不进 files/。 */
+ *  爸爸的浏览器带 Bearer 上传正常；米娅无钥匙=写不进 files/。 */
 export function saveFile(name: string, b64: string): Promise<{ ok?: boolean; path?: string; error?: string }> {
   return apiFetch(`${API}/files/save`, {
     method: 'POST',

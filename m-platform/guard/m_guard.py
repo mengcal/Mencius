@@ -1,13 +1,13 @@
-"""m_guard.py — M平台守卫服务（R10.6，管理员拍板"一次做成 外置式守卫外置"）。
+"""m_guard.py — M平台守卫服务（R10.6，爸爸拍板"一次做成 ZCode 式守卫外置"）。
 
 参照两条成熟模式（2026-09-06 调研）：
 - ssh-agent：密钥常驻守卫进程内存/本地加密存储，**只提供"验证通过/不通过"，永不外发明文**；
 - DPAPI（Windows 数据保护 API，user scope）：以运行账户（SYSTEM）加密落盘——其他 Windows 账户物理解不开。
 
-威胁模型（助手终态=专属标准账户+宿主全权）：
+威胁模型（米娅终态=专属标准账户+宿主全权）：
 - 她可以打到 127.0.0.1:9101（问验证），但拿不到明文、改不了判定；
-- 她读不了 DPAPI(SYSTEM) 加密的 token.bin、停不掉 SYSTEM 任务、改不了本目录（icacls 已锁 SYSTEM+Administrators+主机登录用户）；
-- 她要越界=UAC 弹管理员密码。
+- 她读不了 DPAPI(SYSTEM) 加密的 token.bin、停不掉 SYSTEM 任务、改不了本目录（ACL 后续收紧）；
+- 她要越界=UAC 弹爸爸密码。
 
 端点：
 - GET  /status            → {"configured": bool}（无敏感）
@@ -37,7 +37,7 @@ _PORT = int(os.environ.get("M_GUARD_PORT", "9101"))
 
 def _load_dotenv_mini() -> None:
     r"""R10.8c（致命修复）：SYSTEM 计划任务启动的进程环境里没有用户 .env——
-    M_GUARD_KEY 读成空串 → 所有带钥匙请求被 403（管理员注册 503 真凶）。
+    M_GUARD_KEY 读成空串 → 所有带钥匙请求被 403（爸爸注册 503 真凶）。
     启动时从 D:\m\.env 提取 M_GUARD_* 变量（进程已有环境变量优先）。"""
     env_file = Path(os.environ.get("M_GUARD_ENV_FILE", r"D:\m\.env"))
     try:
@@ -56,8 +56,8 @@ def _load_dotenv_mini() -> None:
 _load_dotenv_mini()
 
 _LOGIN_HITS: list = []  # /login 严格限频（10/min）：防密码爆破
-_LOGIN_FAILS = {"n": 0, "until": 0.0}  # R10.8（评审C P2-2）：连续失败≥5 → 锁 300s
-GUARD_KEY = os.environ.get("M_GUARD_KEY", "")  # R10.8（评审B 🔴A/评审C P1-1）：通信钥匙——
+_LOGIN_FAILS = {"n": 0, "until": 0.0}  # R10.8（Eve P2-2）：连续失败≥5 → 锁 300s
+GUARD_KEY = os.environ.get("M_GUARD_KEY", "")  # R10.8（NOVA 🔴A/Eve P1-1）：通信钥匙——
 # 宿主回环被 host.docker.internal 转发成"所有容器可达"，且转发后源 IP 一律 127.0.0.1
 # （实测 token_audit 证实）——网络位置不再构成身份，/verify /set /set_password /clear
 # 必须带 X-Guard-Key（workplatform env 独有，沙箱 env 没有）；R10.11 起含 /login——
@@ -104,7 +104,7 @@ def _read_token() -> str:
         return ""
 
 
-# ── R10.7（管理员："发布后普通用户怎么取得管理员权限"）：密码找回通道 ──
+# ── R10.7（爸爸："发布后普通用户怎么取得管理员权限"）：密码找回通道 ──
 # 注册（首设）时设管理员密码 → PBKDF2(200k) 哈希后 DPAPI 加密落 password.bin；
 # 忘记 Cookie 时用密码找回：/login 验证通过即发回当前密钥明文（密码持有者=管理员，语义等价找回）。
 def _hash_password(pwd: str) -> str:
@@ -175,19 +175,19 @@ def _write_token(val: str) -> None:
 
 def _write_hostcopy(val: str) -> None:
     """宿主测试副本（m-gates.sh 等宿主脚本用）：DPAPI 解不开时唯一明文落点。
-    迁移脚本会 icacls 收紧为 Administrators+SYSTEM——未来助手标准账户读不到。
+    迁移脚本会 icacls 收紧为 Administrators+SYSTEM——未来米娅标准账户读不到。
     容器内进程与沙箱永远摸不到（宿主文件）。写失败只审计不阻断。"""
     try:
         HOSTCOPY.write_text(val, encoding="utf-8")
         # R10.6b（hy4 F13 缓解）：明文副本 ACL 收紧到 SYSTEM+Administrators+当前账户——
-        # 未来助手标准账户读不到；迁移后如需彻底消除明文落盘，改由 m-gates 向管理员要 Cookie 值。
+        # 未来米娅标准账户读不到；迁移后如需彻底消除明文落盘，改由 m-gates 向爸爸要 Cookie 值。
         try:
             import subprocess as _sp
             user = os.environ.get("USERNAME", "")
             grants = ["SYSTEM:F", "Administrators:F"] + ([f"{user}:F"] if user else [])
             _r = _sp.run(["icacls", str(HOSTCOPY), "/inheritance:r", "/grant:r", *grants],
                          capture_output=True, timeout=10)
-            if _r.returncode != 0:  # R10.11（评审E）：icacls 失败不再静默——明文副本的 ACL 是唯一宿主侧防护
+            if _r.returncode != 0:  # R10.11（千问）：icacls 失败不再静默——明文副本的 ACL 是唯一宿主侧防护
                 _audit("hostcopy_acl_failed", rc=_r.returncode)
         except Exception as e:
             _audit("hostcopy_acl_failed", err=type(e).__name__)
@@ -214,7 +214,7 @@ def _del_password() -> None:
         pass
 
 
-_AUDIT_ROTATE_BYTES = 10 * 1024 * 1024  # R10.11（评审E P1-3）：守卫账本 10MB 三代轮转——与 office/core._rotate_log 同款
+_AUDIT_ROTATE_BYTES = 10 * 1024 * 1024  # R10.11（千问 P1-3）：守卫账本 10MB 三代轮转——与 office/core._rotate_log 同款
                                         # 此前纯 append 无上限（/login 无钥匙 10/min 可日增 1.4MB），磁盘写满会打断 _write_token 原子写
 
 
@@ -280,7 +280,7 @@ def _bootstrap_ensure() -> str:
             _sp.run(["icacls", str(BOOTSTRAP_FILE), "/inheritance:r", "/grant:r", *grants],
                     capture_output=True, timeout=10)
         except Exception as e:
-            _audit("bootstrap_acl_failed", err=type(e).__name__)  # R10.11（评审E）：注释说"只审计"就真审计——此前 except pass 静默
+            _audit("bootstrap_acl_failed", err=type(e).__name__)  # R10.11（千问）：注释说"只审计"就真审计——此前 except pass 静默
         _audit("bootstrap_ensure")
     except Exception as e:
         _audit("bootstrap_failed", err=type(e).__name__)
@@ -452,7 +452,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             cur = _read_token()
             stored = _read_password_hash()
-            # R10.8d（管理员："怎么修改密码"）：修改找回密码的证明路径——
+            # R10.8d（爸爸："怎么修改密码"）：修改找回密码的证明路径——
             #   ① 旧密码验证通过（知道旧密码=有权改，最用户友好）
             #   ② 当前密钥证明（CLI/API 场景）
             # 两者任一通过即可。防持久化攻击：旧密码验证仍然必须。
@@ -472,8 +472,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {"ok": True})
             return
         if self.path == "/login":
-            # R10.7：密码找回——验证通过即 rotate 重签发新密钥（评审E P0-1：找回不回吐旧明文）。
-            # R10.11（评审E P0-1 收口）：补 X-Guard-Key 门——本端点是唯一能签发新管理员密钥的
+            # R10.7：密码找回——验证通过即 rotate 重签发新密钥（千问 P0-1：找回不回吐旧明文）。
+            # R10.11（千问 P0-1 收口）：补 X-Guard-Key 门——本端点是唯一能签发新管理员密钥的
             # 入口，此前却是钥匙门最弱的（只有密码一道）。合法调用方 office /auth/login 本就
             # 带钥匙（token_admin.py:266），补门零破坏；无钥匙的 /login 只服务于没有钥匙的
             # 攻击者（沙箱经 host.docker.internal 可达 9101，5 败锁可被无限触发=锁死找回通道）。
@@ -507,7 +507,7 @@ class Handler(BaseHTTPRequestHandler):
                 _audit("login", ok=False, ip=ip)
                 self._send(200, {"ok": False, "error": "密码不正确"})
                 return
-            # R10.8（评审E P0-1）：不回旧明文——rotate 重签发新密钥（找回=重新签发，与注册对称）
+            # R10.8（千问 P0-1）：不回旧明文——rotate 重签发新密钥（找回=重新签发，与注册对称）
             import secrets as _s2
             new_tok = _s2.token_hex(16)
             _write_token(new_tok)
@@ -516,7 +516,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/verify_password":
             # R10.8h（自毁教训）：只验证密码、绝不签发/轮换——供测试与"检查密码是否正确"使用。
-            # 之前的测试真登录=每次 rotate=把管理员浏览器 Cookie 挤掉（自毁循环）。
+            # 之前的测试真登录=每次 rotate=把爸爸浏览器 Cookie 挤掉（自毁循环）。
             # R10.9（GLM-5.3 自检 P2-2 收口）：①补进程钥匙门——与 /verify /set 同面，
             # 沙箱经 host.docker.internal 连"问密码对不对"都不许；②失败与 /login 同桶
             # 计入 5 败锁——此前 verify_password 无限试错不锁定=爆破旁路（10/min 限频挡不住慢速爆破）。
@@ -594,7 +594,7 @@ def _migrate_from_legacy() -> None:
         os.replace(str(tmp), str(legacy))
         _audit("migrated_from_legacy")
     except Exception as e:
-        # R10.8（评审D）：json 写失败=旧明文残留 secrets 卷——回滚 bin，保单源一致
+        # R10.8（Lyra）：json 写失败=旧明文残留 secrets 卷——回滚 bin，保单源一致
         _del_token()
         _audit("migration_rolled_back", err=type(e).__name__)
         return

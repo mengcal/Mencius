@@ -1,6 +1,6 @@
 # ══════════════════════════════════════════════════════════════
 # SearXNG 优化版 settings.yml（无代理/VPN 友好版）
-# 生成：助手 2026-08-23 | 基于管理员原配置 + 实测可达性
+# 生成：米娅 2026-08-23 | 基于爸爸原配置 + 实测可达性
 #
 # 改动要点：
 #   1. default_lang: zh-CN → "all"（英文查询不再被强制中文）
@@ -55,7 +55,7 @@ server:
   base_url: http://localhost:8080/
   limiter: false
   public_instance: false
-  secret_key: "CHANGE-ME-random-64-hex"   # 生成：python -c "import secrets;print(secrets.token_hex(32))"
+  secret_key: "a80d127f087f39174bb2288e22abb0222d7a0d249ee80cb4b520f408fdaad6c1"
   image_proxy: false
   http_protocol_version: "1.0"
   method: "POST"
@@ -104,7 +104,7 @@ categories_as_tabs:
   it:                            # ← 新增：技术分类
 
 engines:
-  # ───────── 必应系列（管理员原有，保留）─────────
+  # ───────── 必应系列（爸爸原有，保留）─────────
   - name: bing
     engine: bing
     shortcut: bi

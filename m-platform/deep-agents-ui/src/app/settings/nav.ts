@@ -1,7 +1,7 @@
 /**
- * settings/nav.ts —— 参考 open-webui 的设置页导航树 + 未实现占位行常量
+ * settings/nav.ts —— OWUI 设置页导航树 + 未实现占位行常量
  * ------------------------------------------------------------------
- * 组名与顺序参考 open-webui SettingsModal 公开设计（Personal/Basic、个人资料、Admin/系统、AI、Experience、Tools）。
+ * 组名与顺序照抄 open-webui SettingsModal（Personal/Basic、个人资料、Admin/系统、AI、Experience、Tools）。
  * 纯数据模块，不含组件；只被 page.tsx（侧栏渲染 + 占位页标题）消费。
  */
 
@@ -44,7 +44,7 @@ export const NAV: { section: string; groups: Group[] }[] = [
       {
         heading: '系统',
         tabs: [
-          // R10.5（管理员）：Personal 区已有"通用"（助手的）——管理员的这页改名"管理"，不再重名
+          // R10.5（爸爸）：Personal 区已有"通用"（米娅的）——管理员的这页改名"管理"，不再重名
           { id: 'admin:general', label: '管理', icon: Settings, real: true },
         ],
       },
@@ -53,7 +53,7 @@ export const NAV: { section: string; groups: Group[] }[] = [
         tabs: [
           { id: 'admin:connections', label: '外部连接', icon: Link2, real: true },
           { id: 'admin:models', label: '模型', icon: Bot, real: true },
-          { id: 'admin:subagents', label: '工人岗矩阵', icon: LayoutList, real: true },
+          { id: 'admin:subagents', label: '牛马矩阵', icon: LayoutList, real: true },
         ],
       },
       {

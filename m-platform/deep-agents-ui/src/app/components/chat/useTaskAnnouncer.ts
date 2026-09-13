@@ -3,7 +3,7 @@
 /**
  * components/chat/useTaskAnnouncer.ts —— 后台任务完成自动播报（原 ChatInterface.tsx R3/R64 段迁出）
  * ------------------------------------------------------------------
- * 轮询 /background_tasks（15s），完成且未播报的任务 → 自动让助手读结果汇报给管理员。
+ * 轮询 /background_tasks（15s），完成且未播报的任务 → 自动让米娅读结果汇报给爸爸。
  * R64 修复：① 只播报 !reported 的任务（webhook 已汇报过的老任务永不重复播，
  *     bk_001/bk_002 这类历史任务从此闭嘴）；② announced 集合持久化到 localStorage
  *     'mia.announcedTasks'，刷新页面不再清空重播（原 useRef 内存集刷新即失忆 = R56 反复出现的元凶）
@@ -39,7 +39,7 @@ export function useTaskAnnouncer(isLoading: boolean, sendMessage: SendMessage) {
             JSON.stringify([...announcedRef.current])
           );
           sendMessage(
-            `后台任务《${t.task}》已完成，结果如下：\n${t.result}\n请把结果整理后汇报给管理员。`
+            `后台任务《${t.task}》已完成，结果如下：\n${t.result}\n请把结果整理后汇报给爸爸。`
           );
         }
       } catch {

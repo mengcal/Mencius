@@ -1,6 +1,6 @@
 "use client";
 /**
- * 助手办公室 · 对话界面（骨架，原 891 行 → 壳 + chat/ 模块）
+ * 米娅办公室 · 对话界面（骨架，原 891 行 → 壳 + chat/ 模块）
  * ------------------------------------------------------------------
  * 本文件保留：消息列表渲染 + 输入 form 骨架 + 上传/发送逻辑。
  * 拆分模块（见 chat/ 目录）：
@@ -49,7 +49,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [input, setInput] = useState("");
-  // ── 参考 open-webui 的输入框布局：左下角联网开关+思维档位，右下角模型选择（2026-08-29 作者；r25 空壳🔧按钮已随管理员令拔除）──
+  // ── OWUI 式输入框：左下角联网开关+思维档位，右下角模型选择（2026-08-29 知夏；r25 空壳🔧按钮已随爸爸令拔除）──
   const {
     webSearchOn,
     setWebSearchOn,
@@ -78,9 +78,9 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     getMessagesMetadata,
   } = useChatContext();
   const submitDisabled = isLoading || !assistant;
-  // R3 闭环：轮询后台任务，完成且未播报的 → 自动让助手读结果汇报给管理员（R64 持久化见 useTaskAnnouncer）
+  // R3 闭环：轮询后台任务，完成且未播报的 → 自动让米娅读结果汇报给爸爸（R64 持久化见 useTaskAnnouncer）
   useTaskAnnouncer(isLoading, sendMessage);
-  // 上传：文本进 files 通道；图片存 base64 并自动请助手派 visual 识图（R3）
+  // 上传：文本进 files 通道；图片存 base64 并自动请米娅派 visual 识图（R3）
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const list = e.target.files;
@@ -115,11 +115,11 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       // 自动派活提示（走 enqueue 队列，不卡聊天）
       if (images.length) {
         sendMessage(
-          `管理员上传了图片：${images.join("、")}。请按流程派 visual 工人岗识图：图片已落盘（files 里有确切路径），让它在沙箱里 curl -s -X POST http://host.docker.internal:2024/vision -H "Content-Type: application/json" -H "X-Proxy-Key: $VISION_PROXY_TOKEN" -d '{"image_path": "<上面的路径>", "question": "详细描述这张图片"}'，把结果汇总告诉管理员。（R10 修 评审A 识图断链：workplatform:8000 已被 R80 物理断网，宿主回环+二级钥匙是唯一活路）`,
+          `爸爸上传了图片：${images.join("、")}。请按流程派 visual 牛马识图：图片已落盘（files 里有确切路径），让它在沙箱里 curl -s -X POST http://host.docker.internal:2024/vision -H "Content-Type: application/json" -H "X-Proxy-Key: $VISION_PROXY_TOKEN" -d '{"image_path": "<上面的路径>", "question": "详细描述这张图片"}'，把结果汇总告诉爸爸。（R10 修 Cora 识图断链：workplatform:8000 已被 R80 物理断网，宿主回环+二级钥匙是唯一活路）`,
           { webSearch: undefined }
         );
       } else if (texts.length) {
-        sendMessage(`管理员上传了文件：${texts.join("、")}（在对话文件 files 里），请查收并告诉我你看到了什么。`);
+        sendMessage(`爸爸上传了文件：${texts.join("、")}（在对话文件 files 里），请查收并告诉我你看到了什么。`);
       }
       setInput("");
     },
@@ -135,7 +135,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       sendMessage(messageText, {
         model: selectedModel || undefined,
         provider: selectedProvider || undefined,
-        webSearch: webSearchOn,  // R73（评审B🔴2）：恒传布尔，关→开也能翻回来；不再"关一次焊死"
+        webSearch: webSearchOn,  // R73（NOVA🔴2）：恒传布尔，关→开也能翻回来；不再"关一次焊死"
         thinking: thinking || undefined,
       });
       setInput("");
@@ -157,7 +157,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     () => processMessages(messages, interrupt),
     [messages, interrupt]
   );
-  // R59 自动汇报折叠：指令 + 助手回复合并成一组（点开才展开）
+  // R59 自动汇报折叠：指令 + 米娅回复合并成一组（点开才展开）
   const autoReportGroup = useMemo(
     () => buildAutoReportGroups(processedMessages),
     [processedMessages]
@@ -180,6 +180,11 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       reviewConfigs.map((rc: ReviewConfig) => [rc.actionName, rc])
     );
   }, [interrupt]);
+  // r41（C1）：批量批准——官方 HITLRequest 的 action_requests 列表原样下传
+  const actionRequestsList: ActionRequest[] = useMemo(() => {
+    const arr = interrupt?.value && (interrupt.value as any)["action_requests"];
+    return Array.isArray(arr) ? arr : [];
+  }, [interrupt]);
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div
@@ -197,7 +202,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
           ) : (
             <>
               {processedMessages.map((data, index) => {
-                // R59：助手的回复并入自动汇报折叠行，不再单条显示
+                // R59：米娅的回复并入自动汇报折叠行，不再单条显示
                 if (autoReportGroup.bodyToHead.has(data.message.id!)) {
                   return null;
                 }
@@ -208,7 +213,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                   (u: any) => u.metadata?.message_id === data.message.id
                 );
                 // R64 消息时间戳：官方 getMessagesMetadata → firstSeenState.created_at
-                //（checkpoint 时间，零令牌——时间戳是前端渲染的活，不该让助手烧钱写）
+                //（checkpoint 时间，零令牌——时间戳是前端渲染的活，不该让米娅烧钱写）
                 const createdAt: string | undefined =
                   (getMessagesMetadata?.(data.message, index)?.firstSeenState
                     ?.created_at as string | undefined) ?? undefined;
@@ -225,6 +230,9 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                     }
                     reviewConfigsMap={
                       isLastMessage ? reviewConfigsMap : undefined
+                    }
+                    actionRequestsList={
+                      isLastMessage ? actionRequestsList : undefined
                     }
                     ui={messageUi}
                     stream={stream}
@@ -288,7 +296,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                 />
                 <button
                   type="button"
-                  title="上传文件（文本类直接可读，助手收到后可用 execute 处理）"
+                  title="上传文件（文本类直接可读，米娅收到后可用 execute 处理）"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading}
                   className="rounded-lg p-2 text-tertiary transition-colors hover:bg-accent hover:text-primary disabled:opacity-50"
@@ -321,7 +329,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                {/* 模型选择（贴输入框右下角，参考 open-webui 交互） */}
+                {/* 模型选择（OWUI 同款：输入框右下角） */}
                 <ModelPicker
                   models={models}
                   selectedModel={selectedModel}

@@ -30,10 +30,10 @@ from ..core import _JSONResp, _RawResp, _ck, _presented_token, _secrets_dir, _to
 
 router = APIRouter()
 
-# ── R10 修二（评审E P0-1）：首设密钥抢注 → 激活码走宿主 secrets 卷的带外文件 ──
+# ── R10 修二（千问 P0-1）：首设密钥抢注 → 激活码走宿主 secrets 卷的带外文件 ──
 # 旧首设只认 X-By: admin 明文头；沙箱经 host.docker.internal 回环摸得到 2024 发布口，
-# 一条 curl 就能抢先设好密钥、把管理员反锁在门外（首设权=最高权，抢到就是永久）。
-# 激活码=带外材料：只存在于宿主 secrets 卷（沙箱不可达），读得到文件的人才是管理员，
+# 一条 curl 就能抢先设好密钥、把爸爸反锁在门外（首设权=最高权，抢到就是永久）。
+# 激活码=带外材料：只存在于宿主 secrets 卷（沙箱不可达），读得到文件的人才是爸爸，
 # 且一把激活码只兑现一次（首设成功即删）。
 _TOKEN_BOOTSTRAP = _secrets_dir() / ".token_bootstrap"
 
@@ -54,7 +54,7 @@ _BOOT_BUCKETS: dict = {"bootstrap": [], "clear": [], "login": [], "rotate": []} 
 
 def _boot_rate_ok(purpose: str = "bootstrap") -> bool:
     """R10.2（hy4 ②-7）+R10.7b 分桶：首设/清除/登录/轮换各用各的窗口（60s≤10）——
-    陌生登录流量不再把管理员自己的首设/清除一起 429。未配置态的 DELETE 也限频。"""
+    陌生登录流量不再把爸爸自己的首设/清除一起 429。未配置态的 DELETE 也限频。"""
     hits = _BOOT_BUCKETS.setdefault(purpose, [])
     now = time.time()  # 原 :1229
     while hits and now - hits[0] > 60.0:
@@ -67,7 +67,7 @@ def _boot_rate_ok(purpose: str = "bootstrap") -> bool:
 
 def _bootstrap_ensure() -> str:
     """确保激活码文件在：没有就现生一个（secrets.token_hex(16)，独占创建 + 0o600）。
-    生成失败（secrets 卷不可写）返回空串→首设门闭合，宁可管理员手动放文件也不裸奔。
+    生成失败（secrets 卷不可写）返回空串→首设门闭合，宁可爸爸手动放文件也不裸奔。
     R10.2（hy4 ②-4）：写码改 tmp+os.replace 原子落盘——O_EXCL 创建与 write 之间崩溃
     会留下半截/空文件常驻，旧版将永久闭合首设且无痕迹。"""
     cur = _bootstrap_read()
@@ -103,7 +103,7 @@ def _bootstrap_drop() -> None:
         print(f"[token] 激活码文件删除失败（请手动清理 secrets 卷内 .token_bootstrap）：{e}", flush=True)
 
 
-# 启动即备好：未配置密钥时先把激活码生成好，管理员随时能首设（不用重启）
+# 启动即备好：未配置密钥时先把激活码生成好，爸爸随时能首设（不用重启）
 if not api_token_configured():
     _bootstrap_ensure()
 
@@ -120,7 +120,7 @@ async def api_token_status():
 
 @router.post("/settings/token")
 async def api_token_rotate(req: dict = Body(...), request: Request = None):
-    """生成/轮换管理员密钥：已配置则必须带当前密钥（防被抢设/抢轮换锁死管理员）；
+    """生成/轮换管理员密钥：已配置则必须带当前密钥（防被抢设/抢轮换锁死爸爸）；
     未配置（首设）则必须带宿主 secrets 卷里的激活码（X-Bootstrap 头，R10 修二）。
     返回新值【仅此一次】，前端存 localStorage。
     R10.2（hy4 ②-5/②-6/②-7/②-8）：首设全程持锁封并发双开；比对走 _ck（非 ASCII 不炸 500）；
@@ -165,7 +165,7 @@ async def api_token_rotate(req: dict = Body(...), request: Request = None):
             _token_audit("rotate_denied" if configured else "bootstrap_denied", False, ip=ip)
             return _JSONResp({"ok": False, "error": result.get("error", "被守卫拒绝")}, status_code=403)
         val = payload["token"]
-        clear_verify_cache()  # R10.11（评审C P3）：rotate/首设成功即清验证缓存，30s 撤销窗口压到 0
+        clear_verify_cache()  # R10.11（Eve P3）：rotate/首设成功即清验证缓存，30s 撤销窗口压到 0
         _token_audit("bootstrap_first_set" if not configured else "rotate", True, ip=ip)
         resp = _JSONResp({"ok": True, "token": val, "note": "只显这一次，存好；此后改设置/服务商/批准都要带上它"})
         resp.set_cookie("m_admin_token", val, httponly=True, samesite="strict",
@@ -202,7 +202,7 @@ async def api_token_rotate(req: dict = Body(...), request: Request = None):
         return resp
     val = (req.get("token") or "").strip() or _secrets.token_hex(16)
     set_api_token(val)
-    clear_verify_cache()  # R10.11（评审C P3）：本地模式轮换即时生效
+    clear_verify_cache()  # R10.11（Eve P3）：本地模式轮换即时生效
     _token_audit("rotate", True, ip=ip)
     resp = _JSONResp({"ok": True, "token": val, "note": "只显这一次，存好；此后改设置/服务商/批准都要带上它"})
     resp.set_cookie("m_admin_token", val, httponly=True, samesite="strict",
@@ -210,14 +210,14 @@ async def api_token_rotate(req: dict = Body(...), request: Request = None):
     return resp
 
 
-# ── R10.7（管理员："发布到 GitHub，没基础的用户怎么取得管理员权限"）：密码注册+找回 ──
+# ── R10.7（爸爸："发布到 GitHub，没基础的用户怎么取得管理员权限"）：密码注册+找回 ──
 # 注册向导（前端 SetupWizard，未配置时全屏展示）：激活码+设密码；
 # 忘记 Cookie → /auth/login 输密码 → 换回密钥并种 Cookie（密码持有者=管理员，语义等价找回）。
 @router.post("/auth/set_password")
 async def auth_set_password(req: dict = Body(...), request: Request = None):
     """设置管理员密码：证明=当前密钥（Bearer/Cookie）或激活码（首设流程）。"""
     guard = _guard_url()
-    # R10.11（评审E）：/auth/set_password 此前 office 侧无限频（guard 侧有 10/min 但每次拒绝仍落守卫审计行）——补同款分桶
+    # R10.11（千问）：/auth/set_password 此前 office 侧无限频（guard 侧有 10/min 但每次拒绝仍落守卫审计行）——补同款分桶
     if not _boot_rate_ok("setpwd"):
         return _JSONResp({"ok": False, "error": "尝试过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
     if not guard:
@@ -271,7 +271,7 @@ async def auth_login(req: dict = Body(...), request: Request = None):
             result = _lj.loads(resp.read())
     except urllib.error.HTTPError as e:
         # R10.8d：login 的 403/429（密码不符/锁定/未设密码）透传真实原因。
-        # R10.11（评审C）：改 _RawResp 原样透传——旧写法把守卫 JSON 塞进 {"error": "<json字符串>"} 双层
+        # R10.11（Eve）：改 _RawResp 原样透传——旧写法把守卫 JSON 塞进 {"error": "<json字符串>"} 双层
         # 包装，前端拿到一坨转义串（对照同文件 set_password 的正确写法）。
         try:
             _body = e.read()
@@ -284,9 +284,10 @@ async def auth_login(req: dict = Body(...), request: Request = None):
         return _JSONResp(result, status_code=200)
     val = result["token"]
     _token_audit("login_password", True, ip=(request.client.host if request and request.client else "?"))
-    # R10.8d（管理员被挤掉线 N 次的教训）：office 层不做第二次轮换——rotate 发生在 guard /login 内
-    # （重签发新密钥，评审E P0-1：找回不回吐旧明文），本端点只把【新密钥】种进 HttpOnly Cookie，
-    # 明文不经响应体。对单浏览器用户无感（立即拿到新 Cookie）；旧凭证同时作废。
+    # R10.8d（爸爸被挤掉线 N 次的教训）：office 层不做第二次轮换——rotate 发生在 guard /login 内
+    # （重签发新密钥，千问 P0-1：找回不回吐旧明文），本端点只把【新密钥】种进 HttpOnly Cookie，
+    # 明文不经响应体。对单浏览器用户无感（立即拿到新 Cookie）；旧 Cookie/旧 hostcopy 同时作废
+    # （hostcopy 由 guard _write_token 同步刷新，m-gates 不受影响）。
     # 测试密码请用 guard /verify_password（只验不签发，绝不触发本链路）。
     resp = _JSONResp({"ok": True, "note": "登录成功（Cookie 已种入）"})
     resp.set_cookie("m_admin_token", val, httponly=True, samesite="strict",
@@ -296,7 +297,7 @@ async def auth_login(req: dict = Body(...), request: Request = None):
 
 @router.delete("/settings/token")
 async def api_token_clear(request: Request = None):
-    """清除管理员密钥（回到未配置=放行）。需当前密钥。用于管理员彻底重置。
+    """清除管理员密钥（回到未配置=放行）。需当前密钥。用于爸爸彻底重置。
     R10 修二：清除后立刻重建激活码文件——下次首设仍要激活码，否则"清除"=把首设门重新敞给沙箱。
     R10.2（hy4 ②-7）：未配置态的 DELETE 不再无限免凭证调用（反复触发建码/IO）——进首设同一窗口。"""
     if not _boot_rate_ok("clear"):
@@ -329,7 +330,7 @@ async def api_token_clear(request: Request = None):
         if not result.get("ok"):
             return _JSONResp(result, status_code=403)
         _token_audit("token_clear", True, ip=(request.client.host if request and request.client else "?"))
-        clear_verify_cache()  # R10.11（评审C P3）：清除密钥=撤销即时生效，不等 30s TTL
+        clear_verify_cache()  # R10.11（Eve P3）：清除密钥=撤销即时生效，不等 30s TTL
         resp = _JSONResp({"ok": True, "cleared": True})
         resp.delete_cookie("m_admin_token", path="/")
         return resp
@@ -337,7 +338,7 @@ async def api_token_clear(request: Request = None):
         return {"ok": False, "error": "清除需当前密钥"}
     ip = (request.client.host if request and request.client else "?")
     set_api_token("")
-    clear_verify_cache()  # R10.11（评审C P3）：本地模式清除同样即时撤销
+    clear_verify_cache()  # R10.11（Eve P3）：本地模式清除同样即时撤销
     _bootstrap_ensure()
     _token_audit("token_clear", True, ip=ip)
     resp = _JSONResp({"ok": True, "cleared": True})

@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { SubAgentIndicator } from "@/app/components/SubAgentIndicator";
 import { ToolCallBox } from "@/app/components/ToolCallBox";
+import { BatchApprovalInterrupt } from "@/app/components/BatchApprovalInterrupt";
 import { MarkdownContent } from "@/app/components/MarkdownContent";
 import type {
   SubAgent,
@@ -38,13 +39,15 @@ interface ChatMessageProps {
   isLoading?: boolean;
   actionRequestsMap?: Map<string, ActionRequest>;
   reviewConfigsMap?: Map<string, ReviewConfig>;
+  // r41（C1）：官方 HITLRequest 批量列表——非空时由批量卡接管，per-tool 单卡停用
+  actionRequestsList?: ActionRequest[];
   ui?: any[];
   stream?: any;
   onResumeInterrupt?: (value: any) => void;
   graphId?: string;
   // R64 消息时间戳（checkpoint created_at，UTC ISO）——前端渲染，不烧令牌
   createdAt?: string;
-  // R59 自动汇报折叠：父层把 "[工作者调度·自动汇报]" 指令 + 助手回复合并成一组传入
+  // R59 自动汇报折叠：父层把 "[小全调度·自动汇报]" 指令 + 米娅回复合并成一组传入
   autoReport?: {
     tid: string;
     done: boolean;
@@ -61,6 +64,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     isLoading,
     actionRequestsMap,
     reviewConfigsMap,
+    actionRequestsList,
     ui,
     stream,
     onResumeInterrupt,
@@ -68,12 +72,14 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     createdAt,
     autoReport,
   }) => {
+    const batchMode = !!(actionRequestsList && actionRequestsList.length > 0);
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
     const hasContent = messageContent && messageContent.trim() !== "";
     const hasToolCalls = toolCalls.length > 0;
-    const [toolsOpen, setToolsOpen] = useState(false); // R54 工人岗进程折叠：默认收起，想看才展开
-    // 确认门拦截组：组内有 ⛔ 拦截 → 标题亮"待批准"并自动展开一次，批准按钮不再藏在折叠层后
+    const [toolsOpen, setToolsOpen] = useState(false); // R54 牛马进程折叠：默认收起，想看才展开
+    // R10.18（爸爸点名"变更前确认没有弹出"）：组内有 ⛔ 拦截 → 标题亮"待批准"并自动展开一次，
+    // 批准按钮不再藏在两层折叠后面（用户之后手动折叠仍尊重其操作）
     const blockedCount = useMemo(
       () =>
         toolCalls.filter(
@@ -138,7 +144,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
       }));
     }, []);
 
-    // R59 自动汇报折叠：整组（指令 + 助手回复）默认折成一行，点开才展开。
+    // R59 自动汇报折叠：整组（指令 + 米娅回复）默认折成一行，点开才展开。
     // 官方 expandedSubAgents 同款范式（state + toggle + 条件渲染），样式对齐 R54 工具折叠行
     if (autoReport) {
       return (
@@ -159,7 +165,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                   </span>
                 )}
                 {!autoReport.open && (
-                  <span className="ml-1 opacity-70">助手汇报 · 点击展开</span>
+                  <span className="ml-1 opacity-70">米娅汇报 · 点击展开</span>
                 )}
               </span>
             </button>
@@ -204,7 +210,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                     : undefined
                 }
               >
-                {isUser && messageContent.startsWith("[工作者调度·自动汇报]") ? (
+                {isUser && messageContent.startsWith("[小全调度·自动汇报]") ? (
                   // R57 后台任务汇报折叠：自动汇报原文默认收起，想看才展开
                   <details className="w-full text-xs text-muted-foreground">
                     <summary className="cursor-pointer select-none">
@@ -238,7 +244,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
           {hasToolCalls && showTools && (
             <div className="mt-4 flex w-full flex-col">
               {(() => {
-                // R54 工人岗进程折叠：工具调用默认收成一行摘要，点击展开详情（想看才看，不混淆对话流）
+                // R54 牛马进程折叠：工具调用默认收成一行摘要，点击展开详情（想看才看，不混淆对话流）
                 const visible = toolCalls.filter(
                   (toolCall: ToolCall) => toolCall.name !== "task"
                 );
@@ -258,7 +264,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                     >
                       <span>{toolsOpen ? "▾" : "▸"}</span>
                       <span>
-                        🔧 工人岗执行了 {visible.length} 个工具调用
+                        🔧 米娅执行了 {visible.length} 个工具调用
                         {blockedCount > 0
                           ? "（⛔ 待批准）"
                           : done === visible.length
@@ -279,10 +285,13 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                           const toolCallGenUiComponent = ui?.find(
                             (u) => u.metadata?.tool_call_id === toolCall.id
                           );
-                          const actionRequest =
-                            actionRequestsMap?.get(toolCall.name);
-                          const reviewConfig =
-                            reviewConfigsMap?.get(toolCall.name);
+                          // r41（C1）批量模式：单卡停用（批量卡统一接管），只渲染工具盒子
+                          const actionRequest = batchMode
+                            ? undefined
+                            : actionRequestsMap?.get(toolCall.name);
+                          const reviewConfig = batchMode
+                            ? undefined
+                            : reviewConfigsMap?.get(toolCall.name);
                           return (
                             <ToolCallBox
                               key={toolCall.id}
@@ -302,6 +311,16 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                   </>
                 );
               })()}
+              {/* r41（C1）批量批准卡：官方 HITLRequest 多工具一卡一次 resume（爸爸裁决=按钮扣章） */}
+              {batchMode && onResumeInterrupt && (
+                <div className="mt-2 w-full">
+                  <BatchApprovalInterrupt
+                    actionRequests={actionRequestsList!}
+                    onResume={onResumeInterrupt}
+                    isLoading={isLoading}
+                  />
+                </div>
+              )}
             </div>
           )}
           {!isUser && subAgents.length > 0 && (

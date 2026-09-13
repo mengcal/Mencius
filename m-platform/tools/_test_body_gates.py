@@ -1,4 +1,4 @@
-"""R10.4 体积闸门测试（终版-工具 随包交付，评审C/评审A"已实测可复验"口径）。
+"""R10.4 体积闸门测试（终版-工具 随包交付，Eve/Cora"已实测可复验"口径）。
 用法: python _test_body_gates.py   （宿主跑，目标 127.0.0.1:2024）
 断言: vision 9MB→413（8MB 帽）/ codebuddy 3MB→413 / rag/query 3MB→413（2MB 帽）/ vision chunked 流→413。
 """

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """providers.py — mcal 函数式模型工厂
 
-管理员要的：用函数设主模型 + 多模型子代理。
+爸爸要的：用函数设主模型 + 多模型子代理。
 每个服务商（base_url + api_key + 默认模型）在 providers.json 里配，
 make_model(provider, model) 一个函数出模型实例，主脑/子代理随便换。
 
@@ -24,7 +24,7 @@ PROVIDERS_FILE = Path(__file__).resolve().parent / "providers.json"
 
 
 def _model_override(model_name: str) -> dict:
-    """管理员按模型单独设置（settings.json 的 model_overrides 节，2026-08-29 作者）。
+    """管理员按模型单独设置（settings.json 的 model_overrides 节，2026-08-29 知夏）。
 
     参数三层优先级 = 代码显式传入 > model_overrides.<模型名> > 全局默认。
     取不到/没配置返回空 dict，零影响。
@@ -39,7 +39,7 @@ def _model_override(model_name: str) -> dict:
 @lru_cache(maxsize=1)
 def _load_providers_file() -> dict:
     """读 providers.json（遗留兼容层）。新服务商一律走设置页"外部连接"（存 settings.json）。
-    R69（评审E三.2.6）：文件缺失=空表——遗留兼容层不得成为启动硬依赖。"""
+    R69（Qianwen三.2.6）：文件缺失=空表——遗留兼容层不得成为启动硬依赖。"""
     try:
         return json.loads(PROVIDERS_FILE.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -49,8 +49,8 @@ def _load_providers_file() -> dict:
 def load_providers() -> dict:
     """统一服务商表 = providers.json（遗留）+ 设置页外部连接（来源真相，enabled 才算）。
     设置页添加的服务商（external.providers）优先级更高；同名时覆盖遗留条目。
-    返回 {key: {base_url, api_key, model}}——工人岗矩阵和 /providers 接口都吃这张表，
-    从此加服务商不用碰任何文件，设置页点几下就行（2026-08-29 作者）。"""
+    返回 {key: {base_url, api_key, model}}——牛马矩阵和 /providers 接口都吃这张表，
+    从此加服务商不用碰任何文件，设置页点几下就行（2026-08-29 知夏）。"""
     merged = dict(_load_providers_file())
     try:
         from settings_mgr import load_settings, get_plain_provider_key
@@ -108,7 +108,7 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
     max_retries = kwargs.pop("max_retries", 3)
     request_timeout = kwargs.pop("request_timeout", 90)
 
-    # ===== 思考控制（管理员四档：关闭/低/中/高；字符串档位或 True/False）=====
+    # ===== 思考控制（爸爸四档：关闭/低/中/高；字符串档位或 True/False）=====
     # 各家协议不同，按 base_url 域名适配；档位只分"关/开"两级的厂商，低中高都按开处理。
     thinking = kwargs.pop("thinking", None)  # None=不动（但书生默认关思考，见下）
     if thinking is None and provider_name == "ss":
@@ -126,7 +126,7 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
                 extra_body["reasoning_effort"] = thinking
         elif "intern-ai" in host:  # 书生
             extra_body["thinking_mode"] = not off
-        elif "dashscope" in host or "aliyuncs" in host:  # 评审E
+        elif "dashscope" in host or "aliyuncs" in host:  # 千问
             extra_body["enable_thinking"] = not off
         elif off:
             extra_body["reasoning"] = {"enabled": False}
@@ -143,7 +143,7 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
 
     return ChatOpenAI(
         model=model,
-        # 无 key 就占位、调用时才报错；绝不借 .env 别家 key 越权（管理员零硬编码原则：配置页是唯一源）
+        # 无 key 就占位、调用时才报错；绝不借 .env 别家 key 越权（爸爸零硬编码原则：配置页是唯一源）
         api_key=p["api_key"] or "EMPTY",
         base_url=p["base_url"],
         temperature=kwargs.pop("temperature", 0.7),

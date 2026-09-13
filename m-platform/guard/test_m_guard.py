@@ -1,4 +1,4 @@
-"""test_m_guard.py — m-guard 守卫服务 单元测试（hy4 红队审查配套，任务 B；R10.6b 作者终检版）。
+"""test_m_guard.py — m-guard 守卫服务 单元测试（hy4 红队审查配套，任务 B；R10.6b 知夏终检版）。
 
 运行：cd D:\\m\\guard && python test_m_guard.py   （95 断言，全绿为验收线）
 
@@ -28,8 +28,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-# ── 只读加载守卫模块（r27 NOVA R5：路径=脚本同目录，换部署目录/换机器可跑；
-#    GUARD_DIR 环境变量可显式覆盖）────────────────────────────────
+# ── 只读加载守卫模块（r27 NOVA R5：路径=脚本同目录，GUARD_DIR 可显式覆盖）──
 GUARD_DIR = Path(os.environ.get("GUARD_DIR") or Path(__file__).resolve().parent)
 GUARD_SRC = GUARD_DIR / "m_guard.py"
 
@@ -53,7 +52,7 @@ mg = _load_guard()
 _PATCHED_CONSTS = ("TOKEN_BLOB", "PASSWORD_BLOB", "BOOTSTRAP_FILE", "HOSTCOPY", "AUDIT_LOG", "GUARD_KEY")
 
 # ── 绊线（Canary）：证明测试没碰真实守卫数据 ─────────────────────
-# 注意：token_audit.jsonl 故意不纳入——真实守卫服务正在运行，
+# 注意：D:\m\guard\token_audit.jsonl 故意不纳入——真实守卫服务正在运行，
 # 它自己持续追加 verify 记录，纳入会误报。
 _CANARY_PATHS = (
     GUARD_DIR / "token.bin",
@@ -208,10 +207,10 @@ class TestCk(GuardTestCase):
         self.assertFalse(mg._ck("Token", "token"))
 
     def test_non_ascii_equal(self):
-        self.assertTrue(mg._ck("助手的管理员令牌", "助手的管理员令牌"))
+        self.assertTrue(mg._ck("米娅的管理员令牌", "米娅的管理员令牌"))
 
     def test_non_ascii_differ(self):
-        self.assertFalse(mg._ck("助手的管理员令牌", "助手的管理员令牌 "))  # 负例=尾空格差一字（r26 修机械替换误伤的字面量）
+        self.assertFalse(mg._ck("米娅的管理员令牌", "米娅的管理员令脾"))
 
     def test_emoji_equal_and_differ(self):
         self.assertTrue(mg._ck("tok🔑🛡", "tok🔑🛡"))
@@ -286,7 +285,7 @@ class TestDpapiRoundTrip(GuardTestCase):
         self.assertEqual(mg._dpapi_unprotect(mg._dpapi_protect(b"hello-guard")), b"hello-guard")
 
     def test_utf8_multibyte(self):
-        raw = "助手的令牌🔑".encode("utf-8")
+        raw = "米娅的令牌🔑".encode("utf-8")
         self.assertEqual(mg._dpapi_unprotect(mg._dpapi_protect(raw)), raw)
 
     def test_binary_1kb(self):
@@ -494,7 +493,7 @@ class TestGuardKeyAndRotate(HttpTestCase):
         self.assertEqual(self.get("/bootstrap/status", key=False)[0], 200)
 
     def test_login_rotates_not_replays(self):
-        """评审E P0-1 已修：/login 不回旧明文——rotate 重签发新密钥并刷新 hostcopy。"""
+        """千问 P0-1 已修：/login 不回旧明文——rotate 重签发新密钥并刷新 hostcopy。"""
         code, body = self.post("/set", {"token": "NEW-TOK", "current": "OLD-TOK", "password": "long-enough-pw"})
         self.assertEqual(code, 200)
         code, body = self.post("/login", {"password": "long-enough-pw"})
@@ -510,9 +509,9 @@ class TestGuardKeyAndRotate(HttpTestCase):
         self.assertEqual(mg._read_token(), "OLD-TOK", "原子段内失败密钥原样")
 
     def test_change_password_requires_old_password(self):
-        """R10.8d（管理员："怎么修改密码"）：修改找回密码有两条证明路径——
+        """R10.8d（爸爸："怎么修改密码"）：修改找回密码有两条证明路径——
         ① 旧密码验证（前端表单走这条，用户友好）② 当前密钥证明（CLI/API 应急找回，
-        2026-09-06 凌晨实弹验证过：管理员锁门外，作者持 hostcopy 副本重设密码解锁）。
+        2026-09-06 凌晨实弹验证过：爸爸锁门外，知夏持 hostcopy 副本重设密码解锁）。
         注：持当前密钥者本就能调 /set 连密钥带密码整套更换，故 current 证明
         不构成额外提权面（与 /set 同权限面）；无任何证明=403，旧密码错=403。"""
         self.post("/set", {"token": "T1", "current": "OLD-TOK", "password": "old-password-1"})
@@ -556,11 +555,11 @@ class TestGuardKeyAndRotate(HttpTestCase):
         for _ in range(5):
             self.post("/login", {"password": "wrong-wrong-wrong"})
         code, body = self.post("/login", {"password": "long-enough-pw"})
-        self.assertEqual(code, 429, "连续 5 次失败后锁定（评审C P2-2）")
+        self.assertEqual(code, 429, "连续 5 次失败后锁定（Eve P2-2）")
 
     def test_no_key_login_403(self):
-        """R10.11（评审C P2）：/login 是唯一能签发新管理员密钥的端点，补钥匙门时
-        门与断言同批落地（评审C："新门必配断言"——门与绊线同 PR）。"""
+        """R10.11（Eve P2）：/login 是唯一能签发新管理员密钥的端点，补钥匙门时
+        门与断言同批落地（Eve："新门必配断言"——门与绊线同 PR）。"""
         self.post("/set", {"token": "T1", "current": "OLD-TOK", "password": "long-enough-pw"})
         code, body = self.post("/login", {"password": "long-enough-pw"}, key=False)
         self.assertEqual(code, 403)
@@ -596,10 +595,10 @@ class TestVerify(HttpTestCase):
         self.assertFalse(body["ok"])
 
     def test_non_ascii_token_compares_safely(self):
-        self.assertFalse(self.post("/verify", {"token": "助手🔑"})[1]["ok"])
-        self.set_token("助手🔑")
-        self.assertTrue(self.post("/verify", {"token": "助手🔑"})[1]["ok"])
-        self.assertFalse(self.post("/verify", {"token": "助手"})[1]["ok"])
+        self.assertFalse(self.post("/verify", {"token": "米娅🔑"})[1]["ok"])
+        self.set_token("米娅🔑")
+        self.assertTrue(self.post("/verify", {"token": "米娅🔑"})[1]["ok"])
+        self.assertFalse(self.post("/verify", {"token": "米娅"})[1]["ok"])
 
     def test_never_returns_plaintext(self):
         _, body = self.post("/verify", {"token": "T-verify"})
@@ -884,7 +883,7 @@ class TestHttpRobustness(HttpTestCase):
         self.assertEqual(mg.Handler.timeout, 30)
 
     def test_non_ascii_json_body(self):
-        code, body = self.post("/verify", {"token": "助手🔑"})
+        code, body = self.post("/verify", {"token": "米娅🔑"})
         self.assertEqual(code, 200)
         self.assertFalse(body["ok"])
 

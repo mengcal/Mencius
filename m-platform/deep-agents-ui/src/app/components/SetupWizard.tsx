@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SetupWizard — 管理员注册向导（R10.7，管理员："发布到 GitHub，没基础的用户
+ * SetupWizard — 管理员注册向导（R10.7，爸爸："发布到 GitHub，没基础的用户
  * 怎么取得管理员权限？需要一个管理员注册页面，这个一定要有"）。
  * 未配置管理员密钥时全屏展示：粘贴激活码 + 设置管理员密码 → 完成注册。
  * 激活码 = 部署目录 secrets 文件夹里的 .token_bootstrap 文件内容
@@ -130,7 +130,7 @@ export async function needSetupWizard(): Promise<boolean> {
 }
 
 /**
- * LoginGate — R10.8e（管理员："401 死锁，找回入口在进不去的设置页里"）：
+ * LoginGate — R10.8e（爸爸："401 死锁，找回入口在进不去的设置页里"）：
  * 已配置密钥、但本浏览器没有有效凭证时（换电脑/清数据/密钥被轮换），
  * 主界面所有请求 401 → 显示密码登录层，验证通过自动进入。
  * 忘记密码 → 部署目录运行 guard\reset_guard.cmd 恢复出厂（数据不丢）。
@@ -194,14 +194,13 @@ export function LoginGate({ onDone }: { onDone: () => void }) {
 
 
 /**
- * AuthGate — R10.8e（管理员："401 死锁，找回入口在进不去的设置页里"）：
+ * AuthGate — R10.8e（爸爸："401 死锁，找回入口在进不去的设置页里"）：
  * 全局登录闸门（layout 层挂载，覆盖所有页面，含 /settings）。
  * - checking：检测中（短暂空白）
  * - setup：未配置密钥 → 全屏 SetupWizard 注册向导
  * - login：已配置但本浏览器无有效凭证（换电脑/清数据/密钥被轮换）→ LoginGate 密码登录
  * - ok：凭证有效 → 渲染平台
- * 忘记密码 → 部署目录运行 guard
-eset_guard.cmd 恢复出厂（数据不丢）。
+ * 忘记密码 → 部署目录运行 guardeset_guard.cmd 恢复出厂（数据不丢）。
  * 后端连接失败时不挡门（页面自身会显示连接错误）。
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {

@@ -40,16 +40,16 @@ class VisionReq(BaseModel):
     question: str = "请描述这张图片的内容"
 
 
-# ===== R10 修一：/vision 二级钥匙 + 独立频控 + 计量（评审A 修法 C' + 评审C 成本面）=====
-# 修三把视觉工人岗的识图地址从容器内网 workplatform:8000 改成宿主回环 host.docker.internal:2024，
+# ===== R10 修一：/vision 二级钥匙 + 独立频控 + 计量（Cora 修法 C' + Eve 成本面）=====
+# 修三把视觉牛马的识图地址从容器内网 workplatform:8000 改成宿主回环 host.docker.internal:2024，
 # 这条路径绕开了 office 的统一 token 门（auth.py 对 /vision 整条放行），等于给沙箱留了直连识图口。
-# 对策：给 /vision 单独配一把【代理钥匙】VISION_PROXY_TOKEN（二认一，写法沿用 codebuddy 代理层同款模式），
+# 对策：给 /vision 单独配一把【代理钥匙】VISION_PROXY_TOKEN（二认一，写法照抄 codebuddy 代理层），
 # 其全部价值=消耗识图额度，无任何管理权限；钥匙只在宿主 env 与沙箱 env 里，不进镜像、不进源码。
-# R10.2（hy4 ③-1 + 评审A战果二 + 评审C P3 三家同抓）：钥匙未配=fail-CLOSED（旧版放行=半裸奔，
+# R10.2（hy4 ③-1 + Cora战果二 + Eve P3 三家同抓）：钥匙未配=fail-CLOSED（旧版放行=半裸奔，
 # 与 codebuddy 语义相反）。"宿主本地调试"场景不再靠 fail-open 兜——管理员 token 二认一照样能过。
-_VISION_HITS_PROXY: list = []    # 代理钥匙窗（沙箱工人岗）——60s ≤20
-_VISION_HITS_ADMIN: list = []    # 管理员 Bearer 窗（管理员浏览器）——R10.3（评审B 四-4②）分窗：
-                                 # 沙箱刷爆自己的窗不会饿死管理员在设置页点的识图
+_VISION_HITS_PROXY: list = []    # 代理钥匙窗（沙箱牛马）——60s ≤20
+_VISION_HITS_ADMIN: list = []    # 管理员 Bearer 窗（爸爸浏览器）——R10.3（NOVA 四-4②）分窗：
+                                 # 沙箱刷爆自己的窗不会饿死爸爸在设置页点的识图
 _VISION_RATE_WINDOW = 60.0
 _VISION_RATE_MAX = 20
 # 计量日志落 secrets 侧（修四①同目录）：被审计方不可写，账本不被自己抹平
@@ -60,7 +60,7 @@ def _vision_usage_log(status: int, nbytes: int, src: str = "", mode: str = "") -
     """计量（仿 _cb_usage_log）：每次调用（含 401/413/429/502）追加一行。
     R10.2（hy4 ③-4）：补 src（钥匙来源 proxy-key/admin-bearer/none）与 mode（path/b64）——
     出事能区分"谁在用哪条路刷"。不落任何钥匙材料。
-    R10.3：超 10MB 自动滚 .old（评审B 四-4①，磁盘填充无积累）。
+    R10.3：超 10MB 自动滚 .old（NOVA 四-4①，磁盘填充无积累）。
     记账是观测面不是闸门：写盘失败只出声，绝不改变本次调用的结果。"""
     try:
         import datetime as _dt
@@ -80,11 +80,11 @@ def _vision_usage_log(status: int, nbytes: int, src: str = "", mode: str = "") -
 async def vision(req: VisionReq = Body(...), request: Request = None):
     """识图直连接口（书生多模态，绕过 deepagents，快）。
     给 image_path 或 image_b64 + question。
-    R10.3 门序（采纳 评审A 意见 swap，与 codebuddy 对齐）：体积 → 钥匙 → 频控 → 干活。
+    R10.3 门序（采纳 Cora 意见 swap，与 codebuddy 对齐）：体积 → 钥匙 → 频控 → 干活。
     频控的本意是保护上游资源（识图=真金白银的模型调用）——验不过钥匙的请求根本碰不到上游，
     不该消耗保护上游的配额（匿名挤兑面）；401 只花一次 hmac（微秒级），账本有 10MB 旋转兜底。
     钥匙二认一 fail-closed：X-Proxy-Key==VISION_PROXY_TOKEN（沙箱，走代理窗）
-    或 Bearer==管理员 token（管理员浏览器，走管理员窗——分窗，沙箱刷不爆管理员的窗）。
+    或 Bearer==管理员 token（爸爸浏览器，走管理员窗——分窗，沙箱刷不爆爸爸的窗）。
     """
     try:
         import json as _j
@@ -93,8 +93,8 @@ async def vision(req: VisionReq = Body(...), request: Request = None):
     except Exception:
         nbytes = 0
     mode = "path" if (req.image_path or "").strip() else ("b64" if (req.image_b64 or "").strip() else "none")
-    # R10.2（评审A 战果一）：解析后 nbytes 复核（chunked 场景兜底，主体闸在 _BodyCap）；
-    # R10.4（评审C P3-3）：vision 独立 8MB 帽（Retina 大图 b64 后 4MB+，2MB 误伤合法请求）
+    # R10.2（Cora 战果一）：解析后 nbytes 复核（chunked 场景兜底，主体闸在 _BodyCap）；
+    # R10.4（Eve P3-3）：vision 独立 8MB 帽（Retina 大图 b64 后 4MB+，2MB 误伤合法请求）
     if nbytes > _VISION_MAX_BODY:
         _vision_usage_log(413, nbytes, "size-gate", mode)
         return _JSONResp({"error": f"请求体过大（{nbytes} B > {_VISION_MAX_BODY} B）"}, status_code=413)
@@ -116,7 +116,7 @@ async def vision(req: VisionReq = Body(...), request: Request = None):
         _vision_usage_log(429, nbytes, src, mode)
         return _JSONResp({"error": f"识图限流：每 {int(_VISION_RATE_WINDOW)} 秒最多 {_VISION_RATE_MAX} 次"},
                          status_code=429)
-    # R68 修 评审A（中危阻塞）：识图 20s 级同步调用不再坐在事件循环里——丢线程池
+    # R68 修 Cora（中危阻塞）：识图 20s 级同步调用不再坐在事件循环里——丢线程池
     # R10.2（hy4 ③-4：上游异常原来直接 500 且不记账）：收口成 502 并记计量
     try:
         result = await asyncio.to_thread(analyze_image, req.image_path, req.image_b64, req.question)
@@ -127,9 +127,9 @@ async def vision(req: VisionReq = Body(...), request: Request = None):
     return {"result": result}
 
 
-# ===== R82 CodeBuddy 代理层（评审C 方案 a·密钥出笼）=====
-# 背景：R80 把真魔搭 key 撤出沙箱 env（助手 printenv 就能读走），但沙箱里的 CodeBuddy CLI
-# 要干活仍需一个 OpenAI 兼容端点。本端点=唯一授权通道：沙箱工人岗带【代理钥匙】(X-Proxy-Key，
+# ===== R82 CodeBuddy 代理层（Eve 方案 a·密钥出笼）=====
+# 背景：R80 把真魔搭 key 撤出沙箱 env（米娅 printenv 就能读走），但沙箱里的 CodeBuddy CLI
+# 要干活仍需一个 OpenAI 兼容端点。本端点=唯一授权通道：沙箱牛马带【代理钥匙】(X-Proxy-Key，
 # 其全部价值=消耗所配模型的免费额度，无其他权限) 调 /codebuddy/chat/completions，
 # 真 API key 由 workplatform 进程 env 注入、只活在这个进程里。
 # 目标地址取 env 固定值（管理员侧配置，与 SANDBOX_EXEC_URL 同性质），不由任何请求输入拼装。
@@ -142,8 +142,8 @@ _CB_HITS: list = []              # ④滑动窗口时间戳（stdlib time 列表
 _CB_RATE_WINDOW = 60.0
 _CB_RATE_MAX = 30
 # ⑤计量日志路径（相对路径按 BASE 解析，与 _TASKS_FILE 同款）
-# R10 修四①（评审C）：账本挪出被审计方可写区——默认落宿主 secrets 卷（与激活码同目录），
-# 沙箱/工人岗摸不到这个卷，烧了多少额度就赖不掉也抹不平；env 未设时回落 BASE/mia_home/logs 保本地开发。
+# R10 修四①（Eve）：账本挪出被审计方可写区——默认落宿主 secrets 卷（与激活码同目录），
+# 沙箱/牛马摸不到这个卷，烧了多少额度就赖不掉也抹不平；env 未设时回落 BASE/mia_home/logs 保本地开发。
 _cb_log_env = os.environ.get("CODEBUDDY_USAGE_LOG", "").strip()
 if _cb_log_env:
     _CB_USAGE_LOG = Path(_cb_log_env)
@@ -155,13 +155,13 @@ if not _CB_USAGE_LOG.is_absolute():
     _CB_USAGE_LOG = BASE / _CB_USAGE_LOG
 
 
-# ── R10.3（评审C P2 终局报告）：请求体硬顶——纯 ASGI 层，chunked 慢灌也进不来 ──
+# ── R10.3（Eve P2 终局报告）：请求体硬顶——纯 ASGI 层，chunked 慢灌也进不来 ──
 # R10.2 的 Content-Length 早拒罩不住无 CL 头的 chunked 上传（8GB 慢灌会在 FastAPI 全量缓冲
 # 阶段吃满内存且不需要任何钥匙）。本中间件预排空计数：有 CL 头=秒判 413；chunked 逐块累计，
 # 超 _CB_MAX_BODY 直接 413 收场、请求体永远到不了 FastAPI 的缓冲。
-# R10.4（评审C P2 收官轮）：/rag/query 补进体积闸——第三扇钥匙门与 vision/codebuddy 同型，
+# R10.4（Eve P2 收官轮）：/rag/query 补进体积闸——第三扇钥匙门与 vision/codebuddy 同型，
 # r10.2 开门时没跟上同型面排查（"小 body 是合法请求的形态，不是攻击者会遵守的约束"）。
-# R10.4（评审C P3-3）：vision 独立 8MB 帽——Retina 截图 PNG→b64 后 4MB+，2MB 会误伤合法大图；
+# R10.4（Eve P3-3）：vision 独立 8MB 帽——Retina 截图 PNG→b64 后 4MB+，2MB 会误伤合法大图；
 # codebuddy（纯文本）与 rag/query（q_vec 数组，几 KB）维持 2MB。
 _VISION_MAX_BODY = 8 * 1024 * 1024
 
@@ -235,7 +235,7 @@ class _BodyCap:
 def _cb_allowed_models() -> set:
     """R82 补强①：model 白名单。配了 CODEBUDDY_ALLOWED_MODELS（逗号分隔）就认它；
     没配则回落到单模型 env CODEBUDDY_MODEL（默认 Qwen/Qwen3.8-Flash-Next）。
-    作用：沙箱工人岗改 body.model 也换不动上游模型——这把钥匙的全部价值就是消耗所配模型的免费额度，
+    作用：沙箱牛马改 body.model 也换不动上游模型——这把钥匙的全部价值就是消耗所配模型的免费额度，
     换模型=拿它去烧别的（付费）额度，必须在代理层挡死。"""
     raw = os.environ.get("CODEBUDDY_ALLOWED_MODELS", "")
     if raw.strip():

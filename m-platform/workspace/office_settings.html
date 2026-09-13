@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理员面板 · 助手工作平台</title>
+<title>管理员面板 · 米娅工作平台</title>
 <style>
 :root{--bg:#1a1a1e;--panel:#212126;--panel2:#2a2a30;--border:#3a3a42;--txt:#e8e8ec;--sub:#9a9aa5;--accent:#7c5cff;--ok:#4caf7d;--warn:#e6a23c;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);display:flex;height:100vh;overflow:hidden;}
-/* ===== 侧栏（参考 open-webui 管理员面板设计）===== */
+/* ===== 侧栏（抄 OWUI 管理员面板结构）===== */
 .sidebar{width:230px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
 .sidebar h1{font-size:15px;padding:18px 16px 12px;color:var(--txt);display:flex;align-items:center;gap:8px;}
 .sidebar h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
@@ -63,8 +63,8 @@ th{color:var(--sub);font-weight:500;font-size:12px;}
     <a data-p="general" class="active"><span class="ico">⚙️</span>通用</a>
     <a data-p="external"><span class="ico">🔗</span>外部连接</a>
     <a data-p="models"><span class="ico">🧠</span>模型</a>
-    <a data-p="agents"><span class="ico">🐎</span>工人岗矩阵</a>
-    <a data-p="scribe"><span class="ico">📖</span>记录器</a>
+    <a data-p="agents"><span class="ico">🐎</span>牛马矩阵</a>
+    <a data-p="scribe"><span class="ico">📖</span>书记员</a>
     <a data-p="memory"><span class="ico">💾</span>记忆</a>
     <div class="group">管理</div>
     <a data-p="api"><span class="ico">🔑</span>API 密钥</a>
@@ -97,7 +97,7 @@ async function fetchModels(name, baseUrl, keyInputId){
   alert(j.ok ? (name+" 拉到 "+j.count+" 个模型：\n"+j.models.slice(0,15).join("\n")) : ("失败："+JSON.stringify(j)));
 }
 
-/* ============ 各页渲染（open-webui 管理员面板结构，功能逐块接入） ============ */
+/* ============ 各页渲染（OWUI 管理员面板结构，功能逐块接入） ============ */
 const P = {};
 
 P.general = () => `
@@ -107,13 +107,13 @@ P.general = () => `
   <div class="row"><div class="label">语言<small>界面与回复语言</small></div><select><option>中文（简体）</option></select></div>
 </div>
 <div class="card"><h3>聊天</h3>
-  <div class="row"><div class="label">新对话默认进入后台任务队列<small>组长先拆派再干活</small></div><label class="toggle"><input type="checkbox" checked onchange="S.general.boss_first=this.checked"><span class="slider"></span></label></div>
+  <div class="row"><div class="label">新对话默认进入小全车间<small>主管先拆派再干活</small></div><label class="toggle"><input type="checkbox" checked onchange="S.general.boss_first=this.checked"><span class="slider"></span></label></div>
   <div class="row"><div class="label">流式输出</div><label class="toggle"><input type="checkbox" checked disabled><span class="slider"></span></label></div>
   <button class="btn" onclick='save("general",{assistant_name:document.getElementById("g_name").value})'>保存</button>
 </div>`;
 
 P.external = () => `
-<h2>外部连接</h2><div class="desc">OpenAI 兼容服务商（open-webui 同款：连接 + 拉模型 + key 打码存储）</div>
+<h2>外部连接</h2><div class="desc">OpenAI 兼容服务商（OWUI 同款：连接 + 拉模型 + key 打码存储）</div>
 <div class="card"><h3>服务商</h3><div class="hint">点"拉取模型"验证连通并缓存模型列表</div>
   <table><tr><th>名称</th><th>Base URL</th><th>Key</th><th>模型缓存</th><th></th></tr>
   ${(S.external.providers||[]).map((p,i)=>`<tr>
@@ -143,9 +143,9 @@ async function reFetch(i){
 
 P.models = () => `
 <h2>模型</h2><div class="desc">默认模型与各角色映射（改完保存进 agents_config.json 生效需重建容器）</div>
-<div class="card"><h3>角色 → 模型映射</h3><div class="hint">boss=主助手 / 其余为工人岗；provider: ms=魔搭 ss=书生 ds=智谱</div>
+<div class="card"><h3>角色 → 模型映射</h3><div class="hint">boss=米娅主管 / 其余为牛马；provider: ms=魔搭 ss=书生 ds=智谱</div>
   <table><tr><th>角色</th><th>服务商</th><th>模型</th></tr>
-  ${Object.entries({boss:"助手(组长)",coder:"代码工人岗",researcher:"研究工人岗",planner:"策划工人岗",archivist:"档案工人岗",visual:"识图工人岗",scribe:"记录器"}).map(([k,v])=>`
+  ${Object.entries({boss:"米娅(主管)",coder:"代码牛马",researcher:"研究牛马",planner:"策划牛马",archivist:"档案牛马",visual:"识图牛马",scribe:"书记员"}).map(([k,v])=>`
   <tr><td>${v}</td>
   <td><select id="m_${k}" style="min-width:90px">${["ms","ss","ds"].map(x=>`<option ${(S.agents?.[k]?.provider||"ms")===x?"selected":""}>${x}</option>`).join("")}</select></td>
   <td><input type="text" id="mm_${k}" value="${S.agents?.[k]?.model||""}" style="min-width:280px"></td></tr>`).join("")}
@@ -160,22 +160,22 @@ async function saveModels(){
 }
 
 P.agents = () => `
-<h2>工人岗矩阵</h2><div class="desc">SubAgent 团队（deepagents）</div>
-<div class="card"><h3>在编工人岗（1 组长 + 6）</h3>
+<h2>牛马矩阵</h2><div class="desc">SubAgent 团队（deepagents）</div>
+<div class="card"><h3>在编牛马（1 主管 + 6）</h3>
   <table><tr><th>名字</th><th>职责</th><th>状态</th></tr>
-  <tr><td>助手 (boss)</td><td>组长：守铁律、拆派、汇总；记录器的主人</td><td class="tag ok">在编</td></tr>
+  <tr><td>米娅 (boss)</td><td>主管：守铁律、拆派、汇总；书记员的主人</td><td class="tag ok">在编</td></tr>
   <tr><td>coder</td><td>代码/文件/表格</td><td class="tag ok">在编</td></tr>
   <tr><td>researcher</td><td>秘塔/博查/Tavily 搜索调研</td><td class="tag ok">在编</td></tr>
   <tr><td>planner</td><td>方案/文章</td><td class="tag ok">在编</td></tr>
   <tr><td>archivist</td><td>记忆/归档</td><td class="tag ok">在编</td></tr>
   <tr><td>visual</td><td>识图（书生多模态）</td><td class="tag ok">在编</td></tr>
-  <tr><td>scribe</td><td>助手专属记录器：查笔记提醒+随手记账</td><td class="tag ok">在编</td></tr>
+  <tr><td>scribe</td><td>米娅专属书记员：查笔记提醒+随手记账</td><td class="tag ok">在编</td></tr>
   </table>
-  <div class="hint" style="margin-top:10px">添加/修改工人岗：改 agents_config.json + agent_multimodel.py（功能块后续接入此页）</div>
+  <div class="hint" style="margin-top:10px">添加/修改牛马：改 agents_config.json + agent_multimodel.py（功能块后续接入此页）</div>
 </div>`;
 
 P.scribe = () => `
-<h2>记录器</h2><div class="desc">助手的铁律守门人</div>
+<h2>书记员</h2><div class="desc">米娅的铁律守门人</div>
 <div class="card"><h3>行为开关</h3>
   <div class="row"><div class="label">动手前强制查笔记<small>每次任务先 scribe search</small></div><label class="toggle"><input type="checkbox" ${S.scribe.remind_read!==false?"checked":""} onchange="S.scribe.remind_read=this.checked;save('scribe',S.scribe)"><span class="slider"></span></label></div>
   <div class="row"><div class="label">干完活随手记时间线<small>notes tl 自动触发</small></div><label class="toggle"><input type="checkbox" ${S.scribe.auto_tl!==false?"checked":""} onchange="S.scribe.auto_tl=this.checked;save('scribe',S.scribe)"><span class="slider"></span></label></div>
@@ -198,8 +198,8 @@ P.memory = () => `
 P.api = () => `
 <h2>API 密钥</h2><div class="desc">平台级密钥（容器环境变量注入，此处只读展示）</div>
 <div class="card">
-  <div class="row"><div class="label">LangSmith API Key<small>可选服务（自行配置）</small></div><span class="tag ok">已配置（lsv2_pt_••••••）</span></div>
-  <div class="row"><div class="label">智谱 OPENAI_API_KEY</div><span class="tag ok">已配置（••••••••）</span></div>
+  <div class="row"><div class="label">LangSmith API Key<small>许可证验证用（GitHub 主站）</small></div><span class="tag ok">已配置（lsv2_pt_57d2…）</span></div>
+  <div class="row"><div class="label">智谱 OPENAI_API_KEY</div><span class="tag ok">已配置（a64a…atAc）</span></div>
   <div class="row"><div class="label">秘塔 / 博查 / Tavily</div><span class="tag">经 search_tools.py 管理</span></div>
 </div>
 <div class="card"><h3>说明</h3><div class="hint">改密钥 = 改 docker-compose.yml environment 后 docker compose up -d（不用 build）</div></div>`;
@@ -215,13 +215,13 @@ P.interface = () => `
 </div>`;
 
 P.eval = () => `
-<h2>评估</h2><div class="desc">工人岗绩效与任务回放</div>
+<h2>评估</h2><div class="desc">牛马绩效与任务回放</div>
 <div class="card"><h3>建设中</h3><div class="hint">规划：每次 run 记录（谁干的/耗时/模型/结果），此页出统计排行。功能后补。</div><span class="tag build">🚧 BUILDING</span></div>`;
 
 P.about = () => `
 <h2>关于</h2>
 <div class="card">
-  <div class="row"><div class="label">平台</div><span class="tag">助手工作平台 · 后台任务队列（langgraph-api + deepagents）</span></div>
+  <div class="row"><div class="label">平台</div><span class="tag">米娅工作平台 · 小全车间（langgraph-api + deepagents）</span></div>
   <div class="row"><div class="label">构建</div><span class="tag">m-platform:latest（2026-08-28 通关版）</span></div>
   <div class="row"><div class="label">运行模式</div><span class="tag ok">LangSmith lite mode</span></div>
   <div class="row"><div class="label">运维笔记</div><span class="tag">config/0033 五小时战役全录</span></div>

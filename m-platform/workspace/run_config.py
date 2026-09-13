@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""run_config.py — 每轮运行级配置（2026-08-29 作者）
+"""run_config.py — 每轮运行级配置（2026-08-29 知夏）
 
 对话输入框的两个开关真正生效的地方：
 - 输入框选的模型 → 前端随消息带 mia_config.model → 本中间件在模型调用前换主脑
 - 输入框联网开关 → mia_config.web_search=false → 搜索工具被挡回"已关闭"
 
 原则：官方机制（AgentMiddleware + 自定义 state 通道 mia_config），不碰消息文本，
-不改助手提示词，什么都不选 = 完全默认行为。
+不改米娅提示词，什么都不选 = 完全默认行为。
 """
 from langchain.agents.middleware.types import AgentMiddleware
 from langchain_core.messages import ToolMessage
@@ -25,8 +25,8 @@ def _cfg(request) -> dict:
 
 
 def _model_for(request, model_name: str, thinking=None, provider: str | None = None):
-    """构造运行时模型。provider 给定时精确锁定该服务商（2026-08-29 管理员的三个智谱
-    烧错额度的教训：同名模型谁排前用谁不行，必须认准管理员选的那家）。"""
+    """构造运行时模型。provider 给定时精确锁定该服务商（2026-08-29 爸爸的三个智谱
+    烧错额度的教训：同名模型谁排前用谁不行，必须认准爸爸选的那家）。"""
     if not model_name:
         return None
     try:
@@ -100,7 +100,7 @@ def _record_usage(model_name: str, result):
 
 def _now_bj() -> str:
     """R64 时间感知：每轮模型调用前注入当前北京时间。
-    时间与记忆不可分割（管理员 2026-08-31 定调）——没有时间锚，记忆就没有顺序。"""
+    时间与记忆不可分割（爸爸 2026-08-31 定调）——没有时间锚，记忆就没有顺序。"""
     from datetime import datetime, timezone, timedelta
 
     bj = timezone(timedelta(hours=8))
@@ -111,7 +111,7 @@ def _now_bj() -> str:
 
 def _inject_time(request):
     """R64 时间感知（R64 修正）：把当前北京时间追加进本轮 system prompt。
-    每轮模型调用前实时取 datetime.now()（服务端时钟），与 open-webui 的 {{CURRENT_DATE}}
+    每轮模型调用前实时取 datetime.now()（服务端时钟），与 OWUI 的 {{CURRENT_DATE}}
     模板变量、酒馆的 {{date}} {{time}} 宏同理——运行时替换，不是写死的字符串。
     只注入「感知」，不要求模型在回复里写时间戳——那是前端渲染的活，不烧令牌。"""
     try:
@@ -124,8 +124,8 @@ def _inject_time(request):
         pass
 
 
-# R73（2026-09-03 管理员拍板）：角色卡 profile 系统整体退役——三轮外部评审一致认定
-# "卡只换人设不摘工具=权限裸奔"，与工作平台冲突风险大于价值（聊天有助手，角色扮演有酒馆，工程有 ZCode）。
+# R73（2026-09-03 爸爸拍板）：角色卡 profile 系统整体退役——三轮外部评审一致认定
+# "卡只换人设不摘工具=权限裸奔"，与工作平台冲突风险大于价值（聊天有米娅，角色扮演有酒馆，工程有 ZCode）。
 # 原 _character_of/_CHAR_REGISTRY/挂卡换脑逻辑已全部移除；历史设计与教训见 eng-log R70/R73 与 [[m-platform-incidents]]。
 
 
@@ -133,7 +133,7 @@ class RunConfigMiddleware(AgentMiddleware):
     # ---- 模型调用前：按 mia_config 换主脑模型 + 思维档位 + 注入当前时间（R64） ----
     @staticmethod
     def _thinking_for(cfg: dict) -> str:
-        """R79⑥（管理员定的 A+B 方案·评审C 成本洞）：思维档回退链 mia_config.thinking（聊天框，交互回合）
+        """R79⑥（爸爸定的 A+B 方案·Eve 成本洞）：思维档回退链 mia_config.thinking（聊天框，交互回合）
         → boss 岗默认（settings.agents.boss.thinking，webhook/定时等非交互回合）→ off。
         旧逻辑非交互回合拿不到 thinking 直接落"模型默认思考"=自动任务悄悄烧钱，现统一收口到 off 兜底。"""
         t = cfg.get("thinking")
@@ -206,12 +206,12 @@ class RunConfigMiddleware(AgentMiddleware):
 
     @staticmethod
     def _fallback_models():
-        """回退链唯一真源 = 设置页 settings.agents.boss.fallbacks（管理员自己填自己选）。
+        """回退链唯一真源 = 设置页 settings.agents.boss.fallbacks（爸爸自己填自己选）。
         无缓存（改了即时生效）、无 agents_config.json 兜底（配置页删了就没了，符合"零硬编码"原则）。"""
         models = []
         try:
             from settings_mgr import load_settings
-            from providers import make_model  # R68 修 评审B🔴1/评审E三.2.1：旧版没这行→NameError 被下条 except 吞→回退链从未生效
+            from providers import make_model  # R68 修 NOVA🔴1/Qianwen三.2.1：旧版没这行→NameError 被下条 except 吞→回退链从未生效
             fbs = ((load_settings().get("agents") or {}).get("boss") or {}).get("fallbacks") or []
             for fb in fbs:
                 try:

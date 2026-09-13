@@ -1,5 +1,5 @@
 """
-office —— 助手「工作平台·后台任务队列」服务包（由 D:\\m\\workspace\\office.py 拆分而来）
+office —— 米娅「工作平台·小全车间」服务包（由 D:\\m\\workspace\\office.py 拆分而来）
 公共入口：from office.app import app
 模块地图：
 - office.core                纯函数/常量公共层（_secrets_dir/_ck/_rate_ok/_rotate_log/_token_audit/_presented_token/BASE/.env）
@@ -10,5 +10,5 @@ office —— 助手「工作平台·后台任务队列」服务包（由 D:\\m\
 - office.routers.tasks       TASKS 账本 + /tasks/dispatch|webhook|list + /files/save + /threads/title
 - office.routers.token_admin 激活码 + /settings/token（首设/轮换/清除）+ /auth/*
 - office.routers.misc        /skills、/usage、/context、/stats、/health、/approvals、旧路径指引
-
+详见包内 REFACTOR_NOTES.md（原行号 → 新文件对照表）。
 """

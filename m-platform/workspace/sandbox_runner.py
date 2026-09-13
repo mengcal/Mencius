@@ -1,13 +1,13 @@
 """R76 沙箱执行服务：跑在 m-sandbox 容器内（只挂数据区 /data/mia_home）。
 workplatform 的 execute 经宿主回环 POST 到这里执行——沙箱容器里【没有】settings.json/源码/档位文件，
-所以助手的 shell 物理上碰不到平台的"锁和脑"（参考成熟 agent 平台：执行面与守卫面分离）。
+所以米娅的 shell 物理上碰不到平台的"锁和脑"（对标 ZCode：执行面与守卫面分离）。
 端口经宿主回环发布 127.0.0.1:9090；请求头 X-Token 须等于宿主 .env 的 SANDBOX_TOKEN。
 
-R10.5（评审C 战场移交：宿主侧 runner 频控+审计）：
-- 频控：全局滑动窗口 60s ≤120 次（助手正常干活远低于此；本机任意进程可打 9090，
+R10.5（Eve 战场移交：宿主侧 runner 频控+审计）：
+- 频控：全局滑动窗口 60s ≤120 次（米娅正常干活远低于此；本机任意进程可打 9090，
   窗口防"无限并发压死 runner"）；窗口内存态，重启清零=可接受（runner 无持久义务）。
 - 审计：每次 /exec 落一行到容器本地 /var/log/runner_audit.jsonl（时间/来源IP/命令头/退出码）。
-  容器本地文件助手摸不到（她只有 /data 卷的写权）；她能自残 runner 但删不到 docker logs——
+  容器本地文件米娅摸不到（她只有 /data 卷的写权）；她能自残 runner 但删不到 docker logs——
   双通道出声：审计行同时 print 到 stdout（宿主 docker logs 可查）。
   已知边界（诚实清单）：沙箱内 root 理论上可自残 runner 进程本身（非提权，老账维持）。
 """
@@ -46,7 +46,7 @@ def _audit(action: str, **extra) -> None:
     rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": action}
     rec.update({k: str(v)[:200] for k, v in extra.items()})
     line = json.dumps(rec, ensure_ascii=False)
-    print(f"[runner-audit] {line}", flush=True)  # 宿主 docker logs 通道（助手删不到）
+    print(f"[runner-audit] {line}", flush=True)  # 宿主 docker logs 通道（米娅删不到）
     try:
         with _AUDIT_LOCK:
             with open(AUDIT_LOG, "a", encoding="utf-8") as f:

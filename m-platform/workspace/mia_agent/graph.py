@@ -24,7 +24,7 @@ MEMORY_FILE = BASE / "mia_home" / "memory" / "MEMORY.md"
 MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 if not MEMORY_FILE.exists():
     MEMORY_FILE.write_text(
-        "# 工作平台·工作者车间记忆\n\n## 最近任务\n\n## 踩坑记录\n",
+        "# 工作平台·小全车间记忆\n\n## 最近任务\n\n## 踩坑记录\n",
         encoding="utf-8",
     )
 
@@ -33,7 +33,7 @@ if not MEMORY_FILE.exists():
 # async_subagents.py:263/303 源码实锤），官方 demo UI 对此无解——后台部门线程全漏进侧栏。
 # SDK 本身支持 metadata 参数（langgraph_sdk 0.4.4 实核），故在 Python 进程给 SDK 的 create
 # 统一打 cow_task=True 标签；前端 useThreads 既有的 cow_task 排除逻辑(useThreads.ts:89)即刻生效。
-# 注意：只影响容器内 Python 侧建线程（=后台工人岗线程），浏览器 JS 建的主对话线程不经此路。
+# 注意：只影响容器内 Python 侧建线程（=后台牛马线程），浏览器 JS 建的主对话线程不经此路。
 try:
     from langgraph_sdk._async.threads import ThreadsClient as _ATC
     from langgraph_sdk._sync.threads import SyncThreadsClient as _STC
@@ -55,7 +55,7 @@ try:
 except Exception as _e:  # SDK 结构升级对不上时不炸平台（侧栏顶多回到旧样子）
     print(f"[agent] cow_task 标记补丁未生效（不影响启动）：{_e}", flush=True)
 
-try:  # R68（评审C D1）：R66 分档挪家后旧节残留要出声，防"strict 被静默降成 auto_edit"这类暗坑（原 L157-162）
+try:  # R68（Eve D1）：R66 分档挪家后旧节残留要出声，防"strict 被静默降成 auto_edit"这类暗坑（原 L157-162）
     from settings_mgr import load_settings as _ls_probe
     if "confirmLevel" in (_ls_probe().get("subagents") or {}):
         print("[agent] ⚠ 检测到旧节 subagents.confirmLevel 残留（现行为 general.confirmLevel）——旧值已忽略，请清理设置档防误导", flush=True)
@@ -65,11 +65,15 @@ except Exception:
 # ── 包内模块（拆分后各归其位）──
 from mia_agent.prompts import _system_prompt  # 原 L13-66
 from mia_agent.sandbox import SandboxedShellBackend  # 原 L67-117
-from mia_agent.confirm_gate import ConfirmGateMiddleware  # 原 L212-464
+from mia_agent.confirm_gate import ConfirmGateMiddleware  # 原 L212-464（C1 过渡期：名单/判定真源仍被 confirm_gate_c1 引用）
+from mia_agent.confirm_gate_c1 import ConfirmGateC1  # r41：官方 HITL 包装版（主图）
+from mia_agent.flow_observer import observer as _flow_observer  # r41：流程体系 v2 观测器
 from mia_agent.store import MiaState, _STORE  # 原 L120-122/L165-168/L804-854
 from mia_agent.models import _interrupt_on, boss_model  # 原 L124/L858-908
+from mia_agent.plan_check import PlanCheckMiddleware  # r45 层2 验收导航/clarify/同型连撞
 from mia_agent.tools import (_load_mcp_tools, dispatch_to_xiaoquan, edit_memory, email,  # 原 L171-210/L466-802
-                             manage_departments, search_knowledge_base)
+                             list_async_tasks, lark_send, manage_departments, search_knowledge_base,
+                             dispatch_external, list_external_posts, list_external_results)  # r58 对外派活一期
 
 # ── 包外：搜索/中间件（原 L125-127）──
 from search_tools import web_search, web_search_bocha, web_search_tavily, web_search_metaso  # 原 L125
@@ -79,14 +83,14 @@ from run_config import RunConfigMiddleware  # 原 L127
 import skills_lock as _skills_lock  # 原 L999
 
 
-# ── R59 官方多层架构：工人岗编入部门（departments_config.json），部门组长图注册为
-#    独立 graph（cow_graphs.py），助手通过官方 AsyncSubAgent 五工具异步派活：
+# ── R59 官方多层架构：牛马编入部门（departments_config.json），部门主管图注册为
+#    独立 graph（cow_graphs.py），米娅通过官方 AsyncSubAgent 五工具异步派活：
 #    start/check/update/cancel/list——派活即回不阻塞，可中途转向/取消，任务状态
 #    存专用 async_tasks 通道（防上下文压缩丢失）。──（原 L957-960）
 
 
 def _load_departments():  # 原 L964-971
-    # R69（评审C E1 双链）：唯一实现收进 cow_graphs，本模块函数级委托——两份读档=改一漏一的种子，拔掉。
+    # R69（Eve E1 双链）：唯一实现收进 cow_graphs，本模块函数级委托——两份读档=改一漏一的种子，拔掉。
     try:
         from cow_graphs import _load_departments as _cow_load
         return _cow_load()
@@ -103,13 +107,13 @@ def _build_async_subagents():  # 原 L974-991
         workers = "、".join(w.get("name", "") for w in d.get("workers", []))
         out.append(AsyncSubAgent(
             name=d["name"],
-            description=f"{d['name']}组长（工人岗：{workers}）。接到部门任务后拆解派给工人岗、验收汇总上交。",
+            description=f"{d['name']}主管（牛马：{workers}）。接到部门任务后拆解派给牛马、验收汇总上交。",
             graph_id=d["slot"],
         ))
-    # R64 调度层（管理员的军事层级）：跨部门协同任务助手转告调度，调度分解协调各部门
+    # R64 总管层（爸爸的军事层级）：跨部门协同任务米娅转告总管，总管分解协调各部门
     out.append(AsyncSubAgent(
-        name="调度",
-        description="调度（任务分解官）。跨部门协同任务转告给他：他分解成各部门的活、协调各部门并行执行、汇总结果上交。单一部门的任务不用他。",
+        name="总管",
+        description="总管（任务分解官）。跨部门协同任务转告给他：他分解成各部门的活、协调各部门并行执行、汇总结果上交。单一部门的任务不用他。",
         graph_id="gm",
     ))
     # r25（hy4 A2.1 P1 修复）：主图此前没封 deepagents 自动注入的 general-purpose 影子子代理——
@@ -120,7 +124,7 @@ def _build_async_subagents():  # 原 L974-991
 
     def _gp_refuse(state):
         return {"messages": [{"role": "assistant", "content":
-            "general-purpose 槽位已按军事纪律退役：主图只准派在编部门/调度（异步子代理）或用在编工具面干活，"
+            "general-purpose 槽位已按军事纪律退役：主图只准派在编部门/总管（异步子代理）或用在编工具面干活，"
             "派到这里只会得到退回指令。"}]}
     _gpe = StateGraph(MessagesState)
     _gpe.add_node("gp_refuse", _gp_refuse)
@@ -128,7 +132,7 @@ def _build_async_subagents():  # 原 L974-991
     _gpe.add_edge("gp_refuse", END)
     out.append(CompiledSubAgent(
         name="general-purpose",
-        description="已退役槽位——不要派活（军事纪律：只准用在编部门/调度/工具面，派过来只会得到退回指令）。",
+        description="已退役槽位——不要派活（军事纪律：只准用在编部门/总管/工具面，派过来只会得到退回指令）。",
         runnable=_gpe.compile(),
     ))
     return out
@@ -136,14 +140,14 @@ def _build_async_subagents():  # 原 L974-991
 
 _async_subagents = _build_async_subagents()  # 原 L994
 
-# ── R10.3 skills_lock（评审A/评审B 方案落地）：技能清单哈希锁——挂载回归保险 ──（原 L996-1009）
+# ── R10.3 skills_lock（Cora/NOVA 方案落地）：技能清单哈希锁——挂载回归保险 ──（原 L996-1009）
 # 基线落 secrets 卷；不符=本组技能整体停用（宁可不带技能不裸奔）+日志+审计。
 # 改挂载=必重启=必再校验，故启动校验覆盖回归场景；运行中宿主改文件到重启前不被捕获（诚实清单）。
 _SKILLS_DIR = BASE / "mia_home" / "skills"  # 原 L1000: Path(__file__).resolve().parent / "mia_home" / "skills"
 if _skills_lock.enabled():
     _SKILLS_BAD = _skills_lock.verify(_SKILLS_DIR, _skills_lock.ensure_baseline(_SKILLS_DIR))
     if any(_SKILLS_BAD.values()):
-        print(f"[skills_lock] 技能清单不符，本组技能已停用：{_SKILLS_BAD}（管理员在设置页重新登记后重启）", flush=True)
+        print(f"[skills_lock] 技能清单不符，本组技能已停用：{_SKILLS_BAD}（爸爸在设置页重新登记后重启）", flush=True)
         _SKILLS = []
     else:
         _SKILLS = ["skills/"]
@@ -151,7 +155,7 @@ else:
     _SKILLS = ["skills/"]
 
 
-# ===== 官方对话压缩（deepagents SummarizationMiddleware，管理员定调：功能用官方件）=====（原 L911-955）
+# ===== 官方对话压缩（deepagents SummarizationMiddleware，爸爸定调：功能用官方件）=====（原 L911-955）
 # 参数来自设置页 Experience→界面（interface.compaction 节）：
 #   enabled / threshold(Token Threshold) / cap(Token Cap) / retained(Retained Messages) / prompt(压缩提示词)
 # 没配置 = 官方默认行为；关掉 = 不挂压缩中间件。
@@ -177,7 +181,7 @@ def _compaction_middleware():
             kwargs["summary_prompt"] = str(c["prompt"]).strip()
     except Exception:
         pass  # 参数脏了就走官方默认
-    # R69（评审B⚪/MK 教训）：压缩模型可配 interface.compaction.provider/model——
+    # R69（NOVA⚪/MK 教训）：压缩模型可配 interface.compaction.provider/model——
     # 默认不配=用 boss；配了便宜档（如 书生x号/intern-latest）压缩就不烧大模型。配置无效出声回退。
     comp_model = boss_model
     try:
@@ -207,7 +211,7 @@ ConfirmGateMiddleware._MCP_NAMES = {str(t.name).strip().lower() for t in _mcp_to
 agent = create_deep_agent(  # 原 L1011-1034
     model=boss_model,
     name="mia",
-    # ── 官方 human-in-the-loop：动手跑代码前必须经管理员确认（deepagents 官方 interrupt_on）──
+    # ── 官方 human-in-the-loop：动手跑代码前必须经爸爸确认（deepagents 官方 interrupt_on）──
     # 设置页 subagents.interruptOnExecute=false 可关（默认开，省 token 防瞎跑）
     interrupt_on=_interrupt_on(),
     system_prompt=_system_prompt(),  # 设置页 general.system_prompt 优先，_DEFAULT_PROMPT 只是出厂默认
@@ -217,15 +221,19 @@ agent = create_deep_agent(  # 原 L1011-1034
     # R59：AsyncSubAgent 对象直接放进官方 subagents 参数（0.5.0 起同步/异步合并为单一参数，
     # deepagents 内部自动分流：同步→SubAgentMiddleware，异步→AsyncSubAgentMiddleware 五工具）
     subagents=_async_subagents,
-    tools=[dispatch_to_xiaoquan, search_knowledge_base, edit_memory, manage_departments, email,  # R72 +邮箱托管
+    tools=[dispatch_to_xiaoquan, list_async_tasks, search_knowledge_base, edit_memory, manage_departments, email,  # R72 +邮箱托管; r48 M2 真工具
+           lark_send,  # r41 飞书桥（外发批准门内）
+           dispatch_external, list_external_posts, list_external_results,  # r58 对外派活一期
            *_mcp_tools, web_search, web_search_metaso, web_search_bocha, web_search_tavily],
     backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
     state_schema=MiaState,
     middleware=[
-        ConfirmGateMiddleware(),  # R47 动态确认门（四档，改设置即时生效）
+        ConfirmGateC1(),  # r41（C1）：官方 HITL 包装版四档门（批量卡/自包含拒出口）——替换现役 ConfirmGateMiddleware
         ScribeMiddleware(root_dir=BASE / "mia_home"),
         *_compaction_middleware(),
         RunConfigMiddleware(),  # 输入框的模型选择/联网开关在这里生效
+        _flow_observer,  # r41 流程体系 v2 层3：动作序列观测（只记不拦）
+        PlanCheckMiddleware(),  # r45 层2：验收导航注入+clarify 路由+同型×3 连撞提醒（09-13 夜窗）
     ],
 )
 

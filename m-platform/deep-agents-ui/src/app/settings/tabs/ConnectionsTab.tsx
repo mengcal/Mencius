@@ -2,9 +2,9 @@
 
 /**
  * settings/tabs/ConnectionsTab.tsx —— 外部连接（admin:connections）页（原 page.tsx L743-785 + L484-533 + 弹窗 L1186-1227 迁出）
- * 参考 open-webui 交互：填地址+密钥→自动拉模型→启停/刷新/删除/行内改名，全界面操作无需编辑文件。
+ * OWUI 同款：填地址+密钥→自动拉模型→启停/刷新/删除/行内改名，全界面操作无需编辑文件。
  * 含「添加/编辑服务商」弹窗（一个框管添加+编辑，密钥掩码可显隐，三协议模式）。
- * 单条 upsert（参考 open-webui/Dify 交互：每个供应商独立保存，绝不塞进整表大草稿——那是崩溃根源）。
+ * 单条 upsert（OWUI/Dify 式：每个供应商独立保存，绝不塞进整表大草稿——那是崩溃根源）。
  */
 
 import { useState } from 'react';
@@ -52,7 +52,7 @@ export default function ConnectionsTab() {
   const renameProvider = async (old: string, nw: string) => {
     const j = await postProviderAction('rename', { old, new: nw });
     if (j.ok) {
-      flash(`已改名：${old} → ${nw}${j.agents_updated?.length ? `（联动工人岗 ${j.agents_updated.join('、')}）` : ''}`);
+      flash(`已改名：${old} → ${nw}${j.agents_updated?.length ? `（联动牛马 ${j.agents_updated.join('、')}）` : ''}`);
       await reload();
     } else { flash(j.error || '改名失败'); await reload(); }
   };
@@ -61,7 +61,7 @@ export default function ConnectionsTab() {
     await reload();
   };
   const deleteProvider = async (name: string) => {
-    if (!window.confirm(`确定删除服务商「${name}」？助手和工人岗将立刻无法使用它。`)) return;
+    if (!window.confirm(`确定删除服务商「${name}」？米娅和牛马将立刻无法使用它。`)) return;
     await postProviderAction('delete', { name });
     flash('已删除');
     await reload();
@@ -71,7 +71,7 @@ export default function ConnectionsTab() {
     <>
       <h2 className="mb-1 text-lg font-medium">外部连接</h2>
       <p className="mb-5 text-xs text-gray-500">
-        添加后全平台可用：助手对话框的模型列表、工人岗矩阵下拉、按模型设置，全部吃这里拉取的列表——不用再手动编辑任何文件
+        添加后全平台可用：米娅对话框的模型列表、牛马矩阵下拉、按模型设置，全部吃这里拉取的列表——不用再手动编辑任何文件
       </p>
       <Section first title="OpenAI 接口">
         <button
@@ -91,7 +91,7 @@ export default function ConnectionsTab() {
             <input
               className={'bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 text-xs text-gray-800 dark:text-gray-200 outline-none focus:border-gray-500 w-28 shrink-0'}
               defaultValue={p.name}
-              title="点击改名（自动联动工人岗配置）"
+              title="点击改名（自动联动牛马配置）"
               onBlur={(e) => { const old = p.name, nw = e.target.value.trim(); if (nw && nw !== old) renameProvider(old, nw); }}
             />
             <span className="flex-1 truncate text-xs text-gray-600 dark:text-gray-400" title={p.base_url}>{p.base_url}</span>
@@ -109,14 +109,14 @@ export default function ConnectionsTab() {
         ))}
       </Section>
 
-      {/* ── 添加/编辑服务商弹窗（外置式编辑弹窗（参考成熟 agent 平台）：一个框管添加+编辑，密钥掩码可显隐，三协议模式）── */}
+      {/* ── 添加/编辑服务商弹窗（OWUI/ZCode 式：一个框管添加+编辑，密钥掩码可显隐，三协议模式）── */}
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setAddOpen(false)}>
           <div className="w-[480px] rounded-xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-base font-medium text-gray-900 dark:text-white">{editName ? `编辑连接 · ${editName}` : '添加连接'}</h3>
             <label className="mb-1 block text-xs text-gray-500">名称</label>
             <input className={inputC + (editName ? ' opacity-60' : '')} readOnly={!!editName} placeholder="如：智谱 / 魔搭 / 书生 / DeepSeek" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} />
-            {editName && <p className="mt-1 text-[0.625rem] text-gray-400">改名请在列表行内直接改（会自动联动工人岗配置）</p>}
+            {editName && <p className="mt-1 text-[0.625rem] text-gray-400">改名请在列表行内直接改（会自动联动牛马配置）</p>}
             <label className="mb-1 mt-3 block text-xs text-gray-500">接口地址（URL）</label>
             <input className={inputC} placeholder="https://open.bigmodel.cn/api/paas/v4" value={addForm.base_url} onChange={(e) => setAddForm({ ...addForm, base_url: e.target.value })} />
             <label className="mb-1 mt-3 block text-xs text-gray-500">API 密钥（KEY）</label>
