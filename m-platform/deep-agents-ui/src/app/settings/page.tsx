@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * 助手办公室 · 设置页（管理面板交互参考 open-webui 设计，2026-08-28 作者）—— 壳
+ * 米娅办公室 · 设置页（OWUI 管理面板 1:1 复刻，2026-08-28 知夏）—— 壳
  * ------------------------------------------------------------------
- * 结构/样式参考 open-webui SettingsModal + AdminSettingRow/Switch 公开类名体系（未复制源码）：
+ * 结构/样式照抄 open-webui SettingsModal + AdminSettingRow/Switch 的类名：
  *   - 左侧分组导航（Personal/Basic、个人资料、Admin/系统、AI、Experience、Tools）
  *   - 右下角悬浮"保存"按钮
  * 数据全部走后端 /settings API（office.py settings_mgr）。
@@ -61,7 +61,7 @@ function SettingsShell() {
 
   return (
     <div className="fixed inset-0 flex bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-gray-200">
-      {/* ── 左侧导航（参考 open-webui）── */}
+      {/* ── 左侧导航（照抄 OWUI）── */}
       <aside className="flex w-[240px] shrink-0 flex-col border-r border-gray-100 dark:border-gray-900">
         <button onClick={() => (window.location.href = '/')} className="flex items-center gap-1 px-4 pt-4 pb-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
           <ChevronLeft className="size-4" /> 返回
@@ -128,7 +128,7 @@ function SettingsShell() {
           )}
         </div>
 
-        {/* ── 悬浮保存按钮（参考 open-webui）── */}
+        {/* ── 悬浮保存按钮（照抄 OWUI）── */}
         <div className="sticky bottom-0 pointer-events-none flex justify-end">
           <button onClick={save} className="pointer-events-auto mr-6 mb-4 rounded-full bg-gray-900 dark:bg-white px-4 py-2 text-xs font-medium text-white dark:text-black shadow-lg hover:opacity-90">
             {msg || '保存'}

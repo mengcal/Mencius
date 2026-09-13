@@ -4,8 +4,8 @@
  * settings/rows/AdminTokenRow.tsx —— R75 管理员密钥（统一 token）面板
  * ------------------------------------------------------------------
  * 生成/轮换/清除 + 忘记密钥用密码找回（R10.7）+ 修改密码（R10.8d，需旧密码验证）。
- * 密钥只存浏览器 HttpOnly Cookie + 后端 secrets，助手容器没有它 → 改不动设置/服务商/批准。
- * 参考成熟 agent 平台"锁在被锁者之外"。原 page.tsx L25-141 原样迁出。
+ * 密钥只存浏览器 HttpOnly Cookie + 后端 secrets，米娅容器没有它 → 改不动设置/服务商/批准。
+ * 对标 ZCode"锁在被锁者之外"。原 page.tsx L25-141 原样迁出。
  */
 
 import { useEffect, useState } from 'react';
@@ -46,13 +46,13 @@ export default function AdminTokenRow() {
     } catch { setMsg('无法连接后端'); }
   };
   const clear = async () => {
-    // R10.5 事故：管理员想"轮换"时误触清除→首设态又无激活码输入=锁外。加确认+说清后果。
+    // R10.5 事故：爸爸想"轮换"时误触清除→首设态又无激活码输入=锁外。加确认+说清后果。
     if (!window.confirm('重置会清除当前管理员密钥（浏览器 Cookie 一并作废），之后必须用宿主激活码重新生成才能恢复管理权限。确定要重置吗？')) return;
     const r = await tokenClear();
-    if (r.ok) { clearAdminToken(); setJustSet(''); setMsg('已重置。请从部署目录下 guard\.token_bootstrap 文件取激活码，粘贴到下方输入框重新生成。'); refresh(); }
+    if (r.ok) { clearAdminToken(); setJustSet(''); setMsg('已重置。请从宿主 D:\\m\\guard\\.token_bootstrap 文件取激活码，粘贴到下方输入框重新生成。'); refresh(); }
     else setMsg(r.error || '失败');
   };
-  // R10.8d（管理员："用户怎么修改密码"）：修改找回密码——需旧密码验证（防拿到 Cookie 的脚本换通道）
+  // R10.8d（爸爸："用户怎么修改密码"）：修改找回密码——需旧密码验证（防拿到 Cookie 的脚本换通道）
   const changePwd = async () => {
     if (chgNew.length < 8) return setMsg('新密码至少 8 位');
     if (chgNew !== chgNew2) return setMsg('两次输入的新密码不一致');
@@ -68,11 +68,11 @@ export default function AdminTokenRow() {
     } catch { setMsg('无法连接后端'); }
   };
   return (
-    <Row label="管理员密钥" description={'改设置/服务商/批准/知识库写入需带此密钥；助手容器没有它=改不动。' + (configured ? '当前：已启用（写端点强制校验）' : '当前：未配置（fail-closed：所有写端点一律 401，必须先生成）')}>
+    <Row label="管理员密钥" description={'改设置/服务商/批准/知识库写入需带此密钥；米娅容器没有它=改不动。' + (configured ? '当前：已启用（写端点强制校验）' : '当前：未配置（fail-closed：所有写端点一律 401，必须先生成）')}>
       <div className="flex flex-wrap items-center gap-2">
         {configured ? (
           <>
-            {/* R10.11（评审B 风格定稿）：全平台唯一主色=灰黑方形，indigo 只活在向导页；按钮 shadow 移除（行内无投影） */}
+            {/* R10.11（NOVA 风格定稿）：全平台唯一主色=灰黑方形，indigo 只活在向导页；按钮 shadow 移除（行内无投影） */}
             <button type="button" className="rounded-lg bg-gray-900 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-700 dark:bg-white dark:text-black dark:hover:bg-gray-200" onClick={() => gen()}>轮换密钥</button>
             <button type="button" className="text-xs text-red-500 underline-offset-2 hover:underline" onClick={clear}>重置（需激活码恢复）</button>
             {recovering ? (
@@ -118,9 +118,9 @@ export default function AdminTokenRow() {
       {!configured && (
         <div className="mt-2 w-full rounded-lg border border-amber-400 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           <b>首设引导：尚未生成管理员密钥。</b>
-          保存设置 / 服务商 / 批准 / 知识库写入现在会被全部拒绝（401，fail-closed——防止助手容器内的请求抢先把平台钥匙设成它的）。
+          保存设置 / 服务商 / 批准 / 知识库写入现在会被全部拒绝（401，fail-closed——防止米娅容器内的请求抢先把平台钥匙设成它的）。
           首设要验【激活码】：它只存在宿主电脑的 <b>D:\m\guard\.token_bootstrap</b> 文件里（打开复制全部内容粘贴到上面输入框）。
-          能打开这个文件夹的只有管理员和作者，助手与沙箱进不去，所以拿得到激活码的才是管理员。生成后本浏览器自动保存（种入 HttpOnly Cookie），之后正常使用无需再填。
+          能打开这个文件夹的只有爸爸和知夏，米娅与沙箱进不去，所以拿得到激活码的才是管理员。生成后本浏览器自动保存（种入 HttpOnly Cookie），之后正常使用无需再填。
         </div>
       )}
       {justSet && (

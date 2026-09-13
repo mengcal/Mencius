@@ -4,7 +4,7 @@ FROM langchain/langgraph-api:3.11
 ENV UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
-# ── R43：助手的系统工具（curl 必备；docker.sock 由 compose 挂载，容器内可用 curl --unix-socket 查容器）──
+# ── R43：米娅的系统工具（curl 必备；docker.sock 由 compose 挂载，容器内可用 curl --unix-socket 查容器）──
 # 纯国内网络：apt 源换清华镜像（deb.debian.org 直连超时）
 RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
     sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list || true
@@ -17,7 +17,7 @@ RUN set -ex && \
                 'name = "workspace"' \
                 'version = "0.1"' \
                 'dependencies = [' \
-                '  "deepagents==0.7.11",' \
+                '  "deepagents==0.7.13",' \
                 '  "langgraph-sdk==0.4.4",' \
                 '  "langchain-openai",' \
                 '  "langgraph-checkpoint-postgres",' \

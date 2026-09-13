@@ -47,7 +47,6 @@ deepagents / langgraph 等上游库的安全更新请关注各自仓库的 Secur
 
 ## 报告漏洞
 
-请勿公开提交含利用细节的 Issue。
-首选通道：仓库页 **Security → Report a vulnerability**（GitHub 私密漏洞报告，仅维护者可见）。
-若该通道暂未启用，请开一个只写「发现安全问题+联系方式」的 Issue，细节由维护者私信跟进。
+请勿公开提交含利用细节的 Issue。请先在 GitHub Issue 里只写「发现安全问题+联系方式」，
+细节走邮件给维护者（发布者请在占位邮箱处填入真实邮箱后再发布）：`security@example.com`。
 预期 72 小时内回应；修复后会鸣谢报告者（除非希望匿名）。

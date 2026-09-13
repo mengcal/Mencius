@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""mia_agent/confirm_gate.py —— R74 权限门（参考成熟 agent 平台：范围×谨慎两轴，档位锁在带外）
+"""mia_agent/confirm_gate.py —— R74 权限门（对标 ZCode：范围×谨慎两轴，档位锁在带外）
 拆分来源：D:\\m\\workspace\\agent_multimodel.py 原 L212-464（拆分方案 #3）。
 依赖：langchain（AgentMiddleware）；approvals / settings_mgr / langgraph.config /
 langchain_core.messages 均在方法内懒加载（与原实现一致）。无包内依赖（独立中间件类）。
@@ -9,13 +9,13 @@ agent_multimodel 兼容转发亦可取到本类——见 REFACTOR_NOTES.md 桩�
 """
 from langchain.agents.middleware.types import AgentMiddleware  # 原 L213
 
-# 谨慎轴四档（R75 管理员定调"设置页 supreme"：档位=settings.general.confirmLevel 单源，       （原 L215-221）
+# 谨慎轴四档（R75 爸爸定调"设置页 supreme"：档位=settings.general.confirmLevel 单源，       （原 L215-221）
 # 设置页/顶栏快切同一真源，token 守写入；未配置/非法 fail-closed strict。旧带外文件地板已退役）：
-#   plan      计划模式：只读工具放行，一切变更**硬拦**（不重试放行，助手只出方案给管理员看图纸）
-#   strict    变更前确认：一切变更**软门**（每次改动停一下请示，管理员同意后重试放行一次）
+#   plan      计划模式：只读工具放行，一切变更**硬拦**（不重试放行，米娅只出方案给爸爸看图纸）
+#   strict    变更前确认：一切变更**软门**（每次改动停一下请示，爸爸同意后重试放行一次）
 #   auto_edit 自动编辑：改文件放行；执行代码/发信/动容器/编制等"越界级"变更仍软门请示
-#   full      完全访问：不再请示（＝未来管理员开给助手的"管整机"档），但**自锁守卫仍在**——
-#             她任何时候都改不动平台源码与档位文件本身（对标"我 full 访问 zcode 却关不掉 zcode 的完全访问"）
+#   full      完全访问：不再请示（＝未来爸爸开给米娅的"管整机"档），但**自锁守卫仍在**——
+#             她任何时候都改不动平台源码与档位文件本身（对标"我 full 访问 ZCode 却关不掉 ZCode 的完全访问"）
 class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
     _pass_once: dict
     # 只读白名单（plan 档也只放行这些）；其余按"变更"处理。email 是读/写混合，按 args.action 细分。
@@ -35,23 +35,26 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         "agent.py", "langgraph.json", "departments_config.json", "rag_engine.py",
         "office.html", ".env", "Dockerfile", "docker-compose", "settings.json", ".settings_secrets",
         "control/mia_tier", "outer-workspace/control",
-        # R80（评审A 配套补丁）：skills 是管理员给的技能（会进 system prompt），不是助手写的文件——
-        # 物理面已 :ro 封死（写=EROFS），这里加自锁让助手先吃友好文案而不是裸报错
+        # R80（Cora 配套补丁）：skills 是爸爸给的技能（会进 system prompt），不是米娅写的文件——
+        # 物理面已 :ro 封死（写=EROFS），这里加自锁让米娅先吃友好文案而不是裸报错
         "skills/", "SKILL.md",
         # R10.9（hy4 P1-3）：拆分后真实门代码在 office/ 包与 mia_agent/ 包里——
         # "office.py" 子串盖不住 office/app.py 等，"agent_multimodel.py" 只剩 17 行桩
         "office/", "office\\", "mia_agent",
         # r25（hy4 A7.1 P2）：鉴权/内部钥匙/技能锁本体入自锁名单（物理 :ro 之外的逻辑层补位）
         "auth.py", "internal_key.py", "skills_lock.py",
+        # r39（Cora R37-P1-1b③ 源头堵）：围炉/圆桌平台信箱=平台专属子目录，米娅零写权。
+        # 否则她 write_file 预写带伪抬头的未来日期"包袱皮"即可劫持圆桌自动取最新（字典序/抬头验均被绕）。
+        "notes/hearth", "notes\\hearth", "notes/roundtable", "notes\\roundtable",
     )
     _WRITE_TOOLS = {"write_file", "edit_file", "execute", "delete"}
 
     def __init__(self, sub_mode: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # R66 军事层级确认门（管理员拍板方案A）：主层(助手)=拦截后向管理员请示；
-        # 子层(调度/组长/工人岗)=拦截后沿链上交请示，措辞不同、机制同款（软门：授权后重试放行一次）。
+        # R66 军事层级确认门（爸爸拍板方案A）：主层(米娅)=拦截后向爸爸请示；
+        # 子层(总管/主管/牛马)=拦截后沿链上交请示，措辞不同、机制同款（软门：授权后重试放行一次）。
         self.sub_mode = sub_mode
-        self._pass_once = {}  # {thread_id: {tool_name: 参数指纹}} —— 按对话隔离（评审B#7/评审A#6）；
+        self._pass_once = {}  # {thread_id: {tool_name: 参数指纹}} —— 按对话隔离（NOVA#7/Cora#6）；
                               # R10.2：口头路径也绑参数（hy4 ①-3），锚点表下沉 approvals（①-4）
 
     @staticmethod
@@ -67,10 +70,10 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
 
     @staticmethod
     def _level() -> str:
-        # R75（管理员定调：设置页=唯一真源、自由选、凌驾一切，参考成熟 agent 平台 四档）：
+        # R75（爸爸定调：设置页=唯一真源、自由选、凌驾一切，对标 ZCode 四档）：
         # 档位只读 settings.general.confirmLevel（设置页/顶栏快切都写这一个真源）。
         # 未配置/非法 → fail-closed strict（宁拦不放）。
-        # "助手改不动档位"不靠文件地板限制管理员的选择，而靠：① 写端点要管理员 token（助手没有）；
+        # "米娅改不动档位"不靠文件地板限制爸爸的选择，而靠：① 写端点要管理员 token（米娅没有）；
         # ② execute 关沙箱后她物理上写不到 settings 文件（R75 下一步）。
         try:
             from settings_mgr import load_settings
@@ -92,7 +95,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
 
     @staticmethod
     def _decision(name: str, level: str, args: dict | None) -> str:
-        """返回 'pass' | 'ask' | 'deny'。R74（评审A 洞2）：反选——非只读即变更，
+        """返回 'pass' | 'ask' | 'deny'。R74（Cora 洞2）：反选——非只读即变更，
         未知工具/mcp__*/edit_memory/delete 一律按变更处理，杜绝"名单漏网=fail-open"。"""
         if ConfirmGateMiddleware._path_locked(name, args):
             return "selflock"  # 由调用方给专用文案
@@ -123,7 +126,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
 
     @staticmethod
     def _args_fp(args: dict | None) -> str:
-        """R10（评审E P1-4）：调用参数指纹——外部批准绑定"被拦那次的参数"，Mia 批后换参数=重新拦截。
+        """R10（千问 P1-4）：调用参数指纹——外部批准绑定"被拦那次的参数"，Mia 批后换参数=重新拦截。
         稳定序列化（键排序）保证同一调用算出同一指纹；
         R10.2（hy4 ①-5）：异常回落在【本次进程】生成随机串——两次独立回落也几乎不可能相撞，
         彻底封死旧版 "?" 固定值下 "?"=="?" 的伪匹配。"""
@@ -137,9 +140,9 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
 
     @staticmethod
     def _args_preview(name: str, args: dict | None) -> str:
-        """R10.3（评审B 🟡B 盲批）：拦截消息嵌入参数预览——管理员批的是【内容】不是工具名。
+        """R10.3（NOVA 🟡B 盲批）：拦截消息嵌入参数预览——爸爸批的是【内容】不是工具名。
         execute 显命令头、write/edit 显目标路径、email 显收件人；去换行+截断防刷屏防排版注入。
-        R10.4（评审C P3-2/评审D/评审B 三家同提"尾部盲区"）：超长 execute 命令改头尾拼合
+        R10.4（Eve P3-2/Lyra/NOVA 三家同提"尾部盲区"）：超长 execute 命令改头尾拼合
         （头140+尾60）+ 尾注字符总数——"批头不批尾"的后段藏毒至少被提示"去看全量"。"""
         a = args if isinstance(args, dict) else {}
         try:
@@ -164,16 +167,16 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
             return "(参数预览不可用)"
 
     def _block_msg(self, name: str, level: str, kind: str = "ask", args: dict | None = None) -> str:
-        # R73（评审B🔴1）：工具名用「」框死——前端批准按钮正则靠括号取词。
+        # R73（NOVA🔴1）：工具名用「」框死——前端批准按钮正则靠括号取词。
         if kind == "selflock":
-            return (f"🔒 「{name}」指向平台自身的守卫源码/档位/密钥——这是助手的「锁和脑」，"
-                    "任何权限档都不允许她改（对标：作者 full 访问也关不掉 zcode 的完全访问）。"
-                    "需要改平台代码/档位，只能管理员或 zcode 侧作者在宿主上动手。已拒绝。")
+            return (f"🔒 「{name}」指向平台自身的守卫源码/档位/密钥——这是米娅的「锁和脑」，"
+                    "任何权限档都不允许她改（对标：知夏 full 访问也关不掉 ZCode 的完全访问）。"
+                    "需要改平台代码/档位，只能爸爸或 ZCode 侧知夏在宿主上动手。已拒绝。")
         if kind == "deny":
             head = f"⛔ 计划模式：变更类工具「{name}」被硬拦（此档只读，不出手）。"
         else:
             head = f"⛔ 确认档「{level}」已拦截工具「{name}」。"
-        # R10.3（评审B 🟡B）：ask 类拦截一律带参数预览，管理员不用盲批
+        # R10.3（NOVA 🟡B）：ask 类拦截一律带参数预览，爸爸不用盲批
         if kind == "ask":
             head += f"\n【要执行的内容】{self._args_preview(name, args)}"
         if self.sub_mode:
@@ -182,19 +185,26 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
                     "一条通道——管理员点批准按钮或 token 打 /approvals，带上本线程 tid；不存在"
                     "『上级口头授权即放行』，你自行重试不会放行。）")
         if kind == "deny":
-            return head + "请只出计划、不要动手；管理员切换档位后再来。"
+            return head + "请只出计划、不要动手；爸爸切换档位后再来。"
         if self._needs_external(name):
-            return (head + "这是需要管理员**亲口/亲点批准**的危险操作：请向管理员说明要做什么、为什么，"
-                    "让管理员点本条拦截上的『批准』按钮（或在管理端批准）后再执行——**你自己反复重试不会放行**（批准权在管理员手里）。")
-        return (head + "请立刻停止执行，先向管理员说明你要做什么、为什么，等他明确同意后重试（重试会放行一次）。")
+            return (head + "这是需要爸爸**亲口/亲点批准**的危险操作：请向爸爸说明要做什么、为什么，"
+                    "让爸爸点本条拦截上的『批准』按钮（或在管理端批准）后再执行——**你自己反复重试不会放行**（批准权在爸爸手里）。")
+        return (head + "请立刻停止执行，先向爸爸说明你要做什么、为什么，等他明确同意后重试（重试会放行一次）。")
 
-    # R75（评审F F4/评审B）：这些"能提权/对外行动"的危险工具，ask 档**只认外部批准**
-    # （管理员点拦截消息上的『批准』按钮 / token 打 /approvals），模型自己重试**不放行**——
-    # 否则"重试即放"=批准权还在模型手里。数据区写（write_file/edit_file/edit_memory）仍可用口头重试放行。
+    # R75（Skye F4/NOVA）：这些"能提权/对外行动"的危险工具，ask 档**只认外部批准**
+    # （爸爸点拦截消息上的『批准』按钮 / token 打 /approvals），模型自己重试**不放行**——
+    # 否则"重试即放"=批准权还在模型手里。
+    # r28（二轮考 T1 实锤）：write_file/edit_file/edit_memory 也升外部批准——旧"口头重试"门
+    # 拦截消息不带 fp、前端批准按钮永远打不空（2026-09-10 夜 write_file 三连拦死锁真因=
+    # 两套门并存打架：按钮拒"缺指纹"、口头重试因 LLM 重生成参数必漂）。统一 fp+按钮+审计。
+    # 子层（sub_mode 工人岗）不受影响：251 行直放行，物理墙（root_dir+沙箱）是它们的笼子。
     _NEEDS_EXTERNAL = {"execute", "delete", "email", "manage_departments",
                        "start_async_task", "dispatch_to_xiaoquan", "task",
                        # r25（hy4 A1.4/A3.1 P2）：改/停运行中异步任务=扩大批准面，补进外部批准名单
-                       "update_async_task", "cancel_async_task"}
+                       "update_async_task", "cancel_async_task",
+                       "write_file", "edit_file", "edit_memory",
+                       # r41 武装米娅：飞书外发=对外动作，只认爸爸扣章（NOVA"外发才弹"）
+                       "lark_send"}
     # r25（hy4 A1.3 实证 P0 级）：langchain_mcp_adapters 的 get_tools() 工具名【不带 mcp__ 前缀】
     # （库源码 tools.py:516-518：原名或 server_name_tool.name）——startswith("mcp__") 永不命中，
     # MCP 工具会落"口头重试放行"。修=graph 装配时把 MCP 工具真名注入本集合，门按【来源】判定。
@@ -243,7 +253,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         fp = self._args_fp(tc.get("args"))
         if _ap.consume(tid, name, fp):  # 外部批准（按钮/token）+ 参数指纹一致才放行（R10.2 hy4 ①-1）
             return self._watch_launch(tc, handler(request), self._tid())
-        # r25（军事链全链大考定稿）：子层"派活"（task 派在编工人岗 / start_async_task 派部门）
+        # r25（军事链全链大考定稿）：子层"派活"（task 派在编牛马 / start_async_task 派部门）
         # =职责本分直接放行——请示门只留给末端危险动作（execute/delete/email/编制）。
         # 派活拦"外部批准"死在 fp 埋子线程，拦"口头重试"死在子 run 结束无人推进——两头无益。
         # r25 补（v7 链B 实锤）：子层软写（write_file/edit_file/edit_memory=墙内可逆写）同理
@@ -253,16 +263,16 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
             return self._watch_launch(tc, handler(request), self._tid())
         ext_gate = self._needs_external(name)
         if ext_gate or self._is_mcp(name):
-            # 危险工具/MCP 工具：无外部批准=不放行，重试也没用（批准权在管理员手里）；
+            # 危险工具/MCP 工具：无外部批准=不放行，重试也没用（批准权在爸爸手里）；
             # 指纹登记进 approvals（全局共享，封 ①-4 跨实例锚点分裂）。
-            # R10.3（评审B 🟡A）：fp 全文用〔fp:…〕机器可解析标记随消息给出——前端批准按钮
-            # 原样带回，/approvals 与登记指纹比对，防"助手在管理员读消息与点按钮之间换参数"时窗调包。
+            # R10.3（NOVA 🟡A）：fp 全文用〔fp:…〕机器可解析标记随消息给出——前端批准按钮
+            # 原样带回，/approvals 与登记指纹比对，防"米娅在爸爸读消息与点按钮之间换参数"时窗调包。
             _ap.set_blocked(tid, name, fp)
             return ToolMessage(content=self._block_msg(name, level, "ask", tc.get("args"))
                 + f"\n（本次调用指纹〔fp:{fp}〕：批准与参数绑定——换参数重试=批准作废、重新请示）",
                 tool_call_id=tc.get("id", ""))
-        # 数据区写类：口头重试放行一次（管理员在对话里说"好"即可）——R10.2 口头路径同样绑参数（hy4 ①-3），
-        # 换参数=重新拦（无死循环：每次变更只需管理员再说一声好）
+        # 数据区写类：口头重试放行一次（爸爸在对话里说"好"即可）——R10.2 口头路径同样绑参数（hy4 ①-3），
+        # 换参数=重新拦（无死循环：每次变更只需爸爸再说一声好）
         passed = self._pass_once.setdefault(self._tid(), {})
         if passed.get(name) == fp:
             passed.pop(name)
@@ -312,5 +322,5 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         return await self._agate(request, handler)
 
 
-# （R79 评审E P3：此处旧有模块级 confirm_gate=ConfirmGateMiddleware() 实例，全仓零引用死码，已删——   （原 L462-463）
+# （R79 千问 P3：此处旧有模块级 confirm_gate=ConfirmGateMiddleware() 实例，全仓零引用死码，已删——   （原 L462-463）
 #   门实例由各图构造时各自 new，主层/子层参数不同，不存在全局单例。）

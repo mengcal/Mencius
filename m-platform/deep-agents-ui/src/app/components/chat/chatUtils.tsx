@@ -6,7 +6,7 @@
  * - getStatusIcon：TODO 状态图标（completed/in_progress/默认）
  * - processMessages：把 LangGraph 消息流折叠成 { message, toolCalls, showAvatar } 数组
  *   （1. 遍历所有消息；2. AI 消息连同 tool_calls 入 messageMap；3. tool 消息回填对应 tool call 的状态与输出）
- * - buildAutoReportGroups：R59 自动汇报折叠——把 "[工作者调度·自动汇报]" 指令 + 紧随的助手回复合并成一组
+ * - buildAutoReportGroups：R59 自动汇报折叠——把 "[小全调度·自动汇报]" 指令 + 紧随的米娅回复合并成一组
  *
  * 注意：计划名为 chatUtils.ts，因 getStatusIcon 返回 JSX（React 元素），.ts 无法承载，故用 .tsx。
  */
@@ -156,7 +156,7 @@ export function processMessages(
   });
 }
 
-/** R59 自动汇报折叠：把 "[工作者调度·自动汇报]" 指令 + 紧随的助手回复合并成一组，
+/** R59 自动汇报折叠：把 "[小全调度·自动汇报]" 指令 + 紧随的米娅回复合并成一组，
  *    对话流里默认折成一行（点开才展开）——官方 expandedSubAgents 同款 state+toggle 范式 */
 export function buildAutoReportGroups(
   processedMessages: ProcessedMessage[]
@@ -173,7 +173,7 @@ export function buildAutoReportGroups(
     const cur = processedMessages[i].message;
     if (cur.type !== "human") continue;
     const content = extractStringFromMessageContent(cur);
-    if (!content.startsWith("[工作者调度·自动汇报]")) continue;
+    if (!content.startsWith("[小全调度·自动汇报]")) continue;
     const body = processedMessages[i + 1].message;
     if (body.type !== "ai") continue;
     groups.set(cur.id!, {

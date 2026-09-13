@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * settings/tabs/SubagentsTab.tsx —— 工人岗矩阵（admin:subagents）页（原 page.tsx L836-973 原样迁出）
- * Sub-agents（open-webui 式：子代理数=这里建几头工人岗，deepagents 官方机制，无需额外开关）。
+ * settings/tabs/SubagentsTab.tsx —— 牛马矩阵（admin:subagents）页（原 page.tsx L836-973 原样迁出）
+ * Sub-agents（OWUI 式：子代理数=这里建几头牛马，deepagents 官方机制，无需额外开关）。
  * 真实服务商 key + 职业设定 + 思维档 + boss 回退链（R64：回退链必须设置页自己填自己选，不许硬编码）。
- * 改谁更新谁，其他工人岗不动；保存后需重启容器生效（助手启动时读取）。
+ * 改谁更新谁，其他牛马不动；保存后需重启容器生效（米娅启动时读取）。
  */
 
 import { useState } from 'react';
@@ -14,24 +14,24 @@ import { Section, inputC } from '../ui';
 
 export default function SubagentsTab() {
   const { draftRef, agents, providers, modelsByProvider, set, flash } = useSettings();
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set()); // 工人岗默认折叠
+  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set()); // 牛马默认折叠
   const [addAgentOpen, setAddAgentOpen] = useState(false);
   const [addAgentName, setAddAgentName] = useState('');
   return (
     <>
-      <h2 className="mb-1 text-lg font-medium">工人岗矩阵</h2>
-      <p className="mb-5 text-xs text-gray-500">子代理数=这里建几头工人岗（deepagents 官方机制，无需额外开关）；确认分档在 通用→助手与安全</p>
-      <Section first title="工人岗矩阵（职业设定 + 模型指派）">
-        <p className="text-[0.6875rem] text-gray-400 dark:text-gray-600">改谁更新谁，其他工人岗不动；保存后需重启容器生效（助手启动时读取）。</p>
+      <h2 className="mb-1 text-lg font-medium">牛马矩阵</h2>
+      <p className="mb-5 text-xs text-gray-500">子代理数=这里建几头牛马（deepagents 官方机制，无需额外开关）；确认分档在 通用→米娅与安全</p>
+      <Section first title="牛马矩阵（职业设定 + 模型指派）">
+        <p className="text-[0.6875rem] text-gray-400 dark:text-gray-600">改谁更新谁，其他牛马不动；保存后需重启容器生效（米娅启动时读取）。</p>
         <button
           className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-3 py-2 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-900"
           onClick={() => { setAddAgentOpen(!addAgentOpen); setAddAgentName(''); }}
         >
-          <Plus className="size-3.5" /> 添加工人岗
+          <Plus className="size-3.5" /> 添加牛马
         </button>
         {addAgentOpen && (
           <div className="flex gap-2">
-            <input className={inputC} placeholder="工人岗名（英文，如 translator）" value={addAgentName} onChange={(e) => setAddAgentName(e.target.value)} />
+            <input className={inputC} placeholder="牛马名（英文，如 translator）" value={addAgentName} onChange={(e) => setAddAgentName(e.target.value)} />
             <button
               className="shrink-0 rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-black"
               onClick={() => {
@@ -68,7 +68,7 @@ export default function SubagentsTab() {
               </button>
               {open && (
                 <div className="border-t border-gray-100 p-3 dark:border-gray-900">
-                  <label className="mb-1 block text-[0.6875rem] text-gray-500">职业设定（擅长做什么，助手派活依据）</label>
+                  <label className="mb-1 block text-[0.6875rem] text-gray-500">职业设定（擅长做什么，米娅派活依据）</label>
                   <input className={inputC} defaultValue={a.desc || ''} onChange={(e) => set(`agents.${k}.desc`, e.target.value)} />
                   <div className="mt-2 flex gap-3">
                     <div className="flex-1"><label className="mb-1 block text-[0.6875rem] text-gray-500">服务商（外部连接里启用的）</label>
@@ -95,7 +95,7 @@ export default function SubagentsTab() {
                         <option value="high">高</option>
                       </select></div>
                   </div>
-                  {/* R64 回退链编辑（管理员定：回退链必须设置页自己填自己选，不许硬编码） */}
+                  {/* R64 回退链编辑（爸爸定：回退链必须设置页自己填自己选，不许硬编码） */}
                   {k === 'boss' && (() => {
                     const fbs = (draftRef.current[`agents.${k}.fallbacks`] ?? (a.fallbacks || [])) as any[];
                     return (

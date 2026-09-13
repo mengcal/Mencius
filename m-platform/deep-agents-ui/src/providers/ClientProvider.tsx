@@ -22,7 +22,7 @@ export function ClientProvider({
   apiKey,
 }: ClientProviderProps) {
   const client = useMemo(() => {
-    // R80（评审C b 纵深）：langgraph 原生 API 进 auth 模块（Bearer=管理员密钥）——
+    // R80（Eve b 纵深）：langgraph 原生 API 进 auth 模块（Bearer=管理员密钥）——
     // 浏览器主 SDK 客户端带上钥匙；无钥匙=聊天页 401（fail-closed 首部署引导）。
     // R10.5 XSS L2：onRequest 注入 credentials:'include'——原生 API 也走 HttpOnly Cookie，
     // localStorage 不再是钥匙存放地（apiKey 头保留读取兼容，迁移期后自然为空）。

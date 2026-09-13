@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""工人岗搜索工具：博查(中文) + Tavily(英文)，供 deepagents 挂载
+"""牛马搜索工具：博查(中文) + Tavily(英文)，供 deepagents 挂载
 用法：tools=[web_search_bocha, web_search_tavily, web_search]
 """
 import json, urllib.request, urllib.parse
 
-# 密钥管理（管理员铁律：不硬编码）：一律从 settings_mgr（设置页"联网搜索"可自由改）读取，
-# 没配置 = 返回未配置提示，绝不写死任何密钥（2026-08-29 应管理员要求删除全部兜底常量）。
+# 密钥管理（爸爸铁律：不硬编码）：一律从 settings_mgr（设置页"联网搜索"可自由改）读取，
+# 没配置 = 返回未配置提示，绝不写死任何密钥（2026-08-29 应爸爸要求删除全部兜底常量）。
 try:
     from settings_mgr import get_plain_key as _settings_key
 except Exception:  # 老环境没有 settings_mgr
@@ -109,7 +109,7 @@ def _searxng(query, count=5):
     import urllib.parse
     base = str(_search_setting("searxngUrl", SEARXNG_URL)).rstrip("/")
     if not base.lower().startswith(("http://", "https://")):
-        base = SEARXNG_URL.rstrip("/")  # R10.11（评审E P2-4）：轻闸门——异 scheme（file:/data: 等）回落默认内网 searxng；
+        base = SEARXNG_URL.rstrip("/")  # R10.11（千问 P2-4）：轻闸门——异 scheme（file:/data: 等）回落默认内网 searxng；
                                         # 不套 providers 的公网闸门是因为默认值本来就是容器内网地址（设计如此）
     lang = str(_search_setting("searxngLang", "all"))
     url = f"{base}?q={urllib.parse.quote(query)}&format=json&language={urllib.parse.quote(lang)}"
@@ -205,7 +205,7 @@ def web_search_bing(query: str) -> str:
 
 def web_search(query: str) -> str:
     """通用搜索。设置页 search.engine 可指定固定引擎；auto=智能路由：
-    中文优先秘塔(每天100分可持续)→博查，英文用Tavily（管理员2026-08-25定）。"""
+    中文优先秘塔(每天100分可持续)→博查，英文用Tavily（爸爸2026-08-25定）。"""
     count = _count()
     engine = str(_search_setting("engine", "auto"))
     if engine == "metaso":

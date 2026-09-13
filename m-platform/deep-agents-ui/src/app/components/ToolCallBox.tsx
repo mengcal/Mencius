@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useQueryState } from "nuqs";
 import { API, apiFetch } from "@/lib/apiBase";
-import { authHeaders } from "@/lib/providerApi";  // R10（评审E P1-1）：/approvals 在 token 门内，批准按钮必须带 Bearer
+import { authHeaders } from "@/lib/providerApi";  // R10（千问 P1-1）：/approvals 在 token 门内，批准按钮必须带 Bearer
 import {
   ChevronDown,
   ChevronUp,
@@ -44,7 +44,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
     const [isExpanded, setIsExpanded] = useState(
       // R10.8e（前端审查子代理）：含 ⛔ 拦截的工具默认展开——用户必须看到批准按钮，
       // 不应该藏在折叠层里点两次才找到。
-      // R10.11（评审E P3-6 修正）：原写法在第 53 行解构 `result` 之前就引用它（TDZ 静默
+      // R10.11（千问 P3-6 修正）：原写法在第 53 行解构 `result` 之前就引用它（TDZ 静默
       // 风险）——改从 props 的 toolCall.result 取，声明顺序无关、语义不变。
       () => !!uiComponent || !!actionRequest
         || (typeof toolCall?.result === "string" && toolCall.result.includes("⛔"))
@@ -62,8 +62,9 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
       };
     }, [toolCall]);
 
-    // 确认门拦截卡自动展开修复：isExpanded 是挂载时初始值，历史线程加载时 result 尚未挂上、
-    // 拦截内容到达后不会重算，批准按钮会藏在折叠层里。result 含 ⛔ 时补一次强制展开。
+    // R10.18（爸爸点名"变更前确认不弹出"根因）：isExpanded 是挂载时的初始值——历史线程加载时
+    // result 尚未挂上，拦截内容到达后初始值不会重算，批准按钮永远藏在折叠层里。
+    // 补应：result 含 ⛔ 时强制展开一次（用户之后手动折叠仍尊重其操作）。
     const blocked = typeof result === "string" && result.includes("⛔");
     useEffect(() => {
       if (blocked) setIsExpanded(true);
@@ -71,6 +72,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
 
     const statusIcon = useMemo(() => {
       if (blocked) {
+        // 确认档拦截待批：橙色停手图标（与 interrupted 同族，比"已完成"绿勾诚实）
         return (
           <StopCircle
             size={14}
@@ -244,14 +246,14 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
                         ? result
                         : JSON.stringify(result, null, 2)}
                     </pre>
-                    {/* R69 确认门 v2：⛔ 拦截结果上挂「批准」按钮（管理员免敲 curl） */}
+                    {/* R69 确认门 v2：⛔ 拦截结果上挂「批准」按钮（爸爸免敲 curl） */}
                     {typeof result === "string" && result.includes("⛔ 确认档") && (
                       <GateApproveButton
-                        // R73（评审B🔴1 假通过修复）：工具名现用「」框住，取「」内内容；
+                        // R73（NOVA🔴1 假通过修复）：工具名现用「」框住，取「」内内容；
                         // 旧 (\S+) 遇中文无空格会把整句吞进工具名→批准到错工具。
                         toolName={(result.match(/已拦截工具「([^」]+)」/) || [])[1] || ""}
-                        // R10.3（评审B 🟡A 时窗调包）：把拦截消息里的参数指纹原样带回——
-                        // 后端比对"管理员看到的那条"与"登记的那条"，不符=拒绝，不静默重绑。
+                        // R10.3（NOVA 🟡A 时窗调包）：把拦截消息里的参数指纹原样带回——
+                        // 后端比对"爸爸看到的那条"与"登记的那条"，不符=拒绝，不静默重绑。
                         fp={(result.match(/〔fp:([0-9a-f]+)〕/) || [])[1] || ""}
                       />
                     )}
@@ -269,9 +271,9 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
 ToolCallBox.displayName = "ToolCallBox";
 
 /** R69 批准按钮：对 ⛔ 软门拦截调 POST /approvals——模型之外的一次性批准，
- *  点完让助手重试这一步即放行（office.api_approve / approvals.py 的正门 UI 化）。
- *  R10.5（评审B ⚪E 补 UI）：旁挂「撤销」——误点后悔药，DELETE /approvals 同 payload。
- *  r25（管理员裁决）：X-By 常数头作废，请求只带 Bearer/Cookie 真钥匙。 */
+ *  点完让米娅重试这一步即放行（office.api_approve / approvals.py 的正门 UI 化）。
+ *  R10.5（NOVA ⚪E 补 UI）：旁挂「撤销」——误点后悔药，DELETE /approvals 同 payload。
+ *  r25（爸爸裁决）：X-By 常数头作废，请求只带 Bearer/Cookie 真钥匙。 */
 function GateApproveButton({ toolName, fp }: { toolName: string; fp?: string }) {
   const [threadId] = useQueryState("threadId");
   const [state, setState] = useState<"idle" | "sending" | "ok" | "fail">("idle");
@@ -304,7 +306,7 @@ function GateApproveButton({ toolName, fp }: { toolName: string; fp?: string }) 
             const r = await apiFetch(`${API}/approvals`, {
               method: "POST",
               headers: authHeaders({ "Content-Type": "application/json" }),
-              // R10.3（评审B 🟡A）：fp 随批带上（时窗调包防）；缺 fp=后端直接拒并指路（fp 必填）
+              // R10.3（NOVA 🟡A）：fp 随批带上（时窗调包防）；缺 fp=后端直接拒并指路（fp 必填）
               body: JSON.stringify({ thread_id: threadId, tool: toolName, fp: fp || "" }),
             });
             const j = await r.json();
@@ -321,7 +323,7 @@ function GateApproveButton({ toolName, fp }: { toolName: string; fp?: string }) 
       </Button>
       {state === "ok" && (
         <span className="text-xs text-green-600 dark:text-green-400">
-          已批准{revoked === "ok" ? "（已撤销，可重新批）" : "——让助手重试这一步即放行"}
+          已批准{revoked === "ok" ? "（已撤销，可重新批）" : "——米娅会自动继续，不用再发消息催"}
         </span>
       )}
       {state === "fail" && <span className="text-xs text-red-500">批准失败（检查后端）</span>}

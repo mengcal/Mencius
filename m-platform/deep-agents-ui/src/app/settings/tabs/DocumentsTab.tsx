@@ -3,7 +3,7 @@
 /**
  * settings/tabs/DocumentsTab.tsx —— 文档知识库（admin:documents，RAG）页（原 page.tsx L1119-1173 + RAG 状态迁出）
  * RAG 知识库：嵌入走本机 Ollama（浏览器直连），服务器只存向量。
- * 嵌入/存储逻辑在 ragClient.ts；R79（评审E P1）：/rag/rebuild 在 token 门内，带 Bearer。
+ * 嵌入/存储逻辑在 ragClient.ts；R79（千问 P1）：/rag/rebuild 在 token 门内，带 Bearer。
  * 前置：Windows 环境变量 OLLAMA_ORIGINS=* 并重启 Ollama。
  */
 
@@ -51,7 +51,7 @@ export default function DocumentsTab() {
         嵌入走本机 Ollama（浏览器直连），服务器只存向量。前置：Windows 环境变量 OLLAMA_ORIGINS=* 并重启 Ollama
       </p>
       <Section first title="嵌入模型（全库唯一真源）">
-        <Row label="向量模型" description="所有入库/检索/助手查询统一用这一个模型（单模型跨语言，旧中英文双模型已退役）。推荐 qwen3-embedding:0.6b（1024维，本机显卡带得动）。⚠️ 换模型后必须点右边「重建全库」，否则新旧向量不同空间、检索全乱。">
+        <Row label="向量模型" description="所有入库/检索/米娅查询统一用这一个模型（单模型跨语言，旧中英文双模型已退役）。推荐 qwen3-embedding:0.6b（1024维，本机显卡带得动）。⚠️ 换模型后必须点右边「重建全库」，否则新旧向量不同空间、检索全乱。">
           <div className="flex gap-2">
             <input className={inputC + ' w-52'} defaultValue={val('rag.embeddingModel', 'qwen3-embedding:0.6b')}
               onChange={(e) => { set('rag.embeddingModel', e.target.value); setEmbedModel(e.target.value); }} />
@@ -60,7 +60,7 @@ export default function DocumentsTab() {
               onClick={async () => {
                 try {
                   setRagBusy(true);
-                  // R79（评审E P1）：/rag/rebuild 在 token 门内，带 Bearer（r25 起 X-By 常数头作废）
+                  // R79（千问 P1）：/rag/rebuild 在 token 门内，带 Bearer（r25 起 X-By 常数头作废）
                   const j = await (await apiFetch(`${API}/rag/rebuild`, { method: 'POST', headers: authHeaders() })).json();
                   flash(j.ok ? `重建完成：${j.updated} 条切片已按 ${j.model} 重嵌` : `重建失败：${j.error}`);
                 } catch (e: any) { flash(e.message || '重建失败'); } finally { setRagBusy(false); }

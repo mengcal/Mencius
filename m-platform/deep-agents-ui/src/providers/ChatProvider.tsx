@@ -25,7 +25,7 @@ export function ChatProvider({
   const handleRevalidate = () => {
     const tid = threadId;
     if (tid) {
-      // R79（hy4 低危项入守）：/threads/title 进 token 门，写标题带上管理员密钥（管理员浏览器有；
+      // R79（hy4 低危项入守）：/threads/title 进 token 门，写标题带上管理员密钥（爸爸浏览器有；
       // 无 token 环境=标题不更新，静默失败不影响聊天本身，防任意人往线程灌垃圾标题+白烧 LLM）
       const t = getAdminToken();
       apiFetch(`${API}/threads/title`, {  // R68：相对路径在 dev(:3000) 打到 Next 自身=404（R57 同款坑复发），改走 API 基址；R10.5 改 apiFetch（带凭据，Cookie 过守卫）

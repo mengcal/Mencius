@@ -9,7 +9,7 @@ office/app.py / cow_graphs.py 继续以 `import agent_multimodel` / `from agent_
   agent.py:7、office/app.py:30   → agent
   cow_graphs.py:59 / 275         → SandboxedShellBackend
   cow_graphs.py:68 / 275         → ConfirmGateMiddleware、search_knowledge_base
-（故除方案指定的 agent 一行外，另补三个兼容转发，防 cow_graphs 引用断裂；
+（故除方案指定的 agent 一行外，另补三个兼容转发，防 cow_graphs 引用断裂；详见 REFACTOR_NOTES.md。）
 """
 from mia_agent.graph import agent  # noqa: F401  （拆分方案指定的一行转发，全量实现已拆入 mia_agent/）
 from mia_agent.confirm_gate import ConfirmGateMiddleware  # noqa: F401  （cow_graphs.py:68/275 兼容转发）

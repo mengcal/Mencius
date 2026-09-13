@@ -14,7 +14,7 @@ import type { ReactNode, MutableRefObject } from 'react';
 import { postSettings, getSettings } from '@/lib/providerApi';
 import { setEmbedModel } from '@/lib/ragClient';
 
-/** 后端基址（R10.11 评审E P1-2：改走 @/lib/apiBase 的同源 /lg 基址——旧值 127.0.0.1:2024 直连是跨源，
+/** 后端基址（R10.11 千问 P1-2：改走 @/lib/apiBase 的同源 /lg 基址——旧值 127.0.0.1:2024 直连是跨源，
  *  SameSite=Strict Cookie 不携带 → 密钥管理/技能锁/知识库重建三项 401，恢复通道自断。
  *  历史注记：拆分时从原 page.tsx 逐字保留的常量，/lg 改造轮漏了这里。） */
 export { API } from '@/lib/apiBase';

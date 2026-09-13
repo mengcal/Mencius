@@ -4,6 +4,8 @@
   ],
   "graphs": {
     "agent": "./agent.py:agent",
+    "hearth": "./hearth_graph.py:hearth",
+    "roundtable": "./roundtable_graph.py:roundtable",
     "dept_0": "./cow_graphs.py:dept_0",
     "dept_1": "./cow_graphs.py:dept_1",
     "dept_2": "./cow_graphs.py:dept_2",

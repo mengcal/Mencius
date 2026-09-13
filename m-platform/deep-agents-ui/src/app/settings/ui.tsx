@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * settings/ui.tsx —— 样式基元（类名风格参考 open-webui，归属见 NOTICE）
+ * settings/ui.tsx —— OWUI 样式基元（类名照抄 open-webui 源码）
  * ------------------------------------------------------------------
  * Switch / Row / Section 基元组件 + inputC / tabButtonClass / groupHeadingClass
  * 类名常量 + autoGrow 文本域自增高工具（R65/R66 抽公共版）。
@@ -10,9 +10,9 @@
 
 export const inputC =  'w-full bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 text-xs text-gray-800 dark:text-gray-200 outline-none focus:border-gray-500';
 
-/** R10.8f 管理员定纲（老花可读性）+R10.11（评审C/评审A 风格评审）收敛一式：密钥/密码/激活码类
+/** R10.8f 爸爸定纲（老花可读性）+R10.11（Eve/Cora 风格评审）收敛一式：密钥/密码/激活码类
  *  "重要输入框"专用——白底深字大号粗体。全站唯一例外（普通输入一律 inputC）；
- *  新重要输入框必须用本常量，禁止再造第四种圆角（评审B：rounded-full/xl/lg 三混已清账）。 */
+ *  新重要输入框必须用本常量，禁止再造第四种圆角（NOVA：rounded-full/xl/lg 三混已清账）。 */
 export const inputCImportant = 'w-full rounded-lg border-2 border-indigo-300 bg-white px-4 py-2.5 text-base font-medium text-gray-900 placeholder-gray-400';
 
 export const tabButtonClass = (active: boolean) =>

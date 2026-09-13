@@ -2,8 +2,8 @@
 
 /**
  * settings/tabs/WebTab.tsx —— 联网搜索（admin:web）页（原 page.tsx L976-1024 原样迁出）
- * open-webui 细致度参考：搜索开关/引擎路由/SearXNG/搜索限制/引擎密钥。
- * R10.5（管理员）：「Web Search Confirmation」占位删除——搜索是只读动作，确认门四档已管住变更类行为。
+ * OWUI 细致度复刻：搜索开关/引擎路由/SearXNG/搜索限制/引擎密钥。
+ * R10.5（爸爸）：「Web Search Confirmation」占位删除——搜索是只读动作，确认门四档已管住变更类行为。
  */
 
 import { useSettings } from '../context';
@@ -19,7 +19,7 @@ export default function WebTab() {
         <Row label="联网搜索" description="允许在对话中搜索互联网。">
           <Switch checked={!!val('search.enabled', true)} onChange={(v) => set('search.enabled', v)} />
         </Row>
-        <Row label="默认搜索引擎" description="助手默认走智能路由：中文秘塔→博查，英文 Tavily。手动指定后固定用该引擎。">
+        <Row label="默认搜索引擎" description="米娅默认走智能路由：中文秘塔→博查，英文 Tavily。手动指定后固定用该引擎。">
           <select className={inputC + ' w-40'} defaultValue={val('search.engine', 'auto')} onChange={(e) => set('search.engine', e.target.value)}>
             <option value="auto">auto（智能路由）</option>
             <option value="metaso">秘塔 metaso</option>

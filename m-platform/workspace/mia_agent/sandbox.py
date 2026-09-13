@@ -10,10 +10,10 @@ import os  # SandboxedShellBackend 用 os.environ 读 SANDBOX_TOKEN（原 L70）
 from deepagents.backends import LocalShellBackend  # 原 L68
 from deepagents.backends.protocol import ExecuteResponse as _ExecResp  # 原 L69
 
-# R76 execute 沙箱化（管理员定调"设置页 supreme/沙箱=容器时代之墙"）：
+# R76 execute 沙箱化（爸爸定调"设置页 supreme/沙箱=容器时代之墙"）：
 # 文件工具(ls/read/write/edit)已被 deepagents 锁在 root_dir=mia_home 内，唯独 execute 是无圈限裸 shell。
 # 这里把 execute 经内网 POST 到 m-sandbox 容器的执行服务——沙箱只挂数据区，没有 settings.json/源码/档位，
-# 助手的 shell 物理上碰不到平台的"锁和脑"（参考成熟 agent 平台：执行面与守卫面分离）。
+# 米娅的 shell 物理上碰不到平台的"锁和脑"（对标 ZCode：执行面与守卫面分离）。
 class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
     """execute → 沙箱执行服务（固定内网地址，带 X-Token）；其余继承本地实现（已锁 mia_home）。"""
     _URL = os.environ.get("SANDBOX_EXEC_URL") or "http://sandbox:9000/exec"  # compose 固定内网地址（管理员侧配置=env，不由任何输入拼装）

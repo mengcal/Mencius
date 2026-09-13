@@ -2,7 +2,7 @@
 
 /**
  * settings/tabs/ImagesTab.tsx —— 图片（admin:images）页（原 page.tsx L1027-1057 原样迁出）
- * 对接本地 Stable Diffusion WebUI，画图任务由绘图工人岗走这个接口。
+ * 对接本地 Stable Diffusion WebUI，画图任务由绘图牛马走这个接口。
  */
 
 import { useSettings } from '../context';
@@ -13,7 +13,7 @@ export default function ImagesTab() {
   return (
     <>
       <h2 className="mb-1 text-lg font-medium">图片</h2>
-      <p className="mb-5 text-xs text-gray-500">对接本地 Stable Diffusion WebUI，画图任务由绘图工人岗走这个接口</p>
+      <p className="mb-5 text-xs text-gray-500">对接本地 Stable Diffusion WebUI，画图任务由绘图牛马走这个接口</p>
       <Section first title="图像生成">
         <Row label="图像生成" description="Allow users to generate images from prompts.">
           <Switch checked={!!val('images.enabled', false)} onChange={(v) => set('images.enabled', v)} />

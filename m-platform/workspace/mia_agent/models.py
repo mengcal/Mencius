@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""mia_agent/models.py —— 工人岗矩阵配置 + 模型构造
+"""mia_agent/models.py —— 牛马矩阵配置 + 模型构造
 拆分来源：D:\\m\\workspace\\agent_multimodel.py 原 L124（make_model import）、
 L858-908（拆分方案 #5；其中 L893-900 的 boss_model 构造在本段行号范围内，一并归入）。
 依赖：providers.make_model、settings_mgr.load_agents_config（模块级）；
@@ -9,7 +9,7 @@ langchain_openai 在 _model 兜底分支内懒加载（与原实现一致）。
 
 from providers import make_model  # 原 L124
 
-# ============ 工人岗矩阵唯一真源 = 设置页 settings.agents（R65 去重：直用 settings_mgr，不再二份 loader） ============（原 L858）
+# ============ 牛马矩阵唯一真源 = 设置页 settings.agents（R65 去重：直用 settings_mgr，不再二份 loader） ============（原 L858）
 from settings_mgr import load_agents_config  # 原 L859
 
 _CFG = load_agents_config()  # 原 L861
@@ -18,10 +18,10 @@ _CFG = load_agents_config()  # 原 L861
 def _model(key: str, **kwargs):  # 原 L864-880
     """按 key 从设置页 settings.agents 读 provider+model 构造模型实例。
     配置错/服务商不可用 → 只留占位模型让平台起得来（启动成功、调用才报错）。
-    R65 管理员铁律：越权兜底已删——绝不偷换别的服务商干活，没配好就报空不干活。"""
+    R65 爸爸铁律：越权兜底已删——绝不偷换别的服务商干活，没配好就报空不干活。"""
     c = _CFG.get(key) or {}
     try:
-        # 工人岗可自带 thinking 档位（settings.agents 里 "thinking": "off/low/medium/high"，助手可改）
+        # 牛马可自带 thinking 档位（settings.agents 里 "thinking": "off/low/medium/high"，米娅可改）
         t = c.get("thinking")
         kw = dict(kwargs)
         if t not in (None, "", "default") and "thinking" not in kw:
@@ -44,7 +44,7 @@ def _global_params() -> dict:  # 原 L883-890
         return {}
 
 
-# 工作者组长（拆派汇总）（原 L893-900）
+# 小全主管（拆派汇总）（原 L893-900）
 _gp = _global_params()
 _boss_kwargs = {}
 if str(_gp.get("temperature", "")) != "":

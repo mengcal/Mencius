@@ -60,7 +60,7 @@ export function useChat({
     ) => {
       const newMessage: Message = { id: uuidv4(), type: "human", content };
       // 运行级配置随消息走官方 state 通道（run_config.py 中间件消费）
-      // R79⑦（评审B：model/provider/thinking 同 web_search 病只修了一半）：通道按键合并，
+      // R79⑦（NOVA：model/provider/thinking 同 web_search 病只修了一半）：通道按键合并，
       // 条件写=上一轮的旧值粘死（这轮选了模型、下轮"不选"仍用上轮的）。四键恒写；
       // 空串在后端=不换脑/思维档走回退链（run_config._thinking_for），语义闭环。
       const miaConfig: Record<string, unknown> = {
@@ -77,7 +77,7 @@ export function useChat({
             messages: [...(prev.messages ?? []), newMessage],
           }),
           config: { ...(activeAssistant?.config ?? {}), recursion_limit: 100 },
-          // R3：干活时管理员再发消息 → 排队接续，不打断后台任务（官方 multitask 机制）
+          // R3：干活时爸爸再发消息 → 排队接续，不打断后台任务（官方 multitask 机制）
           multitaskStrategy: "enqueue",
         }
       );

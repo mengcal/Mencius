@@ -48,14 +48,14 @@ async def api_set_settings(section: str, data: dict = Body(...), request: Reques
                 current_rev = int((BASE / "settings.json").stat().st_mtime)
                 if int(expected_rev) != current_rev:
                     return {"ok": False, "conflict": True,
-                            "error": "设置已被后台修改（作者/助手/其他对话刚动过），请刷新页面后重改"}
+                            "error": "设置已被后台修改（知夏/米娅/其他对话刚动过），请刷新页面后重改"}
             except Exception:
                 pass
-        # 权限检查（评审B#3/评审A#4）：r25（管理员裁决）X-By 常数头作废——
-        # /settings/* 写面从 R10 起由 api_token_guard token fail-closed 真守（助手无钥匙=中间件 401），
+        # 权限检查（NOVA#3/Cora#4）：r25（爸爸裁决）X-By 常数头作废——
+        # /settings/* 写面从 R10 起由 api_token_guard token fail-closed 真守（米娅无钥匙=中间件 401），
         # 旧 by!=admin 双锁是 R75 无统一 token 时代的遗产，零额外熵，拆掉不再演双保险。
-        # miaManageAgents 对助手的约束在工具面（manage_departments 直写 settings_mgr+确认门），不依赖此处 HTTP 判定。
-        # R75：confirmLevel 回归 settings.general（设置页/顶栏快切同一真源），统一 token 守写入（助手无 token 改不动）。
+        # miaManageAgents 对米娅的约束在工具面（manage_departments 直写 settings_mgr+确认门），不依赖此处 HTTP 判定。
+        # R75：confirmLevel 回归 settings.general（设置页/顶栏快切同一真源），统一 token 守写入（米娅无 token 改不动）。
         # R79④拆假注释：R74 的"带外 :ro 文件地板（两路取严）"已随"设置页 supreme/政令必通"定调整体退役——
         # _level() 单源读 settings.general.confirmLevel，未配置/非法 fail-closed strict；MIA_TIER_FILE 死配置已从 compose 撤除。
         result = save_section(section, data)
@@ -71,7 +71,7 @@ async def api_set_settings(section: str, data: dict = Body(...), request: Reques
 @router.get("/providers")
 async def api_providers():
     """统一服务商表：providers.json（遗留）+ 设置页外部连接（enabled 过滤）。
-    Sub-agents 页下拉框数据源——工人岗 provider 就填这里的 key。"""
+    Sub-agents 页下拉框数据源——牛马 provider 就填这里的 key。"""
     from providers import load_providers
     return {"providers": [
         {"key": k, "model": v.get("model", "")}
@@ -135,7 +135,7 @@ def _save_external_provider(name: str, base_url: str, api_key: str = "", enabled
 @router.post("/providers/add")
 async def api_provider_add(req: dict = Body(...)):
     """添加/更新服务商：{name, base_url, api_key} → 保存并自动拉取模型列表。
-    管理员只要填地址和密钥，其他全自动（open-webui/sillytavern 同款体验）。"""
+    爸爸只要填地址和密钥，其他全自动（OWUI/sillytavern 同款体验）。"""
     name = (req.get("name") or "").strip()
     base_url = (req.get("base_url") or "").strip().rstrip("/")
     api_key = req.get("api_key") or ""
@@ -157,7 +157,7 @@ async def api_provider_add(req: dict = Body(...)):
 @router.post("/providers/rename")
 async def api_provider_rename(req: dict = Body(...)):
     """服务商改名（猪八戒也行）：{old, new}。
-    联动同步：external.providers 条目、secrets 明文路径、agents_config.json 里引用它的工人岗。
+    联动同步：external.providers 条目、secrets 明文路径、agents_config.json 里引用它的牛马。
     名字只是标签，引擎认的是名字背后的 base_url+key。"""
     old, new = (req.get("old") or "").strip(), (req.get("new") or "").strip()
     if not old or not new or old == new:
@@ -170,7 +170,7 @@ async def api_provider_rename(req: dict = Body(...)):
     if any(p.get("name") == new for p in providers):
         return {"error": f"名字 {new} 已被占用"}
     entry["name"] = new
-    # R74 回归修复（评审C P2-A）：save_section 的孤儿密钥清理会当场删掉旧名的 key，
+    # R74 回归修复（Eve P2-A）：save_section 的孤儿密钥清理会当场删掉旧名的 key，
     # 必须【先取旧 key】再保存、再把密钥落到新名——否则改名=密钥无声蒸发。
     from settings_mgr import secret_get, secret_set
     old_path, new_path = f"external.providers.{old}.api_key", f"external.providers.{new}.api_key"
@@ -184,10 +184,10 @@ async def api_provider_rename(req: dict = Body(...)):
     secret_set(old_path, "")
     if migrated_flag:
         secret_set(new_flag, "1")
-    # 联动改工人岗引用
+    # 联动改牛马引用
     changed = []
     try:
-        # 联动改工人岗/组长/回退链引用：改的是配置页 settings.agents（唯一真源），不再碰 agents_config.json
+        # 联动改牛马/主管/回退链引用：改的是配置页 settings.agents（唯一真源），不再碰 agents_config.json
         ag = load_settings().get("agents") or {}
         for k, a in ag.items():
             if isinstance(a, dict):
@@ -224,7 +224,7 @@ async def api_provider_refresh(req: dict = Body(...)):
 
 @router.post("/providers/toggle")
 async def api_provider_toggle(req: dict = Body(...)):
-    """启停服务商：{name, enabled}。停用后助手/工人岗立刻用不了它（load_providers 会过滤）。"""
+    """启停服务商：{name, enabled}。停用后米娅/牛马立刻用不了它（load_providers 会过滤）。"""
     name = req.get("name", "")
     enabled = bool(req.get("enabled", True))
     s = load_settings()
@@ -251,7 +251,7 @@ async def api_provider_update(req: dict = Body(...)):
     """编辑已存在服务商：{name, base_url?, api_key?, tag?, enabled?, mode?}。
     按名字定位、整表安全更新——绝不用 external.providers.<下标>.<字段> 点号路径
     （那会把 providers 列表写成 {"3":{...}} 字典，冲垮全部服务商；R41/本次崩溃同源 bug）。
-    api_key 留空=保持不变；mode=chat_completions|anthropic|responses（open-webui/ZCode 三模式）。"""
+    api_key 留空=保持不变；mode=chat_completions|anthropic|responses（OWUI/ZCode 三模式）。"""
     name = (req.get("name") or "").strip()
     if not name:
         return {"error": "需要 name"}
@@ -287,7 +287,7 @@ async def api_provider_update(req: dict = Body(...)):
 
 @router.get("/models/all")
 async def api_models_all():
-    """所有启用服务商的模型合集（工人岗下拉框数据源）。"""
+    """所有启用服务商的模型合集（牛马下拉框数据源）。"""
     s = load_settings()
     out = []
     for p in s.get("external", {}).get("providers", []):

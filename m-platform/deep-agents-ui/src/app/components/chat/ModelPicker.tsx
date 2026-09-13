@@ -3,7 +3,7 @@
 /**
  * components/chat/ModelPicker.tsx —— 输入框右下角模型选择（原 ChatInterface.tsx L754-812 迁出）
  * ------------------------------------------------------------------
- * 参考 open-webui 交互：按钮弹出模型列表弹层（贴按钮上沿），带模糊搜索（忽略大小写和 -_. 分隔符，
+ * OWUI 同款：按钮弹出模型列表弹层（贴按钮上沿），带模糊搜索（忽略大小写和 -_. 分隔符，
  * "lm5.3"能搜到 GLM-5.3-Flash）；选中后 onPick 落库并收起弹层。
  * 弹层开合/位置/搜索词由本组件自持；models/selected 由 useModelSelection 传入。
  */
@@ -34,7 +34,7 @@ export function ModelPicker({ models, selectedModel, selectedProvider, onPick }:
           setModelSearch("");
         }}
         className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-tertiary transition-colors hover:bg-accent hover:text-primary"
-        title={selectedModel || "选择模型（接线中：当前仍由助手组长模型应答）"}
+        title={selectedModel || "选择模型（接线中：当前仍由米娅主管模型应答）"}
       >
         {selectedModel || "模型"}
         <ChevronDown size={12} />

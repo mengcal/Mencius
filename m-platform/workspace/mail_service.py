@@ -1,10 +1,10 @@
-"""M平台邮箱托管服务（R72，2026-09-03 管理员拍板：ClawEmail 归 M 平台托管——作者管理面、助手使用面）。
+"""M平台邮箱托管服务（R72，2026-09-03 爸爸拍板：ClawEmail 归 M 平台托管——知夏管理面、米娅使用面）。
 
-铁律（助手 8/24 回信风暴教训，写死在本模块）：
+铁律（米娅 8/24 回信风暴教训，写死在本模块）：
 - 只手动收发，绝无 gateway/轮询/自动回复；本模块不驻留任何后台线程。
 - 凭据只从 .settings_secrets 读（email.account.<名字>.password / email.home.<id>.apiKey），源码零密钥。
 - 主机钉死官方端点：IMAP claw.163.com:993 / SMTP claw.163.com:25（STARTTLS），不跟随任何外来 URL。
-- 多主账号=注册表按 home 归属、按名字寻址（管理员"按名字查零机制"令）——open-webui 时代双主账号管不明白的根因是
+- 多主账号=注册表按 home 归属、按名字寻址（爸爸"按名字查零机制"令）——OWUI 时代双主账号管不明白的根因是
   一个网关守护管一摊，这里无守护、无状态，加账号=注册表加一行。
 """
 import imaplib
@@ -25,7 +25,7 @@ def accounts() -> list:
 def _acct(name: str):
     acc = next((a for a in accounts() if a.get("name") == name), None)
     if acc is None:
-        raise ValueError(f"邮箱账号「{name}」不在注册表（设置页 email 节 / 找作者加）")
+        raise ValueError(f"邮箱账号「{name}」不在注册表（设置页 email 节 / 找知夏加）")
     if acc.get("enabled") is False:
         raise ValueError(f"邮箱「{name}」已被停用")
     from settings_mgr import secret_get
@@ -36,14 +36,14 @@ def _acct(name: str):
 
 
 def _imap():
-    """R73（评审B🟡）：统一构造 IMAP4_SSL——显式默认 TLS 上下文（校验证书）+ 30s 超时。"""
+    """R73（NOVA🟡）：统一构造 IMAP4_SSL——显式默认 TLS 上下文（校验证书）+ 30s 超时。"""
     import ssl
     return imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, ssl_context=ssl.create_default_context(), timeout=30)
 
 
 def check(name: str, limit: int = 8) -> str:
     """列最近 N 封（只读不动邮件、不回复）。
-    R73（评审A P3a）：用 UID 命令取真实 UID——check 与 read 是两次独立连接，
+    R73（Cora P3a）：用 UID 命令取真实 UID——check 与 read 是两次独立连接，
     若用序号（sequence number），中间外部删信会导致序号漂移读错信；UID 稳定。"""
     acc, pw = _acct(name)
     M = _imap()
@@ -81,8 +81,8 @@ def _h(raw: bytes, key: str) -> str:
 
 def read(name: str, uid: str) -> str:
     """读单封全文（只读）。"""
-    # R73（评审A P2 实锤）：uid 直接进 IMAP 命令行、imaplib._command 零过滤——
-    # 白名单只认纯数字，比消毒可靠。提示注入让助手传 "1\r\nXXXX LOGOUT" 也进不去。
+    # R73（Cora P2 实锤）：uid 直接进 IMAP 命令行、imaplib._command 零过滤——
+    # 白名单只认纯数字，比消毒可靠。提示注入让米娅传 "1\r\nXXXX LOGOUT" 也进不去。
     if not str(uid).isdigit():
         return "❌ uid 必须是 check 列表里 [方括号] 内的纯数字编号"
     acc, pw = _acct(name)

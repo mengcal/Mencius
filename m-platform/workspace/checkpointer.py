@@ -1,4 +1,4 @@
-"""mcal 助手持久记忆 —— checkpoint 层（对话历史/线程状态）
+"""mcal 米娅持久记忆 —— checkpoint 层（对话历史/线程状态）
 
 放在 D:/m/workspace/checkpointer.py（与 langgraph.json 同级）
 表建在 m 库（checkpoint_* 系列表），幂等：重复运行不重复建表

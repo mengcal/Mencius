@@ -1,11 +1,11 @@
 """mia_agent.dept_watch —— 部门任务"完工/受阻"推送监视器（r25 军事链断点3修复，v2 扫描式）。
 
-背景：组长链走官方 start_async_task 派部门，库不给 runs.create 挂 webhook——
+背景：主管链走官方 start_async_task 派部门，库不给 runs.create 挂 webhook——
 部门 run 结束（包括"受阻请示"收尾）主线程永远不知道，链卡死无人报。
 
 v2 设计（v11/v12 实锤教训：从工具返回抽 task_id 会撞 uuid 前缀/Command 结构不可靠）：
 门放行 start_async_task 只登记"主线程 + 时间戳"；本监视器轮询 threads.search，
-发现【该时刻之后新建的部门/调度线程】（metadata.graph_id ∈ dept_*/gm）run 结束且未通知
+发现【该时刻之后新建的部门/总管线程】（metadata.graph_id ∈ dept_*/gm）run 结束且未通知
 → 唤醒主线程去 check_async_task 取报告转呈。两段式：请示唤醒一次，真完工再唤醒一次。
 
 安全边界：只唤醒登记过的主线程；内存态 TTL 2h；进程内 SDK（X-Internal-Key=同进程钥匙），
@@ -24,10 +24,23 @@ _INTERVAL = 15
 def register(main_tid: str, desc: str = ""):
     """门放行 start_async_task 时登记发起主线程。"""
     if main_tid:
+        # r55b 档位校验器（NOVA 提案）：register 就地定档（不依赖描述头——
+        # start_async_task 的 task 文本才是派活真身，dispatch 标记头只在其自己链上）。
+        try:
+            from mia_agent.model_tier import classify_task
+            _tier = classify_task(desc or "").get("tier", "")
+        except Exception:
+            _tier = ""
+        # r56 缺口①（一条龙对账表）：任务文本里的"完成标志:"行提取登记，
+        # 完工时与部门汇报做机械包含核对——汇报说完成≠标志达成（W5 教训外推到派活链）。
+        _marks = [ln.split("完成标志:", 1)[1].strip()[:80]
+                  for ln in (desc or "").splitlines() if "完成标志:" in ln]
         with _LOCK:
             _WATCH[main_tid] = {"at": time.time(), "seen": set(),
-                                "notified": set(), "desc": (desc or "")[:60]}
-        print(f"[dept-watch] register main={main_tid}", flush=True)
+                                "notified": set(), "desc": (desc or "")[:500],
+                                "tier": _tier,
+                                "marks": _marks[:7]}
+        print(f"[dept-watch] register main={main_tid} tier={_tier} marks={len(_marks)}", flush=True)
 
 
 def _client():
@@ -108,12 +121,39 @@ def _scan():
                         w["seen"].add(tid)
                         if stage == "完工":
                             w["notified"].add(tid)
+                    # r55 档位校验器：标档 vs 实际动作数对账落台账（NOVA"一期天天免费攒"）
+                    if stage == "完工" and info.get("tier"):
+                        try:
+                            import json as _j
+                            from pathlib import Path as _P
+                            _f = _P(__file__).resolve().parent.parent / "mia_home" / "notes" / "tier_audit.jsonl"
+                            _f.parent.mkdir(parents=True, exist_ok=True)
+                            with open(_f, "a", encoding="utf-8") as _fh:
+                                _fh.write(_j.dumps({"ts": round(time.time(), 1),
+                                                    "tier": info["tier"], "steps": len(msgs),
+                                                    "dept": tid[:8], "main": main_tid[:8]},
+                                                   ensure_ascii=False) + "\n")
+                        except Exception:
+                            pass  # 校验账失败绝不挡汇报
                     try:
+                        # r56 缺口①：完成标志机械包含核对（对部门末条汇报文本）——
+                        # 未命中标志不拦停（部门可能有合理变通），但如实附注给米娅/爸爸看。
+                        _mark_note = ""
+                        if info.get("marks"):
+                            _miss = [mk for mk in info["marks"] if mk not in tail3]
+                            if _miss:
+                                _mark_note = (f"【完成标志机械核对】{len(_miss)}/{len(info['marks'])} "
+                                              f"条标志未在部门末条汇报中命中：" +
+                                              "；".join(_miss[:3]) +
+                                              "——用 check_async_task 取全文核对，未达成如实报，别替部门圆。")
                         c.runs.create(main_tid, "agent",
                             input={"messages": [{"role": "user", "content":
-                                f"【部门自动汇报】检测到部门线程 {tid}（{info['desc'] or '任务'}）{stage}。"
-                                "用 check_async_task 查该线程最新汇报，按你的角色处理：调度层汇总后上报派活上级；"
-                                "主对话直接转呈管理员（若含待批准事项，把线程号与指纹〔fp:…〕原样转达，不要改写）。"}]},
+                                f"【部门自动汇报】检测到有部门任务（{info['desc'][:80] or '后台活'}）{stage}。"
+                                + (_mark_note + " " if _mark_note else "") +
+                                "用 list_async_tasks 核对你自己派出的任务状态，对已结束的逐个 check_async_task 取汇报，"
+                                "按你的角色处理：调度层汇总后上报派活上级；主对话直接转呈爸爸"
+                                "（若含待批准事项，把线程号与指纹〔fp:…〕原样转达，不要改写；"
+                                "不认识的线程号如实说明，不要张冠李戴）。"}]},
                             config={"configurable": {"user_id": "dept-watch"}})
                         print(f"[dept-watch] 唤醒 main={main_tid} dept={tid} stage={stage}", flush=True)
                     except Exception as e:

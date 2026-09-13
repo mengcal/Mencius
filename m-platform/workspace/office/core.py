@@ -34,7 +34,7 @@ print("[office] STEP0.5 .env loaded", flush=True)
 
 
 # ===== R10 修四①：宿主侧 secrets 卷目录（被审计方摸不到的地方）=====
-# 账本/激活码一律挪到这个目录：沙箱与工人岗进程不可达 secrets 卷，因此改不动账本、读不到激活码。
+# 账本/激活码一律挪到这个目录：沙箱与牛马进程不可达 secrets 卷，因此改不动账本、读不到激活码。
 # R10.2（hy4 ②-1，实测坐实）：env MIA_SECRETS_PATH 的真语义=密钥【文件】路径
 # （settings_mgr:24 同用此值且按文件读写）——旧实现把文件路径当目录返回，
 # 生产下 .token_bootstrap/两本账全落在 "/data/secrets/.settings_secrets/xxx" 这种不可能路径上，
@@ -67,9 +67,9 @@ def _rate_ok(hits: list, window: float, cap: int) -> bool:
     return True
 
 
-# ── R10.3（评审B 四-4①）/R10.4（评审B 🟡 三代化）：账本旋转——单代 .old 会被洪泛二次旋转覆盖
+# ── R10.3（NOVA 四-4①）/R10.4（NOVA 🟡 三代化）：账本旋转——单代 .old 会被洪泛二次旋转覆盖
 # =定向销毁证据链；改 .1/.2/.3 三代滚动。实际稳定态代链=.1/.2/.3/.4 四个后缀+活代=5 份×10MB=50MB/本
-# （R10.4 收官轮 评审A/评审B 计数对账：多保一代=证据保留更久，无害偏差，注释按实记账。）
+# （R10.4 收官轮 Cora/NOVA 计数对账：多保一代=证据保留更久，无害偏差，注释按实记账。）
 _ROTATE_BYTES = 10 * 1024 * 1024
 
 
@@ -106,7 +106,7 @@ def _token_audit(action: str, ok: bool, **extra) -> None:
 
 
 def _presented_token(request) -> str:
-    """凭证呈现顺序：显式头（Bearer/x-token）优先（CLI/助手进程内场景），HttpOnly Cookie 兜底（浏览器）。
+    """凭证呈现顺序：显式头（Bearer/x-token）优先（CLI/米娅进程内场景），HttpOnly Cookie 兜底（浏览器）。
     R10.5 XSS L2（OWASP 会话管理清单+LibreChat 模式）：管理员密钥种入 httponly+samesite=strict 的
     Cookie——浏览器里的恶意脚本物理上读不到它；localStorage 不再是新钥匙的存放地。"""
     auth = request.headers.get("authorization", "")

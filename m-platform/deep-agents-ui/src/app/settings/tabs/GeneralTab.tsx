@@ -3,7 +3,7 @@
 /**
  * settings/tabs/GeneralTab.tsx —— 通用（个人）页（原 page.tsx L606-676 原样迁出）
  * 系统提示词 / 高级参数（paramsOpen 折叠） / 对话压缩与权限。
- * R80（评审A ⑧ 半条）：人设/系统提示词区补"需重启"提示。
+ * R80（Cora ⑧ 半条）：人设/系统提示词区补"需重启"提示。
  * localStorage 键 'mia.showToolCalls' 原样保留。
  */
 
@@ -22,18 +22,18 @@ export default function GeneralTab() {
   return (
     <>
       <h2 className="mb-1 text-lg font-medium">通用</h2>
-      <p className="mb-5 text-xs text-gray-500">助手人设、高级参数与对话显示偏好（R10.11 头部排版统一）</p>
+      <p className="mb-5 text-xs text-gray-500">米娅人设、高级参数与对话显示偏好（R10.11 头部排版统一）</p>
       <Section first title="系统提示词">
         <textarea
           className={inputC}
           style={{ overflow: 'hidden' }}
-          placeholder="助手人设卡…"
+          placeholder="米娅人设卡…"
           defaultValue={val('general.system_prompt')}
           ref={autoGrow(112)}
           onChange={(e) => { set('general.system_prompt', e.target.value); const t = e.currentTarget; t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight, 112) + 'px'; }}
         />
-        {/* R80（评审A ⑧ 半条）：人设/系统提示词区补"需重启"提示——工人岗矩阵区有、这里两轮漏了 */}
-        <p className="mt-1 text-[0.6875rem] text-gray-400 dark:text-gray-600">保存后需重启容器生效（助手启动时读取 system_prompt）。</p>
+        {/* R80（Cora ⑧ 半条）：人设/系统提示词区补"需重启"提示——牛马矩阵区有、这里两轮漏了 */}
+        <p className="mt-1 text-[0.6875rem] text-gray-400 dark:text-gray-600">保存后需重启容器生效（米娅启动时读取 system_prompt）。</p>
       </Section>
       <Section title="高级参数">
         <Row label="Model parameters" description="Show or hide custom generation parameters.（温度/max_tokens 已生效，其余参数存配置待接线）">
@@ -69,7 +69,7 @@ export default function GeneralTab() {
         <Row label="Context Compaction" description="已归位：在 管理 → 界面 设置（对话压缩，官方 SummarizationMiddleware）">
           <span className="text-xs text-gray-500">见"界面"页</span>
         </Row>
-        <Row label="显示工具调用" description="对话里显示工人岗干活的工具卡片（可折叠展开）。关闭后隐藏，界面更清爽">
+        <Row label="显示工具调用" description="对话里显示牛马干活的工具卡片（可折叠展开）。关闭后隐藏，界面更清爽">
           <Switch
             checked={showToolCalls}
             onChange={(v) => {
@@ -79,7 +79,7 @@ export default function GeneralTab() {
             }}
           />
         </Row>
-        <Row label="允许助手管理工人岗" description="关闭后助手无法修改工人岗的模型/职业配置（只有管理员在设置页能改）">
+        <Row label="允许米娅管理牛马" description="关闭后米娅无法修改牛马的模型/职业配置（只有爸爸在设置页能改）">
           <Switch checked={!!val('permissions.miaManageAgents', true)} onChange={(v) => set('permissions.miaManageAgents', v)} />
         </Row>
       </Section>

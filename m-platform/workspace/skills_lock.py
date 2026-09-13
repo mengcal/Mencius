@@ -1,6 +1,6 @@
-"""R10.3 skills_lock（评审A/评审B 方案落地）：技能清单哈希锁——挂载回归保险的"下一层失守兜底"。
+"""R10.3 skills_lock（Cora/NOVA 方案落地）：技能清单哈希锁——挂载回归保险的"下一层失守兜底"。
 
-威胁模型（两家信中对齐）：当前写面已死（沙箱 EROFS、助手进程 EROFS+自锁、n8n 不沾 mia_home），
+威胁模型（两家信中对齐）：当前写面已死（沙箱 EROFS、米娅进程 EROFS+自锁、n8n 不沾 mia_home），
 本锁不堵现洞，防的是：未来新容器忘叠 :ro、部署改版漏挂、宿主侧误操作把 D:\\m\\skills 改回可写。
 
 机制（原地校验版——deepagents SkillsMiddleware 经 backend(root=mia_home) 读路径，
@@ -8,8 +8,8 @@
 - 基线 {相对路径: sha256} 落宿主 secrets 卷 skills_manifest.json（被校验方改不到）；
 - 基线缺失=首次部署自动信任首扫（落审计日志，之后转入严格模式）；
 - 校验不符 → 图构建时 skills=[]（宁可不带技能不裸奔）+ 容器日志 + 审计出声；
-- settings.skills_lock.enabled=false 时跳过（管理员在设置页明确知情地关）；
-- /skills/rehash（管理员门）：管理员改完 D:\\m\\skills 后重扫重建基线。
+- settings.skills_lock.enabled=false 时跳过（爸爸在设置页明确知情地关）；
+- /skills/rehash（管理员门）：爸爸改完 D:\\m\\skills 后重扫重建基线。
 
 残留（诚实清单）：平台运行中宿主直接改技能文件，到下次重启/重登记前不被捕获——
 宿主写=下战场威胁模型，与 ②-2 同判断。
@@ -34,7 +34,7 @@ def _lock_cfg() -> dict:
 
 
 def enabled() -> bool:
-    """默认开（fail-closed 方向）；settings.skills_lock.enabled=false 才关（管理员显式知情）。"""
+    """默认开（fail-closed 方向）；settings.skills_lock.enabled=false 才关（爸爸显式知情）。"""
     return bool(_lock_cfg().get("enabled", True))
 
 
@@ -73,7 +73,7 @@ def audit(action: str, detail: str) -> None:
 
 
 def ensure_baseline(base: Path) -> dict:
-    """基线缺失=首扫落账（评审B：首次部署自动信任首扫）；已有基线原样返回。"""
+    """基线缺失=首扫落账（NOVA：首次部署自动信任首扫）；已有基线原样返回。"""
     mp = _manifest_path()
     if mp.exists():
         try:
@@ -112,7 +112,7 @@ def verify(base: Path, manifest: dict, audit_on: bool = True) -> dict:
 
 
 def rehash(base: Path) -> dict:
-    """管理员在宿主改完技能后重扫重建基线（管理员门内的端点调这里）。"""
+    """爸爸在宿主改完技能后重扫重建基线（管理员门内的端点调这里）。"""
     manifest = scan(base)
     _manifest_path().write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     audit("rehash", f"{len(manifest)} files")

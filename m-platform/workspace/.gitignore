@@ -1,0 +1,21 @@
+# 密钥与敏感（永不进 git）
+.env
+.env.*
+.settings_secrets
+*.key
+*.pem
+
+# 米娅的私人领域（记忆/日记/笔记/任务流水/用量——本地 zip 备份负责，不进仓库；GitHub 发布红线）
+mia_home/
+
+# Python / 运行时
+.venv/
+__pycache__/
+*.pyc
+.langgraph_api/
+*.log
+
+# 系统垃圾
+Thumbs.db
+desktop.ini
+.DS_Store

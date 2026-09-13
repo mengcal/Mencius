@@ -23,8 +23,8 @@ from ..core import BASE, _JSONResp, _ck, _rate_ok
 
 router = APIRouter()
 
-# ===== RAG 知识库存储层（R43 升级 pgvector，2026-08-31 作者）=====
-# 架构：嵌入仍由前端浏览器直调管理员本机 Ollama（localhost:11434），服务器只管存取与检索。
+# ===== RAG 知识库存储层（R43 升级 pgvector，2026-08-31 知夏）=====
+# 架构：嵌入仍由前端浏览器直调爸爸本机 Ollama（localhost:11434），服务器只管存取与检索。
 # 存储：PG + pgvector（compose 镜像 pgvector/pgvector:pg16，数据卷 pg_data 延续）——真·生产级向量检索。
 # 兜底：PG/vector 不可用时自动回落 mia_home/rag_vectors.json（绝不挡功能），恢复后自动续用。
 # 相关度语义不变：1 - 余弦距离（pgvector 的 <=> 操作符）。
@@ -96,7 +96,7 @@ def _rag_load():
 
 # ── R10 修四④：/rag/query 独立滑动窗口（60s ≤30）──
 # codebuddy/vision/rag 窗口各记各的时间戳：任一被刷爆不会把另两个一起拖死（互不挤兑）。
-# R10.3（评审B 四-4②）：分代理窗/管理员窗——沙箱刷爆检索不饿死管理员设置页的检索按钮。
+# R10.3（NOVA 四-4②）：分代理窗/管理员窗——沙箱刷爆检索不饿死爸爸设置页的检索按钮。
 _RAG_HITS_PROXY: list = []
 _RAG_HITS_ADMIN: list = []
 _RAG_RATE_WINDOW = 60.0
@@ -153,11 +153,11 @@ async def rag_ingest(req: dict = Body(...)):
 async def rag_query(req: dict = Body(...), request: Request = None):
     """检索：{"q_vec": [查询向量], "k": 5}（向量前端算好传来）。
     R67：单模型跨语言（rag.embeddingModel），lang 仅收参数不再过滤——旧双模型时代按语言切库的规矩作废。
-    R10.2（评审C P2）：门从"管理员 token 独占"改成二级钥匙二认一——
-    X-Proxy-Key==RAG_PROXY_TOKEN（沙箱工人岗经宿主回环检索，提示词三扇门之一成真）
+    R10.2（Eve P2）：门从"管理员 token 独占"改成二级钥匙二认一——
+    X-Proxy-Key==RAG_PROXY_TOKEN（沙箱牛马经宿主回环检索，提示词三扇门之一成真）
     或 Bearer==管理员 token（设置页检索按钮）；都拿不出=401（fail-closed，同 vision 语义）。
-    R10.3（评审A swap 意见）：门序=钥匙 → 频控（分窗）。
-    R10.4（评审C P2）：体积闸在 _BodyCap（_PATHS 已含 /rag/query，2MB）——"小 body 是合法请求的形态，
+    R10.3（Cora swap 意见）：门序=钥匙 → 频控（分窗）。
+    R10.4（Eve P2）：体积闸在 _BodyCap（_PATHS 已含 /rag/query，2MB）——"小 body 是合法请求的形态，
     不是攻击者会遵守的约束"，同型钥匙门必须同型防护。"""
     rtok = os.environ.get("RAG_PROXY_TOKEN", "")
     ah = str(request.headers.get("authorization") or "") if request else ""
@@ -192,7 +192,9 @@ async def rag_query(req: dict = Body(...), request: Request = None):
             from rag_engine import search_vectors
             rows = search_vectors(qv, int(req.get("k", 5)))
             return {"ok": True, "store": "pg", "results": [
-                {"score": round(float(s), 4), "name": n, "text": t[:800]} for n, t, s in rows]}
+                {"score": round(float(rel), 4), "final": round(float(f), 4),
+                 "importance": round(float(i), 3), "recency": round(float(rc), 3),
+                 "name": n, "text": t[:800]} for n, t, f, rel, i, rc in rows]}
         except Exception as e:
             print(f"[rag] PG 检索失败，回落 JSON：{e}", flush=True)
     db = _rag_load()
@@ -245,9 +247,9 @@ _RAG_REBUILDING = False
 
 @router.post("/rag/rebuild")
 async def rag_rebuild():
-    """R67（管理员 09-02）：换嵌入模型后全库重建——按配置页 rag.embeddingModel 逐条重嵌表内原文。
+    """R67（爸爸 09-02）：换嵌入模型后全库重建——按配置页 rag.embeddingModel 逐条重嵌表内原文。
     零令牌（本机 Ollama）；维度不符 pgvector 会报错=让问题可见，绝不静默。
-    R68 修 评审A P0/评审B🟡8/评审E二.2.4：逐条嵌入是分钟级同步活，旧版直跑 async 处理器=卡死整个
+    R68 修 Cora P0/NOVA🟡8/Qianwen二.2.4：逐条嵌入是分钟级同步活，旧版直跑 async 处理器=卡死整个
     事件循环（对话/健康检查全挂）——改 asyncio.to_thread 落线程池 + 重入锁 + finally 关连接。"""
     global _RAG_REBUILDING
     if _RAG_REBUILDING:

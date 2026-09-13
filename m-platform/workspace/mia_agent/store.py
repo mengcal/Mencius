@@ -3,7 +3,7 @@
 拆分来源：D:\\m\\workspace\\agent_multimodel.py 原 L165-168（_merge_mia）、
 L804-806（MiaState）、L819-854（_STORE_CM / _make_store / _STORE）（拆分方案 #4）。
 （原 L808-816 的 BASE/MEMORY_FILE 段不在此：BASE 按方案在 mia_agent/graph.py 定义，
- MEMORY_FILE 建档副作用随之归 graph.py，
+ MEMORY_FILE 建档副作用随之归 graph.py，见 REFACTOR_NOTES.md。）
 依赖：deepagents.graph.DeepAgentState、typing、typing_extensions；
 langgraph.store.postgres 在 _make_store 内懒加载（与原实现一致）。
 被引用：mia_agent/tools.py（edit_memory 的 PG 镜像写 _STORE，原 L544）、
@@ -16,7 +16,7 @@ from deepagents.graph import DeepAgentState  # 原 L120
 
 def _merge_mia(a: dict | None, b: dict | None) -> dict:  # 原 L165-168
     """mia_config 并发合并（官方 reducer 模式）：多路同写时按键合并，不再报
-    Can receive only one value per step（2026-08-30 管理员实测踩坑）。"""
+    Can receive only one value per step（2026-08-30 爸爸实测踩坑）。"""
     return {**(a or {}), **(b or {})}
 
 
@@ -26,7 +26,7 @@ class MiaState(DeepAgentState):  # 原 L804-806
 
 
 # ── 官方 store 层（R63）：跨线程/跨会话永久记忆，PG 落库，与 langgraph API 服务端同源 ──（原 L819-824）
-# 挂到 create_deep_agent(store=...)，助手的记忆从此走官方 BaseStore（namespace/key/value），
+# 挂到 create_deep_agent(store=...)，米娅的记忆从此走官方 BaseStore（namespace/key/value），
 # 不再是纯文件自研；checkpointer 管对话历史（线程级），store 管全局共享事实（跨线程永久）。
 _STORE_CM = None  # R68：上下文管理器本体必须模块级持引用——只留 store 的话 cm 出函数即被 GC，
                   # 连接当场关闭（R64 以为"__enter__ 持有"修好了，实际镜像从此全在 closed connection 上失败、

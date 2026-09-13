@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * RAG 客户端（2026-08-30 作者）：浏览器直接调管理员本机 Ollama 嵌入，
+ * RAG 客户端（2026-08-30 知夏）：浏览器直接调爸爸本机 Ollama 嵌入，
  * 服务器只存向量——零内网出站、零 SSRF 风险。
- * R67（管理员 09-02）：嵌入模型唯一真源=配置页 rag.embeddingModel（默认 qwen3-embedding:0.6b，
+ * R67（爸爸 09-02）：嵌入模型唯一真源=配置页 rag.embeddingModel（默认 qwen3-embedding:0.6b，
  * 单模型跨语言 1024 维，旧 bge/mxbai 双模型分工作废）；页面加载后 setEmbedModel() 注入。
  * 前置：Windows 的 Ollama 需设置环境变量 OLLAMA_ORIGINS=* 并重启（允许浏览器跨域）。
  */
@@ -57,8 +57,8 @@ export async function ragIngest(name: string, text: string) {
   })));
   const r = await apiFetch(`${API}/rag/ingest`, {
     method: 'POST',
-    // R79（评审E P1）：/rag/ingest 已入 token 门（提示注入持久化面）——必须带 Bearer。
-    // r25：X-By 常数头作废（管理员裁决），真钥匙=Bearer/Cookie。
+    // R79（千问 P1）：/rag/ingest 已入 token 门（提示注入持久化面）——必须带 Bearer。
+    // r25：X-By 常数头作废（爸爸裁决），真钥匙=Bearer/Cookie。
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ name, chunks: withVec }),
   });
@@ -80,7 +80,7 @@ export async function ragQuery(q: string, k = 5): Promise<{ results?: { name: st
 export function ragStats(): Promise<{ chunks: number; docs: Record<string, number> }> {
   return apiFetch(`${API}/rag/stats`, { headers: authHeaders() })
     .then((r) => {
-      // R80 续（评审C P3）：401/失败不许静默吞成假数据（旧 catch 会让统计永远显示 0 片段）
+      // R80 续（Eve P3）：401/失败不许静默吞成假数据（旧 catch 会让统计永远显示 0 片段）
       if (!r.ok) console.warn(`[rag] stats HTTP ${r.status}`);
       return r.json();
     })
