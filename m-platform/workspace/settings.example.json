@@ -7,364 +7,25 @@
   "external": {
     "providers": [
       {
-        "name": "书生5号",
+        "name": "书生",
         "base_url": "https://chat.intern-ai.org.cn/api/v1",
-        "enabled": true,
         "api_key": "********",
-        "models_cache": [
-          "intern-latest",
-          "intern-s2-preview-397b",
-          "intern-s2-preview-35b",
-          "intern-s2-preview",
-          "intern-s1-pro",
-          "intern-s1",
-          "intern-s1-mini",
-          "internvl-latest",
-          "internvl3.5-latest",
-          "internvl3.5-241b-a28b"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
+        "kind": "openai",
+        "note": "Intern-S1 系列，注册即有免费额度（示例条目，key 自己在设置页填）"
       },
       {
-        "name": "书生4号",
-        "base_url": "https://chat.intern-ai.org.cn/api/v1",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "intern-latest",
-          "intern-s2-preview-397b",
-          "intern-s2-preview-35b",
-          "intern-s2-preview",
-          "intern-s1-pro",
-          "intern-s1",
-          "intern-s1-mini",
-          "internvl-latest",
-          "internvl3.5-latest",
-          "internvl3.5-241b-a28b"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "书生3号",
-        "base_url": "https://chat.intern-ai.org.cn/api/v1",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "intern-latest",
-          "intern-s2-preview-397b",
-          "intern-s2-preview-35b",
-          "intern-s2-preview",
-          "intern-s1-pro",
-          "intern-s1",
-          "intern-s1-mini",
-          "internvl-latest",
-          "internvl3.5-latest",
-          "internvl3.5-241b-a28b"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "书生2号",
-        "base_url": "https://chat.intern-ai.org.cn/api/v1",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "intern-latest",
-          "intern-s2-preview-397b",
-          "intern-s2-preview-35b",
-          "intern-s2-preview",
-          "intern-s1-pro",
-          "intern-s1",
-          "intern-s1-mini",
-          "internvl-latest",
-          "internvl3.5-latest",
-          "internvl3.5-241b-a28b"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "书生1号",
-        "base_url": "https://chat.intern-ai.org.cn/api/v1",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "intern-latest",
-          "intern-s2-preview-397b",
-          "intern-s2-preview-35b",
-          "intern-s2-preview",
-          "intern-s1-pro",
-          "intern-s1",
-          "intern-s1-mini",
-          "internvl-latest",
-          "internvl3.5-latest",
-          "internvl3.5-241b-a28b"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "魔搭1号",
+        "name": "魔搭",
         "base_url": "https://api-inference.modelscope.cn/v1",
-        "enabled": true,
         "api_key": "********",
-        "models_cache": [
-          "deepseek-ai/DeepSeek-V4-Flash-0731",
-          "deepseek-ai/DeepSeek-V4-Pro",
-          "deepseek-ai/DeepSeek-V4-Pro-0813",
-          "early-access/EA-29B-A4B",
-          "MedAIBase/AntAngelMed",
-          "meituan-longcat/LongCat-Flash-Lite",
-          "MiniMax/MiniMax-M1-80k",
-          "MiniMax/MiniMax-M3",
-          "mistralai/Mistral-Large-Instruct-2407",
-          "MusePublic/Qwen-Image-Edit",
-          "opencompass/CompassJudger-1-32B-Instruct",
-          "OpenGVLab/InternVL3_5-241B-A28B",
-          "PaddlePaddle/ERNIE-4.5-0.3B-PT",
-          "PaddlePaddle/ERNIE-4.5-21B-A3B-PT",
-          "PaddlePaddle/ERNIE-4.5-300B-A47B-PT",
-          "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-PT",
-          "Qwen/Qwen-Image-Edit",
-          "Qwen/Qwen3-14B",
-          "Qwen/Qwen3-235B-A22B",
-          "Qwen/Qwen3-235B-A22B-Instruct-2507",
-          "Qwen/Qwen3-235B-A22B-Thinking-2507",
-          "Qwen/Qwen3-30B-A3B",
-          "Qwen/Qwen3-30B-A3B-Thinking-2507",
-          "Qwen/Qwen3-4B",
-          "Qwen/Qwen3-8B",
-          "Qwen/Qwen3-Coder-30B-A3B-Instruct",
-          "Qwen/Qwen3-Embedding-0.6B",
-          "Qwen/Qwen3-Embedding-4B",
-          "Qwen/Qwen3-Embedding-8B",
-          "Qwen/Qwen3-Next-80B-A3B-Instruct",
-          "Qwen/Qwen3-Next-80B-A3B-Thinking",
-          "Qwen/Qwen3-VL-235B-A22B-Instruct",
-          "Qwen/Qwen3-VL-8B-Instruct",
-          "Qwen/Qwen3-VL-8B-Thinking",
-          "Qwen/Qwen3.5-122B-A10B",
-          "Qwen/Qwen3.5-27B",
-          "Qwen/Qwen3.5-35B-A3B",
-          "Qwen/Qwen3.5-397B-A17B",
-          "Qwen/Qwen3.8-27B",
-          "Qwen/Qwen3.8-Flash-Next",
-          "Shanghai_AI_Laboratory/Intern-S1",
-          "Shanghai_AI_Laboratory/Intern-S1-mini",
-          "Shanghai_AI_Laboratory/Intern-S2-Preview",
-          "stepfun-ai/Step-3.5-Flash",
-          "stepfun-ai/Step-3.7-Flash",
-          "Tencent-Hunyuan/Hy3",
-          "XGenerationLab/XiYanSQL-QwenCoder-32B-2412",
-          "XGenerationLab/XiYanSQL-QwenCoder-32B-2504",
-          "ZhipuAI/GLM-4.7-Flash",
-          "ZhipuAI/GLM-5.2"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
+        "kind": "openai",
+        "note": "ModelScope Inference API，魔粒计量（示例条目）"
       },
       {
-        "name": "魔搭2号",
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "deepseek-ai/DeepSeek-V4-Flash-0731",
-          "deepseek-ai/DeepSeek-V4-Pro",
-          "deepseek-ai/DeepSeek-V4-Pro-0813",
-          "early-access/EA-29B-A4B",
-          "MedAIBase/AntAngelMed",
-          "meituan-longcat/LongCat-Flash-Lite",
-          "MiniMax/MiniMax-M1-80k",
-          "MiniMax/MiniMax-M3",
-          "mistralai/Mistral-Large-Instruct-2407",
-          "MusePublic/Qwen-Image-Edit",
-          "opencompass/CompassJudger-1-32B-Instruct",
-          "OpenGVLab/InternVL3_5-241B-A28B",
-          "PaddlePaddle/ERNIE-4.5-0.3B-PT",
-          "PaddlePaddle/ERNIE-4.5-21B-A3B-PT",
-          "PaddlePaddle/ERNIE-4.5-300B-A47B-PT",
-          "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-PT",
-          "Qwen/Qwen-Image-Edit",
-          "Qwen/Qwen3-14B",
-          "Qwen/Qwen3-235B-A22B",
-          "Qwen/Qwen3-235B-A22B-Instruct-2507",
-          "Qwen/Qwen3-235B-A22B-Thinking-2507",
-          "Qwen/Qwen3-30B-A3B",
-          "Qwen/Qwen3-30B-A3B-Thinking-2507",
-          "Qwen/Qwen3-4B",
-          "Qwen/Qwen3-8B",
-          "Qwen/Qwen3-Coder-30B-A3B-Instruct",
-          "Qwen/Qwen3-Embedding-0.6B",
-          "Qwen/Qwen3-Embedding-4B",
-          "Qwen/Qwen3-Embedding-8B",
-          "Qwen/Qwen3-Next-80B-A3B-Instruct",
-          "Qwen/Qwen3-Next-80B-A3B-Thinking",
-          "Qwen/Qwen3-VL-235B-A22B-Instruct",
-          "Qwen/Qwen3-VL-8B-Instruct",
-          "Qwen/Qwen3-VL-8B-Thinking",
-          "Qwen/Qwen3.5-122B-A10B",
-          "Qwen/Qwen3.5-27B",
-          "Qwen/Qwen3.5-35B-A3B",
-          "Qwen/Qwen3.5-397B-A17B",
-          "Qwen/Qwen3.8-27B",
-          "Qwen/Qwen3.8-Flash-Next",
-          "Shanghai_AI_Laboratory/Intern-S1",
-          "Shanghai_AI_Laboratory/Intern-S1-mini",
-          "Shanghai_AI_Laboratory/Intern-S2-Preview",
-          "stepfun-ai/Step-3.5-Flash",
-          "stepfun-ai/Step-3.7-Flash",
-          "Tencent-Hunyuan/Hy3",
-          "XGenerationLab/XiYanSQL-QwenCoder-32B-2412",
-          "XGenerationLab/XiYanSQL-QwenCoder-32B-2504",
-          "ZhipuAI/GLM-4.7-Flash",
-          "ZhipuAI/GLM-5.2"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "魔搭3号",
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "enabled": true,
-        "models_cache": [
-          "deepseek-ai/DeepSeek-V4-Flash-0731",
-          "deepseek-ai/DeepSeek-V4-Pro",
-          "deepseek-ai/DeepSeek-V4-Pro-0813",
-          "early-access/EA-29B-A4B",
-          "MedAIBase/AntAngelMed",
-          "meituan-longcat/LongCat-Flash-Lite",
-          "MiniMax/MiniMax-M1-80k",
-          "MiniMax/MiniMax-M3",
-          "mistralai/Mistral-Large-Instruct-2407",
-          "MusePublic/Qwen-Image-Edit",
-          "opencompass/CompassJudger-1-32B-Instruct",
-          "OpenGVLab/InternVL3_5-241B-A28B",
-          "PaddlePaddle/ERNIE-4.5-0.3B-PT",
-          "PaddlePaddle/ERNIE-4.5-21B-A3B-PT",
-          "PaddlePaddle/ERNIE-4.5-300B-A47B-PT",
-          "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-PT",
-          "Qwen/Qwen-Image-Edit",
-          "Qwen/Qwen3-14B",
-          "Qwen/Qwen3-235B-A22B",
-          "Qwen/Qwen3-235B-A22B-Instruct-2507",
-          "Qwen/Qwen3-235B-A22B-Thinking-2507",
-          "Qwen/Qwen3-30B-A3B",
-          "Qwen/Qwen3-30B-A3B-Thinking-2507",
-          "Qwen/Qwen3-4B",
-          "Qwen/Qwen3-8B",
-          "Qwen/Qwen3-Coder-30B-A3B-Instruct",
-          "Qwen/Qwen3-Embedding-0.6B",
-          "Qwen/Qwen3-Embedding-4B",
-          "Qwen/Qwen3-Embedding-8B",
-          "Qwen/Qwen3-Next-80B-A3B-Instruct",
-          "Qwen/Qwen3-Next-80B-A3B-Thinking",
-          "Qwen/Qwen3-VL-235B-A22B-Instruct",
-          "Qwen/Qwen3-VL-8B-Instruct",
-          "Qwen/Qwen3-VL-8B-Thinking",
-          "Qwen/Qwen3.5-122B-A10B",
-          "Qwen/Qwen3.5-27B",
-          "Qwen/Qwen3.5-35B-A3B",
-          "Qwen/Qwen3.5-397B-A17B",
-          "Qwen/Qwen3.8-27B",
-          "Qwen/Qwen3.8-Flash-Next",
-          "Shanghai_AI_Laboratory/Intern-S1",
-          "Shanghai_AI_Laboratory/Intern-S1-mini",
-          "Shanghai_AI_Laboratory/Intern-S2-Preview",
-          "stepfun-ai/Step-3.5-Flash",
-          "stepfun-ai/Step-3.7-Flash",
-          "Tencent-Hunyuan/Hy3",
-          "XGenerationLab/XiYanSQL-QwenCoder-32B-2412",
-          "XGenerationLab/XiYanSQL-QwenCoder-32B-2504",
-          "ZhipuAI/GLM-4.7-Flash",
-          "ZhipuAI/GLM-5.2"
-        ],
-        "api_key": "********",
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "弟弟的智谱",
+        "name": "智谱",
         "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "enabled": true,
         "api_key": "********",
-        "models_cache": [
-          "glm-4.5",
-          "glm-4.5-air",
-          "glm-4.6",
-          "glm-4.7",
-          "glm-5",
-          "glm-5-turbo",
-          "glm-5.1",
-          "glm-5.2",
-          "glm-5.3",
-          "glm-5.3-flash"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "官方直连·智谱",
-        "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "glm-4.5",
-          "glm-4.5-air",
-          "glm-4.6",
-          "glm-4.7",
-          "glm-5",
-          "glm-5-turbo",
-          "glm-5.1",
-          "glm-5.2",
-          "glm-5.3",
-          "glm-5.3-flash"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "0423的智谱",
-        "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "glm-4.5",
-          "glm-4.5-air",
-          "glm-4.6",
-          "glm-4.7",
-          "glm-5",
-          "glm-5-turbo",
-          "glm-5.1",
-          "glm-5.2",
-          "glm-5.3",
-          "glm-5.3-flash"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
-      },
-      {
-        "name": "书生6号",
-        "base_url": "https://chat.intern-ai.org.cn/api/v1",
-        "enabled": true,
-        "api_key": "********",
-        "models_cache": [
-          "intern-latest",
-          "intern-s2-preview-397b",
-          "intern-s2-preview-35b",
-          "intern-s2-preview",
-          "intern-s1-pro",
-          "intern-s1",
-          "intern-s1-mini",
-          "internvl-latest",
-          "internvl3.5-latest",
-          "internvl3.5-241b-a28b"
-        ],
-        "tag": "有限免费",
-        "mode": "chat_completions"
+        "kind": "anthropic",
+        "note": "bigmodel 开放平台（示例条目；活动赠送额度以官方当期为准）"
       }
     ]
   },
@@ -373,57 +34,57 @@
   },
   "agents": {
     "boss": {
-      "provider": "官方直连·智谱",
+      "provider": "智谱",
       "model": "glm-4.5-air",
       "thinking": "off",
       "desc": "助手组长：一号 glm-4.5-air",
       "fallbacks": [
         {
-          "provider": "书生2号",
+          "provider": "书生",
           "model": "intern-latest",
           "desc": "回退：书生月免费"
         },
         {
-          "provider": "0423的智谱",
+          "provider": "智谱",
           "model": "glm-4.5-air",
-          "desc": "回退：0423号"
+          "desc": "回退：智谱"
         }
       ]
     },
     "coder": {
-      "provider": "书生2号",
+      "provider": "书生",
       "model": "intern-latest",
-      "desc": "代码工人岗：书生2号"
+      "desc": "代码工人岗：书生"
     },
     "researcher": {
-      "provider": "书生3号",
+      "provider": "书生",
       "model": "intern-latest",
-      "desc": "研究工人岗：书生3号"
+      "desc": "研究工人岗：书生"
     },
     "planner": {
-      "provider": "书生4号",
+      "provider": "书生",
       "model": "intern-latest",
-      "desc": "策划工人岗：书生4号"
+      "desc": "策划工人岗：书生"
     },
     "archivist": {
-      "provider": "书生5号",
+      "provider": "书生",
       "model": "intern-latest",
-      "desc": "档案工人岗：书生5号"
+      "desc": "档案工人岗：书生"
     },
     "scribe": {
-      "provider": "弟弟的智谱",
+      "provider": "智谱",
       "model": "glm-4.5-air",
       "desc": "记录器工人岗：弟弟号 glm-4.5-air"
     },
     "visual": {
-      "provider": "0423的智谱",
+      "provider": "智谱",
       "model": "glm-4.6v",
-      "desc": "识图工人岗：0423号 glm-4.6v"
+      "desc": "识图工人岗：智谱 glm-4.6v"
     }
   },
   "interface": {
     "compaction": {
-      "provider": "魔搭3号",
+      "provider": "魔搭",
       "model": "Qwen/Qwen3.8-Flash-Next"
     },
     "theme": "dark",
@@ -449,7 +110,7 @@
     "miaManageAgents": true
   },
   "vision": {
-    "provider": "0423的智谱",
+    "provider": "智谱",
     "model": "glm-4.6v"
   },
   "mcp": {
