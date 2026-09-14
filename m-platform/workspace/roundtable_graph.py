@@ -83,10 +83,14 @@ def _seat_model(seat: str, **kw):
     s = _settings()
     cfg = s.get("roundtable", {}).get(seat) or {}
     boss = s.get("agents", {}).get("boss", {})
+    # r61e（Veda 发现，爸爸令洗门牌）：不硬写账号名——未配置取第一个 provider，
+    # 一个都没有则 make_model("") 构造即炸（占位护栏）。
+    _provs = s.get("providers") or []
+    _first = (_provs[0].get("name", "") if _provs and isinstance(_provs[0], dict) else "")
     fallback = {
-        "A": ("书生2号", "intern-latest"),
-        "B": ("魔搭2号", "Qwen/Qwen3.8-Flash-Next"),
-        "host": (boss.get("provider", "书生1号"), boss.get("model", "intern-latest")),
+        "A": (_first, "intern-latest"),
+        "B": (_first, "intern-latest"),
+        "host": (boss.get("provider", _first), boss.get("model", "intern-latest")),
     }[seat]
     prov = cfg.get("provider") or fallback[0]
     try:

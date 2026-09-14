@@ -231,7 +231,7 @@ def save_section(section: str, data: dict):
         else:
             s["external"]["providers"] = []
         # R69 拆雷（NOVA🟡9 预警今日成真）：删掉"按 base_url 猜改名"的联动。
-        # 旧逻辑在爸爸"新加一个同地址服务商"（如书生6号与书生2~5号同 base_url）时，
+        # 旧逻辑在爸爸"新加一个同地址服务商"（如两个书生号同 base_url）时，
         # 会把新地址误判成"旧服务商改名"，连带把 agents 里 coder/researcher/... 的
         # provider 全部静默改写成新名——加号≠改名！
         # 改名联动现在只认显式 /providers/rename 端点（office.api_provider_rename，那里

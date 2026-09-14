@@ -284,6 +284,25 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         import hashlib as _h
         return "fp:" + _h.sha256(str(tc.get("args") or "").encode("utf-8", "replace")).hexdigest()[:12]
 
+    def _process_decision(self, decision, tool_call, config):
+        """r61e 审计缺口修复（Nova 1.3.18 活体验证方案；Veda 批次明细口径；
+        Eve 结构性事实：官方件 approve/edit 消费无痕，只有 reject/respond 留 ToolMessage）。
+        覆写消费点钩子：批量卡经 resume decisions 逐条过这里——先落账再交官方件
+        （审计先于动作，非法 decision 抛错前也留痕）。父类是 staticmethod、调用点
+        self._process_decision → 实例方法覆写可拿到 tid。
+        ⚠ 版本钉（Nova）：私有方法签名跨小版本可能变——升级 langchain 必跑
+        tools/test_c1_hook.py（喂 approve/edit 断言钩子触发+官方语义不扰）。"""
+        try:
+            import approvals as _ap
+            _ap._audit("c1_decision", thread_id=self._tid(),
+                       tool=str((tool_call or {}).get("name", "")),
+                       dtype=str((decision or {}).get("type", "?")),
+                       edited=bool((decision or {}).get("edited_action")),
+                       reason=str((decision or {}).get("message", ""))[:80])
+        except Exception:
+            pass  # 落账失败不挡批准主链（批准语义优先，缺账由对账脚本兜底补）
+        return HumanInTheLoopMiddleware._process_decision(decision, tool_call, config)
+
     def _frozen(self, tid: str) -> bool:
         """r61c 边界C（hy4）：冻结判定单一函数（when 与 wrap 共用，TTL 只此一处推进）。
         N20：TTL 到期时把 deny/hits/streak 一并清，不留只增集合。

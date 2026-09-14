@@ -34,7 +34,7 @@ def _load_departments():
 def _role_model(role: str, **kw):
     """R64 去硬编码：部门模型一律按「角色名」从统一配置（设置页 agents 节优先）解析。
     departments_config.json 只写角色（coder/visual/...），不写 provider 名——
-    爸爸在设置页改服务商名（今天叫智谱0175明天叫智谱老孟），部门自动跟着变，绝不再失配。"""
+    爸爸在设置页改服务商名（今天叫智谱A明天改名智谱B），部门自动跟着变，绝不再失配。"""
     from settings_mgr import load_agents_config
     from providers import make_model
 

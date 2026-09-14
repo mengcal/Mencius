@@ -46,7 +46,9 @@ class PlanCheckMiddleware(AgentMiddleware):
                              "forbidden 项绝对不许出现在产物里；old-value 项必须已消失。")
             if b.get("clarify"):
                 lines.append("【验收标准未定】本任务没从原话提到可核对的目标——"
-                             "先问爸爸要什么（问是免费的），别猜一个标准再自己满足它。")
+                             "先问爸爸要什么（问是免费的），别猜一个标准再自己满足它。"
+                             "⚠ 边界（09-14 预检轮 W2 案）：请示与问题只写在你给爸爸的回复正文里；"
+                             "交付文件里只放交付物本身，永远不把'待确认问题'写进文件当内容。")
             if lines:
                 sp = getattr(request, "system_prompt", "") or ""
                 request.system_prompt = sp + "\n\n" + "\n".join(lines)

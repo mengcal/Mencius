@@ -36,6 +36,10 @@ mid 可见可逆 → 可以宽。宁可漏到 mid，不可误进 high。
   5. 读侧泄露：python -c "open('.ssh/id_rsa').read()"、ls 文件名侧信道
      ——兜底在输出侧审计（回信外泄面），不在输入侧正则
   6. 路径变形：/etc/../etc、./././etc（需规范化后匹配，二期）
+  7. 引号拆载荷管道生成（r61g Nova 补类）：printf 造命令文本交非名册解释器（如 |busybox）
+     ——名册终点已兜 sh/python 等常见族，生僻解释器仍穿；二期 bashlex AST 解。
+  8. 下载后执行替代形态（r61g Eve P2-B 记档）：`;`/换行/`| tee` 替 `&&`/`-o`
+     （curl x | tee f; bash f）——R80 断网对冲存在，一期透明记账不追。
 对冲视角（Cora）：外传类绕法绕过正则也绕不过 R80 物理断网——一期真实威胁面
 收窄为本地破坏（明文型已主力覆盖）+读泄露进上下文随回信外泄。
 防线单元测试法（Eve）："拒后改写矩阵"——每条 high 规则人工列 3 条等效改写
@@ -64,16 +68,25 @@ import re
 _CMD = r"(?:^|[;&|\n])\s*(?:(?:sudo|env|nohup|nice|timeout|command)(?:\s+\S+){0,3}\s+)*"
 _RULES = [
     # ── high：破坏与外传 ──
-    (_CMD + r"rm\b[^\n]*(--recursive|--force|--no-preserve-root)|" + _CMD + r"rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-rf|-fr)\b", "high", "递归强制删除"),
-    (_CMD + r"rm\s+(-\S+\s+)*/(\s|$)|" + _CMD + r"rm\s+(-[a-z]*r[a-z]*f|--recursive)\b[^\n]*(\*|\$HOME|~|\.\.)(\s|$)", "high", "rm 指向根/家目录/通配/上级"),
-    # r61d P0-2（hy4）：_CMD 包装器参数上限 {0,3} 可被 `env -i A=1 B=2 C=3 rm -rf /` 穿——
-    # 高危目标形态改**词位锚定+目标必须是根**硬约束（不依赖命令位）；
-    # `git rm -rf notes/x`/`rm -rf /tmp/build`/带引号 grep 提及仍不命中（FP 防线保住）。
-    (r"\brm\b[^\n]{0,80}?(?:-[a-z]*[rf][a-z]*[rf]|--recursive|--force|--no-preserve-root)\b[^\n]{0,80}?\s/(?:\s|$)", "high", "rm 目标是根（词位锚定，包装器免疫）"),
-    # r61b P1-12 引号版（载荷可见=high）+ r61c N2 无引号版退 mid + r61f B7（hy4 五轮
-    # 点名）：内联名册补 sh 族——`sh -c 'rm -rf /'` 曾整条穿名册（low）
-    (_CMD + r"(python[23]?|perl|node|ruby|php|pwsh?|powershell|osascript|(?:ba|z|k|da)?sh)\b[^\n]*\s(-c|-e|-enc|-EncodedCommand|-Command)\s*['\"]", "high", "解释器内联执行（载荷不可见）"),
+    # r61g Eve P1-A（架构级，最重要）：rf 形态一律 high 违反自家对称原则——
+    # `rm -rf /tmp/build`/`rm -rf notes/old` 是最高频合法清理，high=连卡不弹→重试→
+    # 连撞 2 次→冻结线程=**guard 自伤停工**。降 mid（上卡爸爸看得见），
+    # 敏感目标（根/家/通配/上级）由下两条保 high。
+    (_CMD + r"rm\b[^\n]*(--recursive|--force|--no-preserve-root)|" + _CMD + r"rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-rf|-fr)\b", "mid", "递归强制删除（确认目标——r61g 降档：日常清理高频合法，high 会冻线程自伤）"),
+    (_CMD + r"rm\s+(-\S+\s+)*/(\s|$)|" + _CMD + r"rm\s+(-[a-z]*r[a-z]*f|--recursive)\b[^\n]*(\*|\$HOME|~|\.\.(/|\s|$))", "high", "rm 指向根/家目录/通配/上级"),
+    # r61d P0-2（hy4）词位兜底 + r61g Cora-2 尾部放宽（`echo rm -rf /|bash` 的 | 断锚逃逸）
+    (r"\brm\b[^\n]{0,80}?(?:-[a-z]*[rf][a-z]*[rf]|--recursive|--force|--no-preserve-root)\b[^\n]{0,80}?\s/(?:\s|$|[|;&`\"])", "high", "rm 目标是根（词位锚定，包装器免疫）"),
+    # r61g Cora-1：反引号命令替换=立即执行（$() 的老语法，不是变量间接——清单第2条不覆盖它）
+    (r"=\s*`\s*(?:sudo\s+)?(?:rm|curl|wget|dd|mkfs|shutdown|reboot|chmod|nc|bash|sh)\b|\$\(\s*(curl|wget)\b", "high", "动态执行外部内容（$() 与反引号族）"),
+    # r61b P1-12 引号版 high + r61c N2 无引号版 mid + r61f B7 sh 族 + r61g Eve-B/Cora-3
+    # 名单再补 awk（system() 直接起 shell）
+    (_CMD + r"(python[23]?|perl|node|ruby|php|pwsh?|powershell|osascript|awk|(?:ba|z|k|da)?sh)\b[^\n]*\s(-c|-e|-enc|-EncodedCommand|-Command)\s*['\"]", "high", "解释器内联执行（载荷不可见）"),
     (_CMD + r"(python[23]?|perl|node|ruby|php|pwsh?|powershell|osascript)\s+(-c|-e|-enc|-EncodedCommand|-Command)\b", "mid", "解释器内联执行（无引号载荷，上卡面——r61c N2）"),
+    (r"\bawk\b[^\n]*system\s*\(", "high", "awk system() 起 shell（r61g Cora-3）"),
+    # r61g Nova-3（管道终点语义）：终点=解释器即"执行前面一切输出"，无论首命令是
+    # curl/printf/echo/cat——首命令名册永远列不全，终点语义只有一种。curl 首命令版
+    # 保持 high（上条既有），本条兜其余首命令的中转（printf 'rm -rf /'|sh 曾穿缝）。
+    (r"[^;\n]*\|\s*(?:sudo\s+|env\s+\S+\s+)*(?:python[23]?|perl|ruby|node|php|pwsh?|powershell|awk|(?:ba|z|k|da)?sh)(?:\s|$|;|&)", "mid", "管道终点交解释器执行（内容上卡核——r61g Nova）"),
     # r61f A2（hy4 五轮"原漏杀格缺失"预判命中）：解释器收码正文里的 os.system 类
     # 载荷不在命令位，re.M 也接不住——给"码中码"专条（正文含 rm/shutdown/mkfs 即拦）
     (r"\bos\.(system|popen|exec[lv]e?)\b[^\n]*(rm\s+-[a-z]*[rf][a-z]*[rf]|rm\s+--recursive|shutdown|reboot|mkfs|dd if|:\(\))", "high", "Python 码中码破坏载荷（heredoc/内联正文——r61f A2）"),
@@ -87,8 +100,10 @@ _RULES = [
     (r"/dev/tcp/|\bnc(at)?\s+-[a-z]*e\b|bash\s+-i\s*>&", "high", "反弹 shell 特征"),
     (_CMD + r"(shutdown|reboot|halt)\b|init\s+0\b", "high", "关机/重启指令"),
     # r61c N5 + r61d P1-2（hy4）：GNU 长参不能只认 rm 一家——tee/chmod 同步
-    (r"(>>?|tee(?:\s+--?[\w-]+)*)\s*/etc/", "high", "写系统配置目录"),
-    (r"(cat|grep|head|tail|cp|scp)\s[^\n]*(\.settings_secrets|id_rsa|\.ssh/id_|secrets/[a-z]|\.netrc)", "high", "触碰密钥文件"),
+    # r61g Cora-4：sed -i 原地改写 /etc 是最常用工具曾零命中；Eve P2-A：动词×词表交叉洞
+    # 一期最低补（cp .env 真密钥复制曾 low）——词表补 .env（模板豁免链同读侧）、动词补 mv。
+    (r"(>>?|tee(?:\s+--?[\w-]+)*)\s*/etc/|sed\b[^\n]*\s-i\b[^\n]*/etc/", "high", "写系统配置目录（重定向/tee/sed -i）"),
+    (r"(cat|grep|head|tail|cp|scp|mv)\s[^\n]*(\.settings_secrets|id_rsa|\.ssh/id_|secrets/[a-z]|\.netrc)", "high", "触碰密钥文件"),
     # r61b P1-14 双向序 + r61c N6：外传词表与读侧同源（补 .env/MEMORY.md/credentials）
     (r"(curl|wget|nc)\s[^\n]*(-d|--data(-binary|-raw)?|-u|-T|--upload-file|-F|--form)\S*[^\n]*(settings_secrets|id_rsa|\.ssh/|api_key|password|token=|\.netrc|\.env(?![\w])|MEMORY\.md|credentials/)", "high", "凭据外传组合（参数侧）"),
     (r"(curl|wget)\s[^\n]*https?://(?!127\.|localhost|\[::1)[^\n]*\s[^\n]*(-d|--data(-binary|-raw)?|-T|-u|-F)\s*\S*(settings_secrets|id_rsa|\.ssh/|\.netrc|\.env(?![\w])|MEMORY\.md|credentials/)", "high", "凭据外传组合（URL 前置序）"),
@@ -112,7 +127,8 @@ _RULES = [
     (r"\bgit\s+push\b[^\n]*(--force|origin\s+(main|master)\b)|\bgh\s+api\b", "mid", "推送远端（force/默认分支从严）"),
     (r"(export|set)\s+[A-Z_]*(KEY|TOKEN|SECRET|PASSWORD)=", "mid", "环境变量注入凭证"),
     # r61c N22：模板豁免认链式后缀（.env.foo.example 也是模板）
-    (r"(cat|head|tail|grep)\s[^\n]*(MEMORY\.md|memory/|\.env(?![\w])(?!(?:\.\w+)*?\.(example|template|sample|dist|tpl|md)(?![\w]))|credentials/)", "mid", "读记忆/凭据目录（隐私面）"),
+    # r61g Eve P2-A：读侧动词补 cp/mv（`cp .env /tmp/`=密钥 staging，可逆→mid 上卡不直拦）
+    (r"(cat|head|tail|grep|cp|mv)\s[^\n]*(MEMORY\.md|memory/|\.env(?![\w])(?!(?:\.\w+)*?\.(example|template|sample|dist|tpl|md)(?![\w]))|credentials/)", "mid", "读/复制记忆与凭据（隐私面）"),
 ]
 
 # write_file/edit_file 内容规则（按文件类型；r61 补 re.I——Veda 真 bug 案）
@@ -133,6 +149,10 @@ _CONTENT_RULES = [
     # 唯一 high 私钥规则，也是 external 隔离的唯一实际生效依据，必须全族）
     (r".*", r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY", "high", "私钥内容"),
     (r"\.py$", r"\bpickle\.loads\b|yaml\.load\s*\((?![^)]*Safe)", "mid", "反序列化风险（供应链面）"),
+    # r61g+（OpenSquilla 第四方评审 1.4/1.5 真金两条）：API 级删除词表——不走 rm 命令
+    # 的删除（os.unlink/shutil.rmtree/Path.unlink、PS Remove-Item -Recurse）内容规则曾缺。
+    (r"\.py$", r"\b(?:os\.(?:unlink|remove|removedirs)|shutil\.rmtree|Path\([^)]*\)\.unlink)\b", "mid", "Python API 级删除（unlink/rmtree——OSQ 案）"),
+    (r"\.ps1$", r"\bRemove-Item\b[^\n]*-Recurse|\bStop-Process\b[^\n]*-Force", "mid", "PowerShell cmdlet 级破坏（OSQ 案）"),
     (r"\.(html|md|txt)$", r"<script>", "mid", "可执行脚本片段入库（XSS 面）"),
 ]
 _C_COMPILE_CACHE = None
@@ -234,9 +254,20 @@ def scan_tool(tool: str, args: dict) -> dict:
     return {"level": level, "findings": findings}
 
 
+_WHY_IDX = None
+
+
 def rule_ids(findings) -> list:
-    """r61e（Cora N4+NOVA 六通道法）：模型可读通道（账本/隔离体/拒账）一律存规则 ID
-    （why 文本的稳定短哈希），人话只留在卡面（爸爸看的渲染层查表）。
-    脱敏按通道枚举闭环，不按位置打补丁——这是 hy4 A-4 的完全体。"""
-    import hashlib as _h
-    return [_h.sha256(w.encode("utf-8")).hexdigest()[:8] for _, w in findings]
+    """r61e（Cora N4+NOVA 六通道法）：模型可读通道（账本/隔离体/拒账）一律存规则 ID，
+    人话只留在卡面（爸爸看的渲染层查表）。脱敏按通道枚举闭环，不按位置打补丁。
+    r61g（Cora-5 稳定性修正）：ID=规则表索引（文案改了账不断）——规则只增不删、
+    调序需同步映射表；渲染层查 _RULES[i][2]。"""
+    global _WHY_IDX
+    if _WHY_IDX is None:
+        _WHY_IDX = {}
+        for i, (_rx, _lvl, why) in enumerate(_RULES):
+            _WHY_IDX.setdefault(why, str(i))
+        for fx, rx, _lvl, why in _CONTENT_RULES:
+            _WHY_IDX.setdefault(why, "c" + str(len(_WHY_IDX)))
+    return [_WHY_IDX.get(w.split("：")[-1] if w.startswith("任务文本含危险指令特征：") else w, "?")
+            for _, w in findings]

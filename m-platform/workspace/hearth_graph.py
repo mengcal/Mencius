@@ -61,7 +61,12 @@ def _seat_model(seat: str):
     from providers import make_model
 
     cfg = _settings().get("hearth", {}).get(seat) or {}
-    fallback = {"A": ("书生2号", "intern-latest"), "B": ("魔搭2号", "Qwen/Qwen3.8-Flash-Next")}[seat]
+    # r61e（Veda 发现，爸爸令洗门牌）：回退不硬写账号名（书生N号/魔搭N号=公开仓里的
+    # 账号门牌）——未配置时取设置里第一个 provider；一个都没有则 make_model("")
+    # 构造即炸（占位护栏，R65 规矩）。
+    provs = _settings().get("providers") or []
+    _first = (provs[0].get("name", "") if provs and isinstance(provs[0], dict) else "")
+    fallback = {"A": (_first, "intern-latest"), "B": (_first, "intern-latest")}[seat]
     return make_model(cfg.get("provider") or fallback[0], cfg.get("model") or fallback[1])
 
 
@@ -128,7 +133,7 @@ def summarize(state: HearthState) -> dict:
     boss = _settings().get("agents", {}).get("boss", {})
     try:
         # r39（Cora P2-2）：归纳失败=如实说且聊天原文降级落盘，不许"说保留实际丢"
-        m = make_model(boss.get("provider", "书生1号"), boss.get("model", "intern-latest"), max_tokens=4000)
+        m = make_model(boss.get("provider", ""), boss.get("model", "intern-latest"), max_tokens=4000)
         cloth, _complete = ask(m, [SystemMessage(PROMPT_SUMMARY), HumanMessage(chat_txt)])
         if cloth and not _complete:
             cloth += "\n\n（归纳位输出触到生成上限，可能有尾段被切。）"
