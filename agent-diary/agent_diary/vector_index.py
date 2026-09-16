@@ -33,6 +33,8 @@ class VectorIndex:
         self.embeddings = None
         self.texts = None
         self.metadatas = None
+        # v1.2.0 P2：内容指纹缓存——数据没变就不重建索引
+        self._fingerprint = None
 
     def _load_model(self):
         """懒加载模型"""
@@ -42,10 +44,51 @@ class VectorIndex:
             self.model = SentenceTransformer(self.model_name)
             print("模型加载完成！")
 
+    def _content_fingerprint(self) -> str:
+        """
+        v1.2.0 P2：计算可索引内容的指纹
+
+        语义知识表（过滤auto_pending后）的条数+最新时间，
+        加上最近7个情景日志文件的(mtime,size)。
+        指纹没变 → 索引不用重建（省掉每次全量encode）。
+        """
+        import sqlite3
+        try:
+            conn = sqlite3.connect(self.store.db_path)
+            c = conn.cursor()
+            c.execute(
+                "SELECT COUNT(*), COALESCE(MAX(created_at),'') "
+                "FROM semantic_facts WHERE confidence != 'auto_pending'"
+            )
+            count, max_created = c.fetchone()
+            conn.close()
+        except Exception:
+            count, max_created = 0, ""
+
+        ep_sig = []
+        ep_dir = self.store.episodic_dir
+        if ep_dir.exists():
+            for f in sorted(ep_dir.glob("*.md"), reverse=True)[:7]:
+                try:
+                    st = f.stat()
+                    ep_sig.append(f"{f.stem}:{st.st_mtime_ns}:{st.st_size}")
+                except OSError:
+                    pass
+        return f"{count}|{max_created}|{';'.join(ep_sig)}"
+
     def build_index(self):
         """
         建索引——把所有语义知识和情景日志向量化
+
+        v1.2.0 P2：内容指纹没变就直接复用旧索引（省encode）。
         """
+        # P2：指纹缓存，内容没变化不重建
+        fp = self._content_fingerprint()
+        if self.embeddings is not None and self._fingerprint == fp:
+            print("内容未变化，复用已有索引")
+            return
+        self._fingerprint = fp
+
         self._load_model()
 
         texts = []
@@ -122,16 +165,25 @@ class VectorIndex:
             np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_vec)
         )
 
-        # 取top_k
-        top_indices = np.argsort(similarities)[::-1][:top_k]
+        # 取top_k的3倍候选，给防御性过滤留余量（v1.2.0 P1第二层）
+        top_indices = np.argsort(similarities)[::-1][:max(top_k * 3, top_k)]
 
         results = []
         for idx in top_indices:
+            md = self.metadatas[idx]
+            # v1.2.0 P1第二层：向量路径防御性过滤——
+            # build_index已过滤auto_pending，这里按id回查再兜一层（防索引过期/增量添加绕过）
+            if md.get("type") == "semantic":
+                conf = self.store.get_fact_confidence(md.get("id"))
+                if conf == "auto_pending":
+                    continue
             results.append({
                 "score": float(similarities[idx]),
                 "text": self.texts[idx][:200],
-                "metadata": self.metadatas[idx],
+                "metadata": md,
             })
+            if len(results) >= top_k:
+                break
 
         return results
 
