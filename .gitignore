@@ -1,1 +1,10 @@
 m-platform/workspace/m-platform-venv/
+# 09-16 add-A 事故后永久黑名单（家规入码，见 eng-log R10.178/R10.184）
+m-platform/workspace/pgdata/
+m-platform/workspace/.pg_uri
+*.bak
+m-platform/workspace/skills_lock_audit.jsonl
+m-platform/workspace/skills_manifest.json
+*.log
+*.pid
+.env
