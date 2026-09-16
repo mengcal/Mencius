@@ -285,6 +285,80 @@ def consolidate(days: int = 7) -> str:
         return f"❌ 自动巩固失败: {e}"
 
 
+@mcp.tool()
+def list_pending_facts() -> str:
+    """
+    v1.3.0: 列出所有待审的自动提炼知识
+
+    看看哪些知识是自动提炼的，需要人工确认。
+
+    Returns:
+        待审知识列表
+    """
+    if store is None:
+        init_diary()
+
+    try:
+        from .consolidator import AutoConsolidator
+        consolidator = AutoConsolidator(store)
+        pending = consolidator.list_pending()
+
+        if not pending:
+            return "✅ 没有待审知识，全部已确认！"
+
+        output = [f"📋 待审知识列表（共 {len(pending)} 条）："]
+        for p in pending:
+            output.append(f"- [{p['id']}] {p['title']}: {p['fact'][:60]}...")
+
+        return "\n".join(output)
+    except Exception as e:
+        return f"❌ 查询失败: {e}"
+
+
+@mcp.tool()
+def promote_fact(fact_id: str) -> str:
+    """
+    v1.3.0: 晋升一条待审知识为正式知识
+
+    Args:
+        fact_id: 知识ID（从list_pending_facts获取）
+
+    Returns:
+        晋升结果
+    """
+    if store is None:
+        init_diary()
+
+    try:
+        from .consolidator import AutoConsolidator
+        consolidator = AutoConsolidator(store)
+        return consolidator.promote(fact_id)
+    except Exception as e:
+        return f"❌ 晋升失败: {e}"
+
+
+@mcp.tool()
+def reject_fact(fact_id: str) -> str:
+    """
+    v1.3.0: 拒绝一条待审知识（删除）
+
+    Args:
+        fact_id: 知识ID（从list_pending_facts获取）
+
+    Returns:
+        删除结果
+    """
+    if store is None:
+        init_diary()
+
+    try:
+        from .consolidator import AutoConsolidator
+        consolidator = AutoConsolidator(store)
+        return consolidator.reject(fact_id)
+    except Exception as e:
+        return f"❌ 删除失败: {e}"
+
+
 @mcp.resource("diary://today")
 def today_diary() -> str:
     """今天的工作日志"""
