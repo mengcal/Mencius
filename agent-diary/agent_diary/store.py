@@ -157,18 +157,112 @@ class DiaryStore:
         return fact_id
 
     def search_semantic_facts(self, query: str, limit: int = 5) -> list:
-        """搜索语义知识（简单LIKE匹配，后续换向量检索）"""
+        """
+        搜索语义知识（v0.4 关键词权重+显著性加权+时间衰减）
+
+        打分规则：
+        - 关键词命中：每个词+1分
+        - 标题命中：额外+2分
+        - 显著性：critical+3分，important+1分
+        - 时间衰减：最近的+分
+        """
+        import re
+
+        # 简单分词
+        keywords = [k.strip() for k in re.split(r'[\s,，。、;；:：]+', query) if k.strip()]
+
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("""
-            SELECT * FROM semantic_facts
-            WHERE title LIKE ? OR fact LIKE ? OR tags LIKE ?
-            ORDER BY date DESC LIMIT ?
-        """, (f"%{query}%", f"%{query}%", f"%{query}%", limit))
+
+        # 拉所有数据，本地打分
+        c.execute("SELECT * FROM semantic_facts")
         rows = [dict(r) for r in c.fetchall()]
         conn.close()
-        return rows
+
+        if not keywords:
+            # 没关键词就按时间排
+            return rows[:limit]
+
+        # 本地打分
+        scored = []
+        for row in rows:
+            score = 0
+            text = (row.get('title', '') + ' ' + row.get('fact', '') + ' ' + row.get('tags', '')).lower()
+
+            for kw in keywords:
+                kw_lower = kw.lower()
+                if kw_lower in text:
+                    score += 1
+                    # 标题命中额外加分
+                    if kw_lower in row.get('title', '').lower():
+                        score += 2
+
+            # 显著性加权
+            fact_type = row.get('type', 'normal')
+            if fact_type == 'critical':
+                score += 3
+            elif fact_type == 'important':
+                score += 1
+
+            # 置信度加权
+            if row.get('confidence') == 'verified':
+                score += 0.5
+
+            if score > 0:
+                scored.append((score, row))
+
+        # 按分数排
+        scored.sort(key=lambda x: -x[0])
+
+        return [row for score, row in scored[:limit]]
+
+    def search_episodic(self, query: str, days: int = 7, limit: int = 10) -> list:
+        """
+        搜索情景日志（v0.4新增）
+
+        按关键词+显著性+时间衰减打分
+        """
+        import re
+        from datetime import timedelta
+
+        keywords = [k.strip() for k in re.split(r'[\s,，。、;；:：]+', query) if k.strip()]
+
+        results = []
+        for i in range(days):
+            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            path = self.get_episodic_path(date)
+            if not path.exists():
+                continue
+
+            content = path.read_text(encoding="utf-8")
+
+            # 按##分段
+            entries = re.split(r'\n## ', content)
+
+            for entry in entries:
+                if not entry.strip():
+                    continue
+
+                score = 0
+                for kw in keywords:
+                    if kw.lower() in entry.lower():
+                        score += 1
+
+                # 显著性加权
+                if '🔴' in entry or '[critical]' in entry:
+                    score += 3
+                elif '🟡' in entry or '[important]' in entry:
+                    score += 1
+
+                # 时间衰减：今天最高
+                score += (days - i) * 0.1
+
+                if score > 0:
+                    results.append((score, date, entry[:200]))
+
+        results.sort(key=lambda x: -x[0])
+        return [{"date": d, "excerpt": e, "score": s} for s, d, e in results[:limit]]
 
     # ── 会话跟踪（门禁用） ──
 
