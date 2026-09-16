@@ -225,6 +225,66 @@ def diary_stats() -> dict:
     return dashboard.summary()
 
 
+@mcp.tool()
+def semantic_search(query: str, top_k: int = 5) -> str:
+    """
+    v1.3.0: 向量语义搜索——理解意思，不是字面匹配
+
+    用法：
+        semantic_search("怎么给大家发邮件不丢信")
+        → 第一个结果就是"Cc吞信"
+
+    Args:
+        query: 自然语言搜索词
+        top_k: 返回前几条
+
+    Returns:
+        语义最相关的几条记录
+    """
+    if store is None:
+        init_diary()
+
+    try:
+        from .vector_index import VectorIndex
+        vi = VectorIndex(store)
+        vi.build_index()
+        results = vi.search(query, top_k=top_k)
+
+        output = [f"🔍 语义搜索结果（'{query}'）："]
+        for i, r in enumerate(results, 1):
+            output.append(f"{i}. [{r['score']:.2f}] {r['text'][:80]}...")
+
+        return "\n".join(output)
+    except Exception as e:
+        return f"❌ 向量搜索失败: {e}（可能没装sentence-transformers）"
+
+
+@mcp.tool()
+def consolidate(days: int = 7) -> str:
+    """
+    v1.3.0: 自动巩固——从情景日志自动提炼语义知识
+
+    定期跑，把流水账变成可复用的规则和教训！
+
+    Args:
+        days: 回顾最近几天的日志，默认7天
+
+    Returns:
+        提炼了多少条新知识
+    """
+    if store is None:
+        init_diary()
+
+    try:
+        from .consolidator import AutoConsolidator
+        consolidator = AutoConsolidator(store)
+        count = consolidator.consolidate(days=days)
+
+        return f"✅ 自动巩固完成！从最近{days}天的日志里提炼了 {count} 条新知识"
+    except Exception as e:
+        return f"❌ 自动巩固失败: {e}"
+
+
 @mcp.resource("diary://today")
 def today_diary() -> str:
     """今天的工作日志"""
