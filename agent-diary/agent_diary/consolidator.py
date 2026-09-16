@@ -99,6 +99,45 @@ class AutoConsolidator:
 
         return patterns
 
+    def list_pending(self) -> list:
+        """列出所有待审的自动提炼知识"""
+        import sqlite3
+        conn = sqlite3.connect(self.store.db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM semantic_facts WHERE confidence = 'auto_pending'")
+        results = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return results
+
+    def promote(self, fact_id: str, confidence: str = "verified") -> str:
+        """晋升一条待审知识为正式知识"""
+        import sqlite3
+        conn = sqlite3.connect(self.store.db_path)
+        c = conn.cursor()
+        c.execute(
+            "UPDATE semantic_facts SET confidence = ? WHERE id = ? AND confidence = 'auto_pending'",
+            (confidence, fact_id)
+        )
+        affected = c.rowcount
+        conn.commit()
+        conn.close()
+        return f"✅ 晋升成功！{fact_id} → {confidence}" if affected else f"❌ 晋升失败！{fact_id} 不存在或不是待审"
+
+    def reject(self, fact_id: str) -> str:
+        """拒绝一条待审知识（删除）"""
+        import sqlite3
+        conn = sqlite3.connect(self.store.db_path)
+        c = conn.cursor()
+        c.execute(
+            "DELETE FROM semantic_facts WHERE id = ? AND confidence = 'auto_pending'",
+            (fact_id,)
+        )
+        affected = c.rowcount
+        conn.commit()
+        conn.close()
+        return f"✅ 已删除待审知识 {fact_id}" if affected else f"❌ 删除失败！{fact_id} 不存在或不是待审"
+
     def consolidate(self, days: int = 7):
         """
         执行一次巩固：扫日志→提炼模式→写入semantic_facts
