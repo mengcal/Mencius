@@ -50,7 +50,9 @@ async def skills_rehash():
     """爸爸在宿主改完 D:\\m\\skills 后重扫重建基线（管理员 token 门内）。
     注：图构建时校验的是启动快照——重建后如技能被停用状态未恢复，重启一次即生效。"""
     if not _skills_lock.enabled():
-        return {"ok": False, "error": "skills_lock 未启用（设置页先开启）"}
+        # d2v03fix3⑨（若若 P1-③必改类）：ok:False+error 并存帧→reason 单键形，
+        # 与 SkillsLockRow.tsx 消费点同批改（前端已改读 j.reason）
+        return {"ok": False, "reason": "skills_lock 未启用（设置页先开启）"}
     manifest = _skills_lock.rehash(_SKILLS_DIR)
     return {"ok": True, "count": len(manifest), "note": "基线已重建；若此前技能被停用，重启后生效"}
 
@@ -80,7 +82,10 @@ async def usage_today():
                 a["calls"] += 1
                 total["calls"] += 1
         except Exception as e:
-            return {"error": str(e)}
+            # d2v03fix3⑨（若若 P1-③判词缝→本单裁决清）：/usage 全仓零消费
+            # （FE 不读、tools 不读——见 grep-closure 豁免账）——error 独存帧改
+            # ok:False+reason；异常原文截 80 防泄路径（Veda 形态建议）。
+            return {"ok": False, "reason": str(e)[:80]}
     return {"date": today, "by_model": agg, "total": total}
 
 
@@ -109,7 +114,7 @@ async def context_threads():
                 if not cur or ts >= cur["ts"]:
                     per[tid] = {"thread": tid, "model": r.get("model", ""), "input": inp, "ts": ts}
         except Exception as e:
-            return {"error": str(e)}
+            return {"ok": False, "reason": f"context/threads 读取失败: {str(e)[:80]}"}  # d2v03fix3 补漏：Cora265/若若266 实锤 L117（同 L88 型）
     baseline = min(all_inputs) if all_inputs else 0
     out = []
     for t in per.values():
@@ -155,7 +160,9 @@ async def api_approve(req: dict = Body(...), request: Request = None):
     import approvals as _ap
     tid, tool = str(req.get("thread_id", "")), str(req.get("tool", ""))
     if not tid or not tool:
-        return {"error": "需要 thread_id 与 tool"}
+        # v0.3 件三：失败键统一 ok:False+reason（与 api_reset_thread 对齐；前端只读 ok，
+        # 全仓 grep 无按 error 键解析的消费方——ToolCallBox.tsx/verify/test 均零染指）
+        return {"ok": False, "reason": "需要 thread_id 与 tool"}
     ok, why = _ap.approve(tid, tool, str(req.get("fp") or ""))
     _token_audit("approval_granted" if ok else "approval_denied", ok,
                  tool=tool, tid=tid[:8],
@@ -201,7 +208,8 @@ async def api_revoke(req: dict = Body(...), request: Request = None):
     import approvals as _ap
     tid, tool = str(req.get("thread_id", "")), str(req.get("tool", ""))
     if not tid or not tool:
-        return {"error": "需要 thread_id 与 tool"}
+        # v0.3 件三：失败键统一（同 api_approve，两分支同形同注释口径）
+        return {"ok": False, "reason": "需要 thread_id 与 tool"}
     return {"ok": _ap.revoke(tid, tool)}
 
 
@@ -212,7 +220,9 @@ async def api_reset_budget(req: dict = Body(...), request: Request = None):
     import approvals as _ap
     tid = str(req.get("thread_id", ""))
     if not tid:
-        return {"error": "需要 thread_id"}
+        # v0.3 件三：原返回 {"error":...} 连 ok 键都没有（前端接线前必须一字面）——
+        # 统一为 ok:False+reason（与另两门同形）
+        return {"ok": False, "reason": "需要 thread_id"}
     n = _ap.reset_task_cards(tid)
     _token_audit("approval_budget_reset", True, tid=tid[:8], cleared=n)
     return {"ok": True, "cleared_cards": n}
@@ -220,21 +230,79 @@ async def api_reset_budget(req: dict = Body(...), request: Request = None):
 
 @router.post("/approvals/guard_unlock")
 async def api_guard_unlock(req: dict = Body(...), request: Request = None):
-    """r61b（hy4 P1-1 闭环）：爸爸接管后手动提前解冻线程（TTL 30min 是兜底不是唯一路）。
-    {thread_id?}——不传=解全部。token 门内（/approvals 前缀）。"""
+    """r61b（hy4 P1-1 闭环）：爸爸接管后手动提前解冻线程。r61j N-4：退避真值
+    30min→1h→2h→第 3 次永久（永久锁只能走本端点），解冻动作收进门侧单一真源
+    ConfirmGateC1.guard_unlock（三集合同清 lock/streak/frozen_hold——端点旧自 pop
+    漏清 hold，解封后 wrap 会误吃一次接力拒信，r61h 九轮 hy4 N-4 点的名）。
+    {thread_id?}——不传=解全部。token 门内（/approvals 前缀）。
+    r61k：返回 ok=bool(cleared)——cleared=0（无匹配线程/门不在此进程）时
+    ok:false+hint，不再静默 ok:true。
+    d2v03fix3⑤ 命名债：hint 键退役改 reason（全仓 grep 消费方=m-gates 绊线一格+
+    本端点自产帧，前端零读此键——三处同批改，error 键绝迹口径不变）。"""
     import approvals as _ap
     from mia_agent.confirm_gate_c1 import ConfirmGateC1
     tid = str(req.get("thread_id", ""))
-    cleared = 0
-    for g in ConfirmGateC1._GATE_INSTANCES:
-        for k in ([tid] if tid else list(g._guard_lock.keys())):
-            if k in g._guard_lock:
-                g._guard_lock.pop(k, None)
-                g._guard_streak.pop(k, None)
-                cleared += 1
+    cleared = ConfirmGateC1.guard_unlock(tid)
     _ap._audit("guard_unlock", thread_id=tid or "*", by="admin", cleared=cleared)
-    _token_audit("approval_guard_unlock", True, tid=tid[:8] or "*", cleared=cleared)
+    _token_audit("approval_guard_unlock", bool(cleared), tid=tid[:8] or "*", cleared=cleared)
+    # r61k 第二笔（hy4 十轮端点侧点1）：cleared=0 不再静默 ok:true——跨进程部署/
+    # tid 拼错/花名册空三种情况下，审计账会说"爸爸解冻了"而门根本没动（静默失败=
+    # 双倍失败）。ok 必须跟 cleared 走；0 时给 reason 指排查方向。token 账同口径。
+    # d2v03fix3⑤：键名 hint→reason（与其余失败帧统一键形）。
+    if not cleared:
+        return {"ok": False, "cleared": 0,
+                "reason": "无匹配线程或门实例不在此进程（跨进程/tid 拼错/花名册空）"}
     return {"ok": True, "cleared": cleared}
+
+
+@router.post("/approvals/reset_thread")
+async def api_reset_thread(req: dict = Body(...), request: Request = None):
+    """D2 挂账四件④（hy4 十二轮 P-B，09-15 爸爸令动工）：管理端"重置本线程状态"=
+    三锁叠加（冻结+超预算+压力钉）的唯一总出口。guard_unlock 只开冻结那把，
+    三把齐扣时批准卡路径走不到=线程死锁。本端点一次清三锁并落账 desk_state_reset
+    （P-B 明令必须落账），卡片配额同步走 reset_task_cards（与 /approvals/reset 同源）。
+    {thread_id} 必填真值（? 桶不连坐）。token 门内（/approvals 前缀）。
+    v0.3 件二：请求体可选 force=true=审计链旁路（先清锁后落账，落账失败走死信
+    文件）——二次确认就是这一个字段（无 settings 键，L26 不破；前端两步式后置）。"""
+    import approvals as _ap
+    from mia_agent.confirm_gate_c1 import ConfirmGateC1
+    tid = str(req.get("thread_id", ""))
+    if not tid:
+        # hy4 十五轮②：空 tid 失败键与下方 reset 失败分支统一为 reason（前端接线前必须一字面）
+        # v0.3 件四：失败也是安全事件——"有声"家规补落一条失败账（此前此分支零账静默，
+        # 空请求打门审计面上什么都不发生；tid 记 "*" 与成功账同形，reason 固定短语供机判）
+        _token_audit("approval_reset_thread", False, tid="*", reason="missing_thread_id")
+        return {"ok": False, "reason": "需要 thread_id（真值，? 桶不连坐）"}
+    r = ConfirmGateC1.reset_thread(tid, force=bool(req.get("force")))
+    if not r.get("ok"):
+        # hy4 十五轮③(b)：失败也是安全相关事件（落账失败=三锁未清需人工）——补落一条
+        # 失败账，零账不符"有声"家规；参数与成功账同名（tid/reason）。
+        _token_audit("approval_reset_thread", False, tid=tid[:8], reason=r.get("reason", ""))
+        return {"ok": False, "reason": r.get("reason", "")}
+    cards = 0
+    try:
+        cards = _ap.reset_task_cards(tid)
+    except Exception:
+        pass  # 配额清失败不回滚三锁（门账已落，配额是软约束）
+    if r.get("audit") == "deadletter":
+        # v0.3 件二死信帧（十六轮三改）：force 路任一环节失败都汇到此帧（出口优先），
+        # desk_state_reset 账搬家到 mia_home/runtime/bypass_deadletter.jsonl——行内
+        # stage/cleared 区分"锁已清只缺账"与"清锁抛、锁可能半清"，清前三锁计数与
+        # 异常名也在那行。token 账不带 freeze/budget/pressure：返回帧没有这些键，
+        # 塞零=假账比缺账更坏。
+        _token_audit("approval_reset_thread", True, tid=tid[:8], forced=True,
+                     audit="deadletter", cards=cards)
+        return {"ok": True, "forced": True, "audit": "deadletter", "cards": cards}
+    _flag = {"forced": True} if r.get("forced") else {}  # v0.3 件二：force 帧账注（普通帧账形零变化）
+    # hy4 十五轮③(a) 账注：budget=两表命中数之和非线程数，多实例按实例累加
+    _token_audit("approval_reset_thread", True, tid=tid[:8],
+                 freeze=r["freeze"], budget=r["budget"], pressure=r["pressure"],
+                 cards=cards, **_flag)
+    # hy4 十四轮 §⑤连带：budget 是两表命中数之和（单实例最多 2），明细 budget_detail
+    # 原样透传给前端（token 账参数不变——账口径漂移比少一个字段更坏）。
+    return {"ok": True, "freeze": r["freeze"], "budget": r["budget"],
+            "budget_detail": r.get("budget_detail"),
+            "pressure": r["pressure"], "cards": cards, **_flag}
 
 
 # ── R2.1（2026-08-29 知夏）：旧配置系统已删除 ──
@@ -282,7 +350,9 @@ async def remember_rules_add(req: dict = Body(...)):
     tool = str(req.get("tool") or "")
     key = rule_key(tool, req.get("args") or {})
     if not key:
-        return {"ok": False, "error": "该调用提取不到精确键（不接受通配规则）"}
+        # d2v03fix3⑨（若若 P1-③必改类）：并存 error 键改 reason——本端点前端
+        # （BatchApprovalInterrupt.tsx:124）POST 后响应体整体忽略，零消费直改无连带。
+        return {"ok": False, "reason": "该调用提取不到精确键（不接受通配规则）"}
     s = load_settings()
     rules = s.setdefault("remember_rules", [])
     if any(str(r.get("key", "")).lower() == key for r in rules):

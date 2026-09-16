@@ -66,7 +66,7 @@ except Exception:
 from mia_agent.prompts import _system_prompt  # 原 L13-66
 from mia_agent.sandbox import SandboxedShellBackend  # 原 L67-117
 from mia_agent.confirm_gate import ConfirmGateMiddleware  # 原 L212-464（C1 过渡期：名单/判定真源仍被 confirm_gate_c1 引用）
-from mia_agent.confirm_gate_c1 import ConfirmGateC1  # r41：官方 HITL 包装版（主图）
+from mia_agent.confirm_gate_c1 import ConfirmGateC1, assert_gate_order  # r41：官方 HITL 包装版（主图）；09-15 夜：连带启动保险丝
 from mia_agent.flow_observer import observer as _flow_observer  # r41：流程体系 v2 观测器
 from mia_agent.store import MiaState, _STORE  # 原 L120-122/L165-168/L804-854
 from mia_agent.models import _interrupt_on, boss_model  # 原 L124/L858-908
@@ -208,6 +208,19 @@ def _compaction_middleware():
 _mcp_tools = _load_mcp_tools()
 ConfirmGateMiddleware._MCP_NAMES = {str(t.name).strip().lower() for t in _mcp_tools}
 
+# 09-15 夜保险丝接线（主会话授权的最小接线，assert_gate_order 配套）：主图中间件先落具名变量，
+# 编译前过一遍"ConfirmGateC1 确实在列"——漏装=启动炸，不许安全带装兜里（fail-closed，宁炸不静默）。
+# 顺序约束：必须在上面 ConfirmGateMiddleware._MCP_NAMES 注入之后构造（门的 MCP 来源判定吃这份名单）。
+_middleware = [
+    ConfirmGateC1(),  # r41（C1）：官方 HITL 包装版四档门（批量卡/自包含拒出口）——替换现役 ConfirmGateMiddleware
+    ScribeMiddleware(root_dir=BASE / "mia_home"),
+    *_compaction_middleware(),
+    RunConfigMiddleware(),  # 输入框的模型选择/联网开关在这里生效
+    _flow_observer,  # r41 流程体系 v2 层3：动作序列观测（只记不拦）
+    PlanCheckMiddleware(),  # r45 层2：验收导航注入+clarify 路由+同型×3 连撞提醒（09-13 夜窗）
+]
+assert_gate_order(_middleware)  # 现状语义=存在性检查（非顺序检查），缺门抛 ValueError 挡启动
+
 agent = create_deep_agent(  # 原 L1011-1034
     model=boss_model,
     name="mia",
@@ -227,14 +240,7 @@ agent = create_deep_agent(  # 原 L1011-1034
            *_mcp_tools, web_search, web_search_metaso, web_search_bocha, web_search_tavily],
     backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
     state_schema=MiaState,
-    middleware=[
-        ConfirmGateC1(),  # r41（C1）：官方 HITL 包装版四档门（批量卡/自包含拒出口）——替换现役 ConfirmGateMiddleware
-        ScribeMiddleware(root_dir=BASE / "mia_home"),
-        *_compaction_middleware(),
-        RunConfigMiddleware(),  # 输入框的模型选择/联网开关在这里生效
-        _flow_observer,  # r41 流程体系 v2 层3：动作序列观测（只记不拦）
-        PlanCheckMiddleware(),  # r45 层2：验收导航注入+clarify 路由+同型×3 连撞提醒（09-13 夜窗）
-    ],
+    middleware=_middleware,  # 09-15 夜：装配件提为具名变量交保险丝验身（内容与顺序逐字未动）
 )
 
 # r25（军事链断点3修复）：部门任务完工/受阻推送监视器——门放行 start_async_task 时登记

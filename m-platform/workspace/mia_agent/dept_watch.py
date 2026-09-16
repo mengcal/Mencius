@@ -71,7 +71,11 @@ def _scan():
             if c is None:
                 try:
                     c = _client()
-                except Exception:
+                except Exception as e:
+                    # 09-15 d2v03fix3⑦（若若④）：看门狗哑火必须可观测——旧版构造失败
+                    # 静默 continue=SDK/钥匙/网络任一坏掉永远没人知道。只落异常类名
+                    # （不落密文：str(e) 可含 URL/头信息），前缀随文件真源 [dept-watch]。
+                    print(f"[dept-watch] client 构造失败（本轮扫描哑火）: {type(e).__name__}", flush=True)
                     continue
             try:
                 ths = c.threads.search(limit=40)
@@ -118,9 +122,10 @@ def _scan():
                         w = _WATCH.get(main_tid)
                         if not w:
                             continue
-                        w["seen"].add(tid)
                         if stage == "完工":
-                            w["notified"].add(tid)
+                            w["seen"].add(tid)      # 完工终结，永不再看
+                        else:
+                            w["notified"].add(tid)  # 请示只防重复提醒，完工帧照常放行
                     # r55 档位校验器：标档 vs 实际动作数对账落台账（NOVA"一期天天免费攒"）
                     if stage == "完工" and info.get("tier"):
                         try:
@@ -157,8 +162,13 @@ def _scan():
                             config={"configurable": {"user_id": "dept-watch"}})
                         print(f"[dept-watch] 唤醒 main={main_tid} dept={tid} stage={stage}", flush=True)
                     except Exception as e:
-                        print(f"[dept-watch] 唤醒失败: {e}", flush=True)
-        except Exception:
+                        # 09-16 二十轮补刀（hy3①）：本件自立的"只落类名防泄密文"原则的
+                        # 同文件漏网——str(e) 可含 URL/头。与 L70/L167 两处同规格。
+                        print(f"[dept-watch] 唤醒失败: {type(e).__name__}", flush=True)
+        except Exception as e:
+            # 09-15 d2v03fix3⑦（若若④）：外层总 catch 旧版静默吞一切=bug 长期隐形。
+            # 只落异常类名不落消息（防泄密文），环照常续命（哑了要能听见，不能停）。
+            print(f"[dept-watch] 扫描轮异常（已跳过本轮）: {type(e).__name__}", flush=True)
             continue
 
 

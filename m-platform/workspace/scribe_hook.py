@@ -43,6 +43,9 @@ except Exception:  # 老环境兜底：没有 settings_mgr 就默认启用
 # 规范正文在 mia_home/notes/工作规范.md（可查询），这里是每轮强制的执行令。
 WORK_RULES_INJECT = (
     "\n\n【本轮工作规范（书记员强制执行令，先于一切动作）】\n"
+    "0. 绝对红线（爸爸 09-14 令，任何档位任何场景不豁免）：银行、支付、转账相关的页面与"
+    "接口，任何智能体（米娅自己、牛马、外派、总管）一律禁碰——不是先请示，是不做；"
+    "需要花钱的事只写方案给爸爸，由他自己操作。\n"
     "1. 动手前先查笔记：execute 跑 notes search 关键词（或看 mia_home/notes/工作规范.md），"
     "有记录照做，绝不凭记忆瞎干。\n"
     "2. 派活纪律：凡动手的活一律 start_async_task 转告总管，把爸爸原话完整转达，"
@@ -51,6 +54,99 @@ WORK_RULES_INJECT = (
     "4. 干完关键步骤：让书记员记笔记（auto_log 已自动记，重要结论手动补一笔）。\n"
     "5. 违反以上任何一条 = 失职。"
 )
+
+# ── G-3 来源域分离（plan-memory-v03-draft §3 + §3.1 修正，09-14）──
+# 文件卡 frontmatter 第三字段 prov ∈ self（缺省）/ delegated（外派回帖）/ inbox（信箱来件摘要）。
+# 硬规矩（进门不靠模型判断）：delegated/inbox 卡**连目录行都不出**——
+# 晋升（prov 改 self + 人签字落账）前，外部来源连大纲都不给注入面。MINJA 直达路径就此切断。
+# §3.1 修正（爸爸点破）：注入面**永不注卡正文**，只出"标题+文件名"一行式目录；
+# 正文取用走米娅既有 read 通道按需读，读侧偷懒病由"目录常驻提醒"治，不靠全文硬灌。
+_PROV_BLOCKED = ("delegated", "inbox")
+_CARD_LINE_MAX = 60       # §3.1：每条目录行 ≤60 字符（超出硬截，机械可判）
+_CARD_TOC_LIMIT = 2048    # §3.1：目录总量 ≤2KB（UTF-8 字节机械上限，超限截尾加标记）
+_CARD_TOC_TRUNC = "...(目录截断)"
+
+
+def prov_of_card(text: str) -> str:
+    """读卡 frontmatter 的 prov 字段；无 frontmatter / 无 prov 键 = self（缺省，零迁移向后兼容）。"""
+    lines = (text or "").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return "self"
+    for ln in lines[1:]:
+        s = ln.strip()
+        if s == "---":
+            break
+        if s.startswith("prov:"):
+            v = s[len("prov:"):].strip().strip("'\"")
+            return v or "self"
+    return "self"
+
+
+def card_injectable(text: str) -> bool:
+    """G-3 门：仅 self（含缺省）可进注入面；delegated/inbox 一律拦。"""
+    return prov_of_card(text) not in _PROV_BLOCKED
+
+
+def card_active_name(fname: str) -> bool:
+    """§3.1 活跃白名单：仅顶层 *.md 卡出目录行。
+    隐藏件（. 开头，含 .reflect_last）、备份件（*.bak / *.md.bak / backup-*）严禁；
+    非卡件（r61h 知夏裁决 09-14 夜）：MEMORY.md 索引已走 deepagents memory 通道常驻勿双注、
+    nag-*/reflect-preview-* 是书记员自家提醒与反思产物非记忆卡；
+    调用侧 glob("*") 不递归，projects/ 等子目录文件不进目录。"""
+    if fname.startswith(".") or fname.endswith(".bak") or not fname.endswith(".md"):
+        return False
+    if fname.startswith("backup-") or fname.startswith("nag-") or fname.startswith("reflect-preview-"):
+        return False
+    if fname == "MEMORY.md":
+        return False
+    return True
+
+
+def card_toc_line(fname: str, text: str) -> str:
+    """§3.1 目录行：'- [memory:文件名] 标题'；标题=卡内首个 # 标题，无则回落文件名；≤60 字符。"""
+    title = ""
+    for ln in (text or "").splitlines():
+        s = ln.strip()
+        if s.startswith("#"):
+            title = s.lstrip("#").strip()
+            break
+    return f"- [memory:{fname}] {title or fname}"[:_CARD_LINE_MAX]
+
+
+def build_card_inject(memory_dir) -> str:
+    """注入面卡侧（§3.1 修正后）：**只出目录行，永不注卡正文**。
+    memory 顶层活跃卡（card_active_name 白名单）按文件名升序=确定性序各出一行；
+    facts-*.md 行级流水账不进注入面（§3.1：流水账不进提示词按需查，维持现状）；
+    delegated/inbox 过 prov 门连目录行都不出；总量 ≤2KB，超限截尾加'...(目录截断)'。
+    读不了/目录不存在都回空串——G-3 是门，不是新故障源。"""
+    try:
+        parts = []
+        used = 2  # 前导 "\n\n" 占位
+        limit = _CARD_TOC_LIMIT - len(_CARD_TOC_TRUNC.encode("utf-8"))  # 预留给截断标记
+        for p in sorted(Path(memory_dir).glob("*")):
+            if not card_active_name(p.name):
+                continue
+            if p.name.startswith("facts-"):
+                continue  # 流水账（含 facts-*backup* 形态）不注入，米娅按需 read
+            try:
+                text = p.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            if not card_injectable(text):
+                continue  # G-3 加码：未晋升卡连大纲（目录行）都不给注入面
+            line = card_toc_line(p.name, text)
+            cost = len(line.encode("utf-8")) + 1  # +1=行尾换行
+            if used + cost > limit:
+                parts.append(_CARD_TOC_TRUNC)
+                break
+            used += cost
+            parts.append(line)
+        if not parts:
+            return ""
+        return "\n\n" + "\n".join(parts)
+    except Exception:
+        return ""
+
 
 # ── R51 事实抽取节流与缓冲 ──
 _EXTRACT_THRESHOLD = 600      # 累积字数触发抽取
@@ -85,10 +181,13 @@ class ScribeMiddleware(AgentMiddleware):
     # ---- R64 工作规范强制注入（爸爸定调：书记员提醒必须成为强制提示词）----
     # 老方式把提醒贴在工具结果尾部 = 软建议，米娅可以当耳旁风；
     # 新方式：每轮模型调用前把工作规范注入 system prompt 尾部——模型每轮必读，想忘都忘不掉。
+    # G-3（09-14）§3.1 修正：卡侧只注"标题+文件名"目录行（正文永不进注入面），
+    # delegated/inbox 过 prov 门连目录行都不出；备份/隐藏件/流水账不列。
     def _inject_work_rules(self, request):
         try:
             sp = getattr(request, "system_prompt", "") or ""
-            request.system_prompt = sp + WORK_RULES_INJECT
+            request.system_prompt = (
+                sp + WORK_RULES_INJECT + build_card_inject(self._root / "memory"))
         except Exception:
             pass
 

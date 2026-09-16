@@ -1,0 +1,16 @@
+v0.2.1: phase-1 completion — formal round 26/26 passed, guard/D2/hygiene/fix batches, WIKI inventory, G-5 memory audit, gate fuses wired
+
+- machine guard: r61h/i/j/k rule batches, fork-bomb fix, deny-anti-replay semantics documented
+- D2 pressure downgrade: 24h pin TTL, class-level streak ledger, sub-layer pins, reset_thread
+  three-lock exit (+force rescue path with deadletter to separate fault domain)
+- hygiene batches (d2v03/fix2/fix3/fix4): level_and_source single decision point, RLock on
+  shared dicts, pin_id lifecycle, hint->reason naming debt cleared, dept-gate asserts wired
+  (3 graphs), G-5 memory_change audit (sha-only, no plaintext), e2e positioning note
+- confirm gate: fuse assert_gate_order wired into graph assembly (fail-closed at startup)
+- gateway: litellm 1.101.0 (shadow-tested), modelscope five-account failover
+- docs: WIKI.md home inventory, REFACTOR_NOTES, langchain/system reports; release hygiene:
+  private push scripts & runtime data excluded, internal paths scrubbed
+- formal round: 26-case behavior audit zero failures (strategy table + machine scoring)
+
+known debt (phase 2): D-UX card readability (lyra review), D-21 edit-approval invalidation,
+D-25 python -c form false-freeze, guard_unknown event provenance
