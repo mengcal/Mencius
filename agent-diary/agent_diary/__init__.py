@@ -6,13 +6,15 @@ AgentDiary 📔
 
 核心组件：
 - DiaryStore: 存储层（情景日志/语义知识/程序手册）
-- MemoryGate: 门禁中间件（不读不能动手、动完必记）
+- DiaryGate: 门禁中间件 v0.2（六条军规：硬拒/双钩/fail-closed/白名单/正向出口/审计）
 - make_diary_tools: 创建read_diary/write_diary工具
+- AuditDashboard: 审计仪表盘 v0.3
 """
 
 from .store import DiaryStore
-from .memory_gate import MemoryGate
+from .memory_gate import DiaryGate
 from .tools import make_diary_tools
+from .dashboard import AuditDashboard
 
-__version__ = "0.1.0"
-__all__ = ["DiaryStore", "MemoryGate", "make_diary_tools"]
+__version__ = "0.3.0"
+__all__ = ["DiaryStore", "DiaryGate", "make_diary_tools", "AuditDashboard"]

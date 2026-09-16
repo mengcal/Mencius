@@ -9,10 +9,10 @@ AgentDiary — 核心工具
 
 from typing import Optional
 from .store import DiaryStore
-from .memory_gate import MemoryGate
+from .memory_gate import DiaryGate
 
 
-def make_diary_tools(store: DiaryStore, gate: MemoryGate):
+def make_diary_tools(store: DiaryStore, gate: DiaryGate):
     """
     创建日记工具集
 
