@@ -83,43 +83,62 @@ class LangGraphDiaryMiddleware:
 
 class ClaudePreToolUseHook:
     """
-    Claude Desktop pretool-use hook（v0.9.1重写）
+    Claude Desktop pretool-use hook（v1.0.2修：真实协议格式）
 
     用法：
         hook = ClaudePreToolUseHook(store=store)
 
         # Claude Desktop配置pretool-use hook时调用这个函数
         result = hook(tool_name="Write", tool_input={"path": "xxx"}, session_id="user_123")
-        # result = {"decision": "block", "reason": "..."} 拦截
-        # result = {"decision": "approve"} 放行
+        # 拦截：{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}
+        # 放行：{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}
     """
 
     def __init__(self, store: DiaryStore, execution_tools: list = None):
         self.store = store
         self.gate = DiaryGate(store=store, execution_tools=execution_tools)
 
-    def __call__(self, tool_name: str, tool_input: dict, session_id: str = "default") -> dict:
+    def __call__(self, tool_name: str, tool_input: dict, session_id: str = None) -> dict:
         """
-        pretool-use hook调用接口
+        pretool-use hook调用接口（真实Claude协议）
 
         Args:
             tool_name: 工具名（Write/Read/Bash等）
             tool_input: 工具输入参数
-            session_id: 当前会话ID（调用时传，不烤死）
+            session_id: 当前会话ID（必填，没传报错——不再default兜底）
 
         Returns:
-            {"decision": "approve"} 放行
-            {"decision": "block", "reason": "..."} 拦截
+            Claude真实hook格式：
+            - 拦截：{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}
+            - 放行：{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}
         """
+        # v1.0.2修：session_id必填，不再default兜底
+        if not session_id:
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": "session_id is required! Each session must have a unique ID, otherwise read_diary marks the whole session as read."
+                }
+            }
+
         allowed, reason = self.gate.check_read_before(session_id, tool_name)
 
         if not allowed:
             return {
-                "decision": "block",
-                "reason": reason + "\n\n请先调用read_diary读取相关笔记，再重试本操作。"
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason + "\n\n请先调用read_diary读取相关笔记，再重试本操作。"
+                }
             }
 
-        return {"decision": "approve"}
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow"
+            }
+        }
 
 
 # ═══════════════════════════════════════════════════════════
