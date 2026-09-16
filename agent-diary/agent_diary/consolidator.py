@@ -117,9 +117,11 @@ class AutoConsolidator:
                 self.store.add_semantic_fact(
                     title=title,
                     fact=fact,
-                    fact_type=significance,  # 自动提炼的类型
-                    confidence="auto_extracted",  # 自动提炼的置信度标记
+                    fact_type=significance,
+                    confidence="auto_pending",  # 自动提炼的待审，不是正式知识
+                    source="auto_consolidated",
                     agent="auto",
+                    tags=["auto_extracted", "pending_review"],
                 )
                 count += 1
 

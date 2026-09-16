@@ -1,2 +1,4 @@
 # AgentDiary 依赖
 fastmcp>=2.14.0
+sentence-transformers>=2.2.0
+torch>=2.0.0

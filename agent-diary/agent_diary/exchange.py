@@ -97,11 +97,14 @@ class DiaryImporter:
 
         imported = 0
         for fact in data["semantic_facts"]:
-            # 去重：直接查标题是不是已存在
+            # 去重：按fact内容去重（不是标题），改个措辞就算重复
             import sqlite3
+            fact_content = fact["fact"].strip()
+
             conn = sqlite3.connect(self.store.db_path)
             c = conn.cursor()
-            c.execute("SELECT COUNT(*) FROM semantic_facts WHERE title = ?", (fact["title"],))
+            # 查fact内容是不是已存在
+            c.execute("SELECT COUNT(*) FROM semantic_facts WHERE fact = ?", (fact_content,))
             count = c.fetchone()[0]
             conn.close()
 
