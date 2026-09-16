@@ -115,10 +115,45 @@ agent = MyAgent(
 - [x] v0.2：六条军规落地（硬拒/双钩/fail-closed/正向出口/白名单/审计对账）
 - [x] v0.3：审计仪表盘（一行命令看门禁工作得好不好）
 - [x] v0.4：搜索升级（关键词权重+显著性加权+时间衰减）
-- [ ] v0.5：向量检索集成（qwen3-embedding）
-- [ ] MCP Server接口（所有智能体可接入）
+- [x] v0.5：完整demo更新
+- [x] v0.6：三个必改级bug修复（celia实跑评审）
+- [x] v0.7：MCP Server版！即插即用，所有MCP客户端都能接入
+- [ ] 向量检索集成（qwen3-embedding）
 - [ ] 多智能体共享（姐妹们互相看）
 - [ ] 自动巩固（情景日志→语义知识的自动提取）
+
+## MCP Server 使用方法（v0.7）
+
+做成MCP Server，**所有支持MCP的agent都能即插即用**！
+
+### 启动Server
+
+```bash
+python -m agent_diary.mcp_server
+```
+
+### 接入支持的客户端
+
+- **Claude Desktop**：配置mcp.json，加一行就行
+- **Cursor**：直接加MCP Server配置
+- **任何支持MCP的框架**：都能接入
+
+### 提供的工具
+
+| 工具 | 功能 |
+|---|---|
+| `read_diary` | 读笔记，自动打标记 |
+| `write_diary` | 写日志，自动打标记 |
+| `diary_dashboard` | 审计仪表盘，看门禁工作得好不好 |
+| `diary_stats` | 机器可读的统计摘要 |
+
+### 提供的资源
+
+- `diary://today`：今天的工作日志
+
+### 提供的提示词
+
+- `diary_gate_rules`：给agent的规则提示词
 
 ## v0.2 更新：六条军规
 
