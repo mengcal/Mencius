@@ -44,12 +44,13 @@ class DiaryExporter:
             "episodes": [],
         }
 
-        # 导出语义知识
+        # 导出语义知识（敏感字段隔离：默认不导private的）
         import sqlite3
         conn = sqlite3.connect(self.store.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT * FROM semantic_facts")
+        # 敏感字段隔离：默认过滤private的知识，防止家事外泄
+        c.execute("SELECT * FROM semantic_facts WHERE tags NOT LIKE '%private%'")
         for row in c.fetchall():
             data["semantic_facts"].append(dict(row))
         conn.close()
@@ -124,7 +125,26 @@ class DiaryImporter:
                 )
                 imported += 1
 
-        return f"✅ 导入完成！从{data['meta']['agent']}导入了 {imported} 条新知识"
+        # 导入episodes日志
+        episodes_imported = 0
+        episodic_dir = self.store.episodic_dir
+        episodic_dir.mkdir(parents=True, exist_ok=True)
+
+        for ep in data.get("episodes", []):
+            date = ep.get("date", "")
+            content = ep.get("content", "")
+            if date and content:
+                # 导入的日志标记来源
+                target_file = episodic_dir / f"{date}.md"
+                if not target_file.exists():
+                    # 新文件，写入
+                    target_file.write_text(
+                        f"<!-- imported from {data['meta']['agent']} -->\n{content}",
+                        encoding="utf-8"
+                    )
+                    episodes_imported += 1
+
+        return f"✅ 导入完成！从{data['meta']['agent']}导入了 {imported} 条知识 + {episodes_imported} 天日志"
 
 
 if __name__ == "__main__":
