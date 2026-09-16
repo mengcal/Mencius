@@ -49,6 +49,40 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 - 触发词：什么时候自动加载
 - 比如："怎么发群邮件"
 
+## v1.1+ 新功能
+
+### 🧠 v1.1.0 向量语义搜索
+用sentence-transformers做语义检索，理解意思不是字面匹配：
+```python
+# 搜"怎么给大家发邮件不丢信"
+# 关键词搜索：可能搜不到"Cc吞信"
+# 语义搜索：第一个结果就是"Cc吞信" ✅
+
+from agent_diary.vector_index import VectorIndex
+index = VectorIndex(store)
+index.build_index()
+results = index.search("怎么发邮件不丢信")
+```
+
+### 🔄 v1.2.0 自动巩固
+从情景日志自动提炼语义知识，把流水账变成规则：
+```python
+from agent_diary.consolidator import AutoConsolidator
+consolidator = AutoConsolidator(store)
+count = consolidator.consolidate(days=7)
+# 自动找出：教训/经验/踩坑/规矩/铁律
+# 写入semantic_facts表
+```
+
+### 🔌 v1.3.0 MCP Server 7个工具
+1. read_diary - 读笔记
+2. write_diary - 写日志
+3. gate_check - 收工前问一声
+4. diary_dashboard - 审计仪表盘
+5. diary_stats - 统计信息
+6. **semantic_search** - 向量语义搜索
+7. **consolidate** - 自动巩固
+
 ## 核心组件
 
 ### 1. memory_gate.py — 门禁中间件
