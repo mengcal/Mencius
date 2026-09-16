@@ -26,7 +26,9 @@ export default function SkillsLockRow() {
     try {
       const r = await apiFetch(`${API}/skills/rehash`, { method: 'POST', headers: authHeaders() });
       const j = await r.json();
-      setMsg(j.ok ? `已重建（${j.count} 个文件）${j.note ? '；' + j.note : ''}` : (j.error || '失败'));
+      // 09-15 d2v03fix3⑨：后端 skills_rehash 失败帧 ok:False+error → ok:False+reason
+      // （若若 P1-③必改类，前后端同批）——消费点随改读 j.reason。
+      setMsg(j.ok ? `已重建（${j.count} 个文件）${j.note ? '；' + j.note : ''}` : (j.reason || '失败'));
       refresh();
     } catch { setMsg('失败'); } finally { setBusy(false); }
   };

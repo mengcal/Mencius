@@ -110,7 +110,7 @@ ap.external_store("ridpost", {"done": True, "output": "x" * 10}, task_id="dtid1"
 q = ap.external_store("ridpost", {"output": "-----BEGIN " + "PRIVATE KEY-----\nzz"}, task_id="dtid2")
 tail2 = open(ap._AUDIT_PATH, encoding="utf-8").read()
 T("E17f 隔离体存 rids（私钥人话不回流）", "私钥内容" not in tail2 and '"quarantined"' in tail2)
-T("E17g rids 格式=8位hex", bool(_re.search(r'"rids": \["[0-9a-f]{8}"', tail2)))
+T("E17g rids 格式=规则索引（r61g Cora-5 稳定化）", bool(_re.search(r'"rids": \["\d+"', tail2)))
 
 # ── 4. HTTP nonce/claimed 链（Cora N6+Lyra②）──
 # 注意：服务端读真账——本进程账路径必须还原，否则 dispatch 落临时件、

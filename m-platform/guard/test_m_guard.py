@@ -1,6 +1,6 @@
 """test_m_guard.py — m-guard 守卫服务 单元测试（hy4 红队审查配套，任务 B；R10.6b 知夏终检版）。
 
-运行：cd D:\\m\\guard && python test_m_guard.py   （95 断言，全绿为验收线）
+运行：cd D:\\m\\guard && python test_m_guard.py   （225 断言，全绿为验收线）
 
 纪律：
 - 只 import D:\\m\\guard\\m_guard.py；所有落盘常量（TOKEN_BLOB / BOOTSTRAP_FILE / HOSTCOPY /

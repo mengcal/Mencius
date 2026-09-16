@@ -23,6 +23,28 @@ r61 收官批（Cora/Eve/Lyra 补审并入）：
     爸爸总批=日后收紧/降级的数据源）
   - git push 只 force/默认分支进 mid（Cora：发布线日常不当狼）
 
+r61h 收官批（hy4 八轮 P-2/P-3/A-6）：
+  - rm×系统目录词表兜底（Eve/爸爸定档）：不依赖 _CMD 锚定的 rm 系+词表（与规则 22
+    同源 /(?:etc|usr|home|var|root|bin|boot|opt|srv|data|app)\b）判 high——单 wrapper
+    +>3 token 的 sudo/env 长参穿透面就此封死；rm -rf /etc 恢复 r61f 档；
+    /tmp、./build 等非词表目标不误伤（Eve 降档线保住）。P-2/P-3 是同一个洞的两面。
+  - rule_ids：dispatch 通道改按首个全角冒号切一次（why 内含冒号的 3+ 条不再解析成
+    "?"）；落 r61f→r61g 下标映射表（r61g 插队欠账，见 rule_ids docstring）；
+    规则表自此严格表尾追加，禁止改序。
+
+r61h 九轮修订（hy4 九轮 N-2/N-3，idx35 原位改形、下标不动，rids 老账不断）：
+  - N-2：rm 侧词表剔除 app/data——/app/build、/data/cache 是应用数据目录高频合法
+    清理，high 不弹卡→重试撞 streak 冻结=自伤族（Eve P1-A 同案），降 mid 上卡可见；
+    rule 22（chmod 全盘放权）词表不动，两侧就此分源。
+  - N-3：idx35 并 B 支"同行共现"——r 系 token × f 系 token × 词表绝对目标同处一行、
+    顺序不限，接住 rm -r -f /etc、rm -R -f /home/x、rm /etc -rf（GNU 选项后置）
+    三型（原只落 mid）；放宽边界与误杀对照见规则注释。
+
+r61k（hy4 十轮第一笔，idx35 原位、下标不动，老账 rids=35 不断）：
+  - B 支尾连接段 `[^\n]*?` 收成 `[^;\n|&]*?`（段内约束）——跨段混写
+    （rm -r -f ./build; cat /etc/hosts）不再误升 high，落 mid 即可；三型照过。
+  - A 支不动：改 A 支需重跑八轮 5 格、风险自担（hy4 明示本笔跳过）。
+
 ━━ 设计原则（Cora）：拦截强度与误杀代价对称 ━━
 high 不可逆且爸爸看不见（连卡都不弹）→ 正则必须窄（高置信）；
 mid 可见可逆 → 可以宽。宁可漏到 mid，不可误进 high。
@@ -96,7 +118,11 @@ _RULES = [
     # r61b P0-2（hy4）：dd 改 \S+ 形态 + 补读块设备；r61c N14：设备名补 mmcblk/loop/md+重定向写盘
     (r"mkfs(\.|\s)|dd\s+(if=\S+\s+)?of=/dev/(sd|nvme|hd|vd|disk|mmcblk|loop|md)", "high", "格式化/直写块设备"),
     (r"dd\s+if=/dev/(sd|nvme|hd|vd|disk|mmcblk|loop|md)|(>>?|tee\s+-\w+\s+)\s*/dev/(sd|nvme|hd|vd|disk|mmcblk|loop)", "high", "读/重定向写块设备（镜像外传与直写）"),
-    (r":\(\)\s*\{.*\|.*\}&", "high", "fork 炸弹"),
+    # r61i 信箱171 P0（Nova 实跑坐实）：原 `:\(\)\s*\{.*\|.*\}&` 顺序写反——真炸弹
+    # `:(){ :|:& };:` 的 & 在 } 前（`};&` 要求 & 紧跟 }，实测 low 放行）。改 [^}]* 锁
+    # 进花括号体内，命中 `:(){ :|:& };:`、`:(){:|:&};:`、`:(){ :|:& };: arg` 三形态。
+    # **原位替换不动下标（仍=13）**——rids 老账不断（r61h A-6 纪律）。
+    (r":\(\)\s*\{[^}]*\|[^}]*&", "high", "fork 炸弹"),
     (r"/dev/tcp/|\bnc(at)?\s+-[a-z]*e\b|bash\s+-i\s*>&", "high", "反弹 shell 特征"),
     (_CMD + r"(shutdown|reboot|halt)\b|init\s+0\b", "high", "关机/重启指令"),
     # r61c N5 + r61d P1-2（hy4）：GNU 长参不能只认 rm 一家——tee/chmod 同步
@@ -129,6 +155,39 @@ _RULES = [
     # r61c N22：模板豁免认链式后缀（.env.foo.example 也是模板）
     # r61g Eve P2-A：读侧动词补 cp/mv（`cp .env /tmp/`=密钥 staging，可逆→mid 上卡不直拦）
     (r"(cat|head|tail|grep|cp|mv)\s[^\n]*(MEMORY\.md|memory/|\.env(?![\w])(?!(?:\.\w+)*?\.(example|template|sample|dist|tpl|md)(?![\w]))|credentials/)", "mid", "读/复制记忆与凭据（隐私面）"),
+    # r61h P-2+P-3（hy4 八轮，Eve/爸爸定档）→ 九轮 N-2/N-3 原位改形（idx35 不动）：
+    # rm×系统目录词表兜底——**不依赖 _CMD**，任意 wrapper 前缀（sudo/env/nohup/
+    # timeout + >3 token 的长参形态）都不影响；裸根（rm -rf /）仍由规则 1/2 接住。
+    # N-2（词表收缩）：与 rule 22（chmod 全盘放权）就此分源——rm 侧剔除 app/data
+    # （应用数据目录高频合法清理，high→重试→streak 冻结=自伤族）；chmod 侧不动。
+    # N-3（补 flag 拆分/目标后置族）：A 支=原形态（r/f 同 token 且在目标前，
+    # 80 字窗口）；B 支="同行共现"放宽形——r 系带划词 token（-r/-R/-rf/--recursive
+    # 等含 r 的划词短参或 --recursive 族）× f 系带划词 token（-f/-rf/--force 族）
+    # × 词表绝对目标（空白紧跟 /etc 等）同处一行、任意顺序，接住
+    # rm -r -f /etc、rm -R -f /home/x、rm /etc -rf（GNU 选项后置）三型。
+    # r61k 第一笔（hy4 十轮，只收 B 支尾连接段，下标不动）：目标连接 `[^\n]*?`
+    # 收成 `[^;\n|&]*?`——词表目标必须在 rm 同段内可达，不跨 ; | & 命令分隔；
+    # r/f token 前瞻仍按行；A 支 {0,80} 窗口原样不动（hy4 判：改 A 支需重跑
+    # 八轮 5 格、风险自担，本笔跳过）。
+    # 放宽边界：B 支要求 r、f 两路 token 齐备且目标为绝对词表路径——rm -r /etc
+    # （缺 f）、rm -f x（缺 r）、相对路径 ./etc、/（裸根）、非词表目标一律不升；
+    # --force 单词同时充 r/f（含字母 r），但与 A 支同判（--force+词表目标本就
+    # high，无新增面）。剩余代价（归"代价格"FP 账，不入"挡不住"FN 清单——hy4
+    # 十轮点名别混账）：同段内 -r*/-f* 词与词表路径共现仍会误升；跨段混写
+    # （rm -r -f ./build; cat /etc/hosts）r61k 后落 mid 不再 high；A 支跨段旧
+    # 代价（rm --force ./build; cat /etc/hosts，hy4 八轮已记档）保留不改。
+    # 误杀对照（verify_r61h_matrix N2/N3 段钉死）：rm -rf ./build、rm -r -f ./build、
+    # git rm -r -f notes/x、rm -rf /tmp/x、docker rm --force c1、rm file.txt 不伤。
+    # 表尾追加不改序纪律仍立（r61h A-6）；本条为 idx35 原位改形，老账 rids=35 不断。
+    (r"\brm\b[^\n]{0,80}?(?:-[a-z]*[rf][a-z]*[rf]|--recursive|--force|--no-preserve-root)\b[^\n]{0,80}?\s/(?:etc|usr|home|var|root|bin|boot|opt|srv)\b"
+     r"|\brm\b(?=[^\n]*(?<![\w-])-{1,2}[a-z]*r[a-z]*(?![\w-]))(?=[^\n]*(?<![\w-])-{1,2}[a-z]*f[a-z]*(?![\w-]))[^;\n|&]*?\s/(?:etc|usr|home|var|root|bin|boot|opt|srv)\b",
+     "high", "rm 目标是系统/家目录（词表兜底，包装器免疫——r61h P-2/P-3）"),
+    # r61i 信箱171 P0 配套（Nova 规则级正卷）：函数式 fork 炸弹一判——`:(){...}` 无
+    # 冒号前缀的 `function bomb { bomb | bomb & }` 族曾零覆盖。定档 **mid 不 high**：
+    # 按对称原则（high 须窄而高置信），`function 名 { ... | 名 & }` 与合法脚本里
+    # "函数体内起后台流水线"写法同形，误杀代价=连撞冻线程自伤；mid 上卡爸爸可见
+    # 可逆，漏到 mid 不误进 high。表尾追加=idx 36（r61h A-6 序纪律，不动既有下标）。
+    (r"function\s+\w+\s*(?:\(\s*\)\s*)?\{[^}]*\|\s*\w+\s*&", "mid", "函数式 fork 炸弹（管道自递归后台化——r61i mid 从严防误杀）"),
 ]
 
 # write_file/edit_file 内容规则（按文件类型；r61 补 re.I——Veda 真 bug 案）
@@ -261,7 +320,25 @@ def rule_ids(findings) -> list:
     """r61e（Cora N4+NOVA 六通道法）：模型可读通道（账本/隔离体/拒账）一律存规则 ID，
     人话只留在卡面（爸爸看的渲染层查表）。脱敏按通道枚举闭环，不按位置打补丁。
     r61g（Cora-5 稳定性修正）：ID=规则表索引（文案改了账不断）——规则只增不删、
-    调序需同步映射表；渲染层查 _RULES[i][2]。"""
+    调序需同步映射表；渲染层查 _RULES[i][2]。
+    r61h A-6（hy4 八轮）追加序纪律补救：r61g 插了 3 条没带表，此处补落，此后一律
+    表尾追加。老账换算表（r61f 下标→r61g 下标，速记：<3 不变、3..4 移 +1、≥5 移 +3）：
+      0 递归强删→0（档已降 mid）/ 1 rm 根家通配上级→1 / 2 rm 词位根→2 /
+      3 内联 high→4 / 4 内联 mid→5 / 5 码中码→8 / 6 动态执行 eval→9 /
+      7 curl|sh→10 / 8 mkfs 写块设备→11 / 9 读重定向块设备→12 / 10 fork 炸弹→13 /
+      11 反弹 shell→14 / 12 关机重启→15 / 13 写系统配置→16 / 14 触碰密钥→17 /
+      15 外传参数侧→18 / 16 外传 URL 序→19 / 17 scp/rsync→20 / 18 nc 重定向喂→21 /
+      19 chmod 全盘放权→22 / 20 读先行外传→23 / 21 rm 一般 mid→24 / 22 find 绝对→25 /
+      23 xargs/exec→26 / 24 计划任务服务→27 / 25 下载后执行→28 / 26 装包→29 /
+      27 python -m 装包→30 / 28 杀进程→31 / 29 git push→32 / 30 export 凭证→33 /
+      31 读记忆凭据→34。
+      r61g 新增（r61f 无此三号）：3 反引号/$()族（Cora-1）、6 awk system（Cora-3）、
+      7 管道终点解释器（Nova-3）。r61h 追加：35 rm×系统目录词表兜底（P-2/P-3）。
+      r61i（信箱171 P0）：13 fork 炸弹原位重写（下标不变，老账仍指对）；表尾追加
+      36 函数式 fork 炸弹（mid）。r61h 九轮：35 原位改形（N-2 词表剔 app/data、
+      N-3 并 B 支容忍 r/f 拆参与目标后置），下标不变，老账仍指对。
+      r61k 十轮：35 B 支尾连接段段内化（[^\\n]*?→[^;\\n|&]*?），下标不变，老账仍指对。
+    """
     global _WHY_IDX
     if _WHY_IDX is None:
         _WHY_IDX = {}
@@ -269,5 +346,8 @@ def rule_ids(findings) -> list:
             _WHY_IDX.setdefault(why, str(i))
         for fx, rx, _lvl, why in _CONTENT_RULES:
             _WHY_IDX.setdefault(why, "c" + str(len(_WHY_IDX)))
-    return [_WHY_IDX.get(w.split("：")[-1] if w.startswith("任务文本含危险指令特征：") else w, "?")
+    # r61h A-6（hy4 八轮）：dispatch 前缀按**首个**全角冒号切一次——规则 why 文案
+    # 本身含冒号的（rf 降档那条、python -m 装包、收窄案等 3+ 条）不再被 [-1] 截成
+    # 对不上账的尾巴（那些格在派活通道曾一律解析成 "?"，正断 A-6 要消灭的症状）。
+    return [_WHY_IDX.get(w.split("：", 1)[1] if w.startswith("任务文本含危险指令特征：") else w, "?")
             for _, w in findings]

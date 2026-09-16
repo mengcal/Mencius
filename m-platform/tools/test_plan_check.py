@@ -53,6 +53,7 @@ r2 = tb.note_task("帮我整理下笔记", TID, 2)
 req2 = Req()
 pc._inject(req2)
 T("clarify 提示进 system（问是免费的）", r2["clarify"] and "先问爸爸" in req2.system_prompt)
+T("W2 案边界：请示只进回复不进交付文件", "永远不把'待确认问题'写进文件" in req2.system_prompt)
 
 # ── 3) 同型×3 连撞（C5 复现场景：out-of-scope:/notes 三连）──
 observer._runs[TID] = [

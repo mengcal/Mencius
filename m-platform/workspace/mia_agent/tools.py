@@ -263,6 +263,18 @@ def edit_memory(action: str, section: str = "", content: str = "", project: str 
             print("[memory] ⚠ PG store 缺失，本次未镜像（文件已写）", flush=True)
     except Exception as e:
         print(f"[memory] ⚠ PG store 镜像失败（文件已写，需排查）：{e}", flush=True)
+    # G-5（09-16 fix4，Cora MemSecBench 线索）：记忆变更落审计账（ev=memory_change，走 approvals._audit
+    # 同款通道）。脱敏家规：明文内容绝不进账——只落长度 + sha256 前 16 位指纹（事后可比对、不可还原）。
+    # 函数内延迟 import 防 tools↔approvals 顶层环；落账失败不挡写入主链（写已完成），但必须出声。
+    _chg = content or ""
+    try:
+        import hashlib as _hashlib
+        import approvals as _ap
+        _ap._audit("memory_change", action=action, section=section, project=project,
+                   content_len=len(_chg),
+                   content_sha16=_hashlib.sha256(_chg.encode("utf-8")).hexdigest()[:16])
+    except Exception as e:
+        print(f"[memory] ⚠ 变更审计落账失败（写入已完成，需排查）：{type(e).__name__}: {e}", flush=True)
     return f"✅ 记忆已更新（{action}）：{section or '全文'}。已自动备份上一版到 {mem.name}.bak"
 
 

@@ -54,6 +54,20 @@ def _role_model(role: str, **kw):
         return ChatOpenAI(model="unconfigured", api_key="EMPTY", base_url="https://unconfigured.invalid")
 
 
+def assert_dept_gates(middlewares) -> None:
+    """子层接线断言（09-16 fix4：兑现 assert_gate_order docstring 当初摘掉的"子层不验"承诺，另单已批）。
+    部门图/牛马的 middleware 必须**含 SubGate 且不含 ConfirmGateC1**——
+    反向错装（主图批量卡门混进部门图）=当年口头门死锁形状（子图 interrupt 无人批=挂死），
+    fail-closed：装配期直接抛 ValueError，挡在构建/重建，绝不静默出厂。
+    边界与 assert_gate_order 一致：只验存在性与反向错装，不验顺序。
+    （按类名比对不 import 门件类型——同 assert_gate_order 惯用法，避顶层环。）"""
+    names = [type(m).__name__ for m in middlewares]
+    if "SubGate" not in names:
+        raise ValueError(f"C1 子层接线断言失败：部门 middleware 缺 SubGate（fail-closed）：{names}")
+    if "ConfirmGateC1" in names:
+        raise ValueError(f"C1 子层接线断言失败：主图门 ConfirmGateC1 混进部门图（=口头门死锁形状，fail-closed）：{names}")
+
+
 def _build_dept_graph(dept: dict, slot: str):
     """构建一个部门主管图：主管模型 + 本部门牛马（同步 SubAgent，部门内阻塞协作）。"""
     from agent_multimodel import SandboxedShellBackend  # R79①：execute 进沙箱（与主图同款）
@@ -102,6 +116,9 @@ def _build_dept_graph(dept: dict, slot: str):
         _sys = w.get("system_prompt", f"你是{dept_name}的{w['name']}。")
         if _card_txts:
             _sys += "\n\n# 作业规范卡（平台发放，逐条遵守）\n\n" + "\n\n---\n\n".join(_card_txts)
+        # r41（C1）：子层换 SubGate 全拦件（deny 拒/ask 转文案沿链上报——子图 interrupt 无人批=挂死）
+        _sub_mw = [SubGate(dept=f"{dept_name}/{w['name']}")]
+        assert_dept_gates(_sub_mw)  # 09-16 fix4：子层门接线断言（装配即验，错装=构建期炸）
         subagents.append(SubAgent(
             name=w["name"],
             description=(w.get("desc") or f"{dept_name}·{w['name']}"),
@@ -109,8 +126,7 @@ def _build_dept_graph(dept: dict, slot: str):
             model=_role_model(w.get("role") or w["name"], **wkwargs),
             tools=wtools,
             # R66 层级确认门·官方规则(0.7.11 subagents.py)：声明式牛马不继承父图自定义 middleware，门必须各挂各的
-            # r41（C1）：子层换 SubGate 全拦件（deny 拒/ask 转文案沿链上报——子图 interrupt 无人批=挂死）
-            middleware=[SubGate(dept=f"{dept_name}/{w['name']}")],
+            middleware=_sub_mw,
         ))
 
     # R66 #5 封影子编制：deepagents 会自动给图塞一头 general-purpose（主管可绕开编制用它）。
@@ -134,6 +150,10 @@ def _build_dept_graph(dept: dict, slot: str):
     supervisor_model = _role_model(sup.get("role") or "boss", **sup_kwargs)
 
     from run_config import RunConfigMiddleware  # 部门用量也进观测台
+    # R66 层级确认门：主管图挂子层门（拦截=上报请示，不弹爸爸）；interrupt_on 官方继承表管不到自定义 middleware
+    # r41（C1）：主管同牛马=SubGate 全拦（ask 转文案链上报），批量卡只活在米娅主图
+    _sup_mw = [RunConfigMiddleware(), SubGate(dept=dept_name or "supervisor")]
+    assert_dept_gates(_sup_mw)  # 09-16 fix4：主管层同为子层，装配即验
     graph = create_deep_agent(
         model=supervisor_model,
         name=slot,
@@ -144,9 +164,7 @@ def _build_dept_graph(dept: dict, slot: str):
         tools=[search_knowledge_base],  # R66 #5：主管判断派活前可查私人知识库（此前无工具，派活铁律落空）
         subagents=subagents,
         backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
-        # R66：主管图挂子层门（拦截=上报请示，不弹爸爸）；interrupt_on 官方继承表管不到自定义 middleware
-        # r41（C1）：主管同牛马=SubGate 全拦（ask 转文案链上报），批量卡只活在米娅主图
-        middleware=[RunConfigMiddleware(), SubGate(dept=dept_name or "supervisor")],
+        middleware=_sup_mw,
     )
     return graph
 
@@ -290,6 +308,9 @@ def _get_gm_graph():
     from run_config import RunConfigMiddleware
     from agent_multimodel import ConfirmGateMiddleware, SandboxedShellBackend  # R79①：总管图 execute 也进沙箱
     from mia_agent.confirm_gate_c1 import SubGate  # r41（C1）：总管子层全拦件
+    # 09-16 fix4 裁决2（工兵越墙见闻②）：总管图第三处同形状同风险，补接子层断言（fail-closed）
+    _gm_mw = [RunConfigMiddleware(), SubGate(dept="general_manager")]
+    assert_dept_gates(_gm_mw)
     g = create_deep_agent(
         model=model,
         name="general_manager",
@@ -300,7 +321,7 @@ def _get_gm_graph():
         backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
         # R66 层级确认门：总管图子层模式（拦截=上报米娅请示，不弹爸爸）；主管/牛马已在 _build_dept_graph 挂好
         # r41（C1）：总管同为子层=SubGate 全拦（ask 转文案链上报）
-        middleware=[RunConfigMiddleware(), SubGate(dept="general_manager")],
+        middleware=_gm_mw,
     )
     _dept_cache["_gm"] = g
     _cfg_mtime = mtime

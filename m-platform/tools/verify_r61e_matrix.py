@@ -37,8 +37,18 @@ M2 = [
     ("git rm -rf notes/x", "low"),              # 原误杀防线
     ("docker rm -f c1", "low"),                 # 原误杀防线
     ("grep -rn 'rm -rf /' notes/", "low"),      # 变体：引号内根路径后非行尾
-    ("rm -rf /tmp/build", "high"),              # r60 既有设计：force+recursive 一律 high
+    ("rm -rf /tmp/build", "mid"),              # r61g Eve P1-A：rf+任意目标降 mid（high 会冻线程自伤）
     ("rm notes/x.txt", "mid"),                  # 变体：无 flag 删除→mid
+    ("rm -rf notes/old", "mid"),                # r61g Eve：日常删档不再 high
+    ("rm -rf ../x", "high"),                    # r61g Eve 修法链：上级删除保 high
+    ("echo rm -rf /|bash", "high"),             # r61g Cora-2：词位兜底尾部放宽到管道符
+    ("x=`rm -rf /`", "high"),                   # r61g Cora-1：反引号立即执行族
+    ("printf 'rm -rf /' | sh", "mid"),          # r61g Nova-3：管道终点=解释器兜底上卡
+    ("bash -c 'shutdown now'", "high"),         # r61g Eve-B：sh 族进内联名册
+    ("awk 'system(\"rm -rf /\")' x", "high"),   # r61g Cora-3：awk system 起 shell
+    ("sed -i s/x/y/ /etc/hosts", "high"),       # r61g Cora-4：sed -i 直写 etc
+    ("cp .env /tmp/", "mid"),                   # r61g Eve P2-A：密钥 staging 动词×词表交叉
+    ("docker ps | awk '{print $1}'", "mid"),    # 已知代价：awk 在终点名册（合法也弹卡，记档）
 ]
 for c, want in M2:
     g = E(c); T(f"M2 {c[:26]!r}={want}", g["level"] == want, g["level"])

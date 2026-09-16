@@ -95,6 +95,43 @@ for CASE in '{"thread_id":"gate-test","tool":"execute","fp":"deadbeefdeadbeef"}'
 done
 RV=$(curl -s --max-time 10 -X DELETE http://127.0.0.1:2024/approvals -H 'Content-Type: application/json' -H "Authorization: Bearer $TOK" -d '{"thread_id":"gate-test","tool":"execute"}')
 if echo "$RV" | grep -q '"ok"'; then echo "✓ DELETE /approvals 响应正常: $RV"; else echo "✗ DELETE /approvals 异常: $RV"; FAILS=$((FAILS+1)); fi
+echo "── d2v03fix2④ 三端点分层绊线：401 只出自 token 门，过了门必是 ok/reason 业务帧 ──"
+# hy4 十六轮裁决⑤分层契约的可执行化（十七轮④四条落地）。码体分离=④3：同一次 curl 里
+# -w '\n%{http_code}' 把码接在正文尾、壳里拆——只 grep 正文会在"401 体不含业务键"时假绿。
+# 选路注（④原句 vs 现场）：④要求"401 且体不含 ok 键（体空）"，实测中间件守卫帧非空
+# （app.py:83 固定回一枚 ok:false+error 键的守卫帧），按现场改为三断言：不含 reason 键
+# （reason=函数体业务拒帧的身份证，出现在 401=函数体漏进鉴权层）+ 不含 ok:true
+# （④担心的"401 也做成 ok 帧"分层塌陷）+ 含守卫短语（正面锁定此 401 出自 token 门）。
+# 结案文档 grep-closure-d2v03fix2.md §6 同步报备，交 hy4/主会话追认。
+for EP in reset_thread guard_unlock; do
+  RESP=$(curl -s --max-time 15 -w '\n%{http_code}' -X POST "http://127.0.0.1:2024/approvals/$EP" -H 'Content-Type: application/json' -d '{}')
+  CODE=${RESP##*$'\n'}; BODY=${RESP%$'\n'*}
+  if [ "$CODE" = "401" ] && ! echo "$BODY" | grep -q '"reason"' \
+     && ! echo "$BODY" | grep -qE '"ok":[[:space:]]*true' && echo "$BODY" | grep -q '需要管理员密钥'; then
+    echo "✓ /approvals/$EP 无钥匙 = 401 守卫帧（业务键绝迹，门在函数体外）"
+  else
+    echo "✗ /approvals/$EP 无钥匙实得 $CODE 体=$BODY"; FAILS=$((FAILS+1))
+  fi
+done
+# 反向绊线（④2 更关键的那半边）：带钥匙进门后不得再出鉴权帧，也不得出 error 键。
+# reset_thread 用空体=空 tid（业务拒；④4 同格钉死：reason 必含 thread_id）；
+# guard_unlock 用不存在的 tid（空体＝"解全部"是真解冻动作，绊线不碰爸爸的门）。
+RESP=$(curl -s --max-time 15 -w '\n%{http_code}' -X POST http://127.0.0.1:2024/approvals/reset_thread -H 'Content-Type: application/json' -H "Authorization: Bearer $TOK" -d '{}')
+CODE=${RESP##*$'\n'}; BODY=${RESP%$'\n'*}
+if [ "$CODE" = "200" ] && echo "$BODY" | grep -qE '"ok":[[:space:]]*false' \
+   && echo "$BODY" | grep -qE '"reason":[[:space:]]*"[^"]*thread_id' && ! echo "$BODY" | grep -q '"error"'; then
+  echo "✓ reset_thread 带钥匙空体 = 200+ok:false+reason 含 thread_id（业务拒非鉴权帧，error 键绝迹）: $BODY"
+else
+  echo "✗ reset_thread 带钥匙空体实得 $CODE 体=$BODY"; FAILS=$((FAILS+1))
+fi
+RESP=$(curl -s --max-time 15 -w '\n%{http_code}' -X POST http://127.0.0.1:2024/approvals/guard_unlock -H 'Content-Type: application/json' -H "Authorization: Bearer $TOK" -d '{"thread_id":"mgate-none"}')
+CODE=${RESP##*$'\n'}; BODY=${RESP%$'\n'*}
+if [ "$CODE" = "200" ] && echo "$BODY" | grep -qE '"ok":[[:space:]]*false' \
+   && echo "$BODY" | grep -qE '"reason":[[:space:]]*"[^"]' && ! echo "$BODY" | grep -q '"error"'; then
+  echo "✓ guard_unlock 带钥匙无匹配 tid = 200+ok:false+reason 非空（d2v03fix3⑤ 命名债清偿：hint→reason 单源，error 键绝迹）: $BODY"
+else
+  echo "✗ guard_unlock 带钥匙无匹配 tid 实得 $CODE 体=$BODY"; FAILS=$((FAILS+1))
+fi
 echo "── 前端 XSS L0 断言（rehype-raw/dangerouslySetInnerHTML/innerHTML 命中即红）──"
 XH=$(grep -rn "rehype-raw\|dangerouslySetInnerHTML\|innerHTML" /d/m/deep-agents-ui/src --include=*.ts --include=*.tsx 2>/dev/null | wc -l)
 if [ "$XH" = "0" ]; then echo "✓ XSS sink 命中 = 0"; else echo "✗ XSS sink 命中 $XH 处"; FAILS=$((FAILS+1)); fi
