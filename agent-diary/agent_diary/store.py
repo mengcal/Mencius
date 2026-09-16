@@ -140,7 +140,9 @@ class DiaryStore:
                           source: str = "", agent: str = "unknown",
                           confidence: str = "verified", tags: list = None) -> str:
         """添加一条语义知识"""
-        fact_id = f"fact_{hashlib.sha1(title.encode()).hexdigest()[:8]}"
+        # bug2修复：主键按title+fact内容哈希，不按title
+        # 这样同标题不同内容就是不同的ID，不会静默覆盖
+        fact_id = f"fact_{hashlib.sha1((title + '|' + fact).encode()).hexdigest()[:8]}"
 
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -175,8 +177,8 @@ class DiaryStore:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
 
-        # 拉所有数据，本地打分
-        c.execute("SELECT * FROM semantic_facts")
+        # bug3修复：默认过滤掉auto_pending（待审知识不进读侧）
+        c.execute("SELECT * FROM semantic_facts WHERE confidence != 'auto_pending'")
         rows = [dict(r) for r in c.fetchall()]
         conn.close()
 

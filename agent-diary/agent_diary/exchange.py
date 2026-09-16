@@ -111,13 +111,16 @@ class DiaryImporter:
             if count == 0:
                 # 导入的知识标记来源
                 source = f"shared_from_{data['meta']['agent']}" if as_shared else fact.get("source", "")
+                # bug1修复：导入一律压成auto_pending，不继承包里的confidence
+                # 防止恶意包自封verified
                 self.store.add_semantic_fact(
                     title=fact["title"],
                     fact=fact["fact"],
                     fact_type=fact.get("type", "note"),
                     source=source,
                     agent=fact.get("agent", "unknown"),
-                    confidence=fact.get("confidence", "imported"),
+                    confidence="auto_pending",  # 导入=待审，看过才转正
+                    tags=["imported", "pending_review"],
                 )
                 imported += 1
 
