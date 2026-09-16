@@ -158,6 +158,22 @@ class DiaryStore:
 
         return fact_id
 
+    def get_fact_confidence(self, fact_id: str) -> str:
+        """
+        v1.2.0 P1第二层：按id查一条语义知识的置信度
+
+        向量路径防御性过滤用——索引可能过期/被增量添加绕过，
+        读侧永远以库里最新confidence为准。
+        """
+        if not fact_id:
+            return ""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT confidence FROM semantic_facts WHERE id = ?", (fact_id,))
+        row = c.fetchone()
+        conn.close()
+        return row[0] if row else ""
+
     def search_semantic_facts(self, query: str, limit: int = 5) -> list:
         """
         搜索语义知识（v0.4 关键词权重+显著性加权+时间衰减）
