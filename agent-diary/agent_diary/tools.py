@@ -26,7 +26,22 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate, session_id: str = "defa
         session_id: 当前会话ID（v0.6修复：自动打标记用）
     """
 
-    def read_diary(query: str = "", days: int = 3) -> str:
+    # v1.1.0: 向量索引（懒加载）
+    _vector_index = None
+
+    def _get_vector_index():
+        nonlocal _vector_index
+        if _vector_index is None:
+            try:
+                from .vector_index import VectorIndex
+                _vector_index = VectorIndex(store)
+                _vector_index.build_index()
+            except Exception as e:
+                print(f"向量索引加载失败，降级为关键词搜索: {e}")
+                return None
+        return _vector_index
+
+    def read_diary(query: str = "", days: int = 3, semantic: bool = False) -> str:
         """
         读笔记——搜索相关的工作日志和历史教训
 
@@ -45,6 +60,13 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate, session_id: str = "defa
         # 2. 语义搜索相关知识
         semantic_results = store.search_semantic_facts(query) if query else []
 
+        # v1.1.0: 向量语义搜索
+        vector_results = []
+        if query and semantic:
+            vi = _get_vector_index()
+            if vi:
+                vector_results = vi.search(query, top_k=3)
+
         result_parts = []
         result_parts.append("📔 【最近工作日志】")
         result_parts.append(episodic)
@@ -53,6 +75,11 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate, session_id: str = "defa
             result_parts.append("\n📚 【相关知识】")
             for fact in semantic_results:
                 result_parts.append(f"- **{fact['title']}**: {fact['fact']} (置信度: {fact['confidence']})")
+
+        if vector_results:
+            result_parts.append("\n🧠 【语义搜索结果】")
+            for r in vector_results:
+                result_parts.append(f"- [{r['score']:.2f}] {r['text'][:80]}...")
 
         # v0.6修复：读了笔记，自动打标记
         store.mark_read_diary(session_id)
