@@ -51,12 +51,12 @@ class VectorIndex:
         texts = []
         metadatas = []
 
-        # 1. 语义知识
+        # 1. 语义知识（alice逮的P1：过滤auto_pending待审知识）
         import sqlite3
         conn = sqlite3.connect(self.store.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT * FROM semantic_facts")
+        c.execute("SELECT * FROM semantic_facts WHERE confidence != 'auto_pending'")
         for row in c.fetchall():
             row = dict(row)
             texts.append(f"{row['title']}: {row['fact']}")
