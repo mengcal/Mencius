@@ -176,9 +176,40 @@ pip install -r requirements.txt
 ### 宿主适配器（强制面）
 
 真正的强制门禁需要在宿主家里装中间件：
-- **langgraph版**：wrap_tool_call中间件（约30行，DiaryGate现成逻辑直接复用）
-- **Claude系**：pretool-use hook
-- **Cursor版**：即将支持
+
+#### 1. LangGraph版
+```python
+from agent_diary.host_adapters import create_langgraph_diary_middleware
+
+middleware = create_langgraph_diary_middleware(
+    store=store,
+    session_id="user_123",
+)
+graph = builder.compile(middlewares=[middleware])
+```
+
+#### 2. Claude Desktop版（pretool-use hook）
+```python
+from agent_diary.host_adapters import create_claude_pretool_use_hook
+
+hook = create_claude_pretool_use_hook(
+    store=store,
+    session_id="user_123",
+)
+# 配置到claude_desktop_config.json的hooks里
+```
+
+#### 3. 通用装饰器版（任何框架都能用）
+```python
+from agent_diary.host_adapters import DiaryMiddleware
+
+middleware = DiaryMiddleware(store=store, session_id="xxx")
+
+@middleware.wrap
+def my_execution_tool(arg1, arg2):
+    # ... 干活
+    pass
+```
 
 MCP Server负责存储和查询，宿主中间件负责强制拦截。
 两层配合，才是完整的"不读不能动手、动完必记"！
