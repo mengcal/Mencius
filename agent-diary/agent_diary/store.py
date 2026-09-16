@@ -63,8 +63,20 @@ class DiaryStore:
                 session_id TEXT PRIMARY KEY,
                 has_read_diary INTEGER DEFAULT 0,
                 has_written_diary INTEGER DEFAULT 0,
+                task_started INTEGER DEFAULT 0,
                 task_started_at TEXT,
                 task_completed_at TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        # 拦截记录（审计用）
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS block_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                tool_name TEXT,
+                reason TEXT,
                 created_at TEXT DEFAULT (datetime('now'))
             )
         """)
@@ -199,6 +211,37 @@ class DiaryStore:
         row = c.fetchone()
         conn.close()
         return bool(row and row[0])
+
+    def mark_task_started(self, session_id: str):
+        """标记任务开始（执行了工具）"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("""
+            INSERT OR REPLACE INTO session_log (session_id, task_started, task_started_at)
+            VALUES (?, 1, datetime('now'))
+        """, (session_id,))
+        conn.commit()
+        conn.close()
+
+    def has_task_started(self, session_id: str) -> bool:
+        """检查是否启动了任务（执行过工具）"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT task_started FROM session_log WHERE session_id = ?", (session_id,))
+        row = c.fetchone()
+        conn.close()
+        return bool(row and row[0])
+
+    def log_block(self, session_id: str, tool_name: str, reason: str):
+        """记录一次拦截事件（审计用）"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO block_log (session_id, tool_name, reason)
+            VALUES (?, ?, ?)
+        """, (session_id, tool_name, reason))
+        conn.commit()
+        conn.close()
 
     # ── 审计 ──
 
