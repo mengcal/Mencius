@@ -58,10 +58,15 @@ class DiaryGate:
         self.fail_closed = fail_closed  # 门禁出错时默认拒
 
         # 执行类工具列表（需要先读笔记才能调用）
+        # 同时覆盖Python风格和Claude风格的工具名
         self.execution_tools = execution_tools or [
+            # Python风格
             "run_command", "execute_bash", "write_file", "edit_file",
             "send_email", "call_api", "deploy", "install",
             "delete_file", "move_file", "create_branch", "commit", "push",
+            # Claude风格
+            "Write", "Edit", "Bash", "NotebookEdit",
+            "WebFetch", "WebSearch",
         ]
 
         # 拦截计数（审计用）
@@ -73,11 +78,20 @@ class DiaryGate:
         return tool_name in self.SAFE_LIST
 
     def is_execution_tool(self, tool_name: str) -> bool:
-        """判断是不是执行类工具"""
+        """判断是不是执行类工具（v0.9.1修：大小写不敏感）"""
         if self.is_safe_tool(tool_name):
             return False
-        return tool_name in self.execution_tools or any(
-            exec_tool in tool_name.lower() for exec_tool in self.execution_tools
+
+        tool_lower = tool_name.lower()
+
+        # 精确匹配
+        if tool_lower in [t.lower() for t in self.execution_tools]:
+            return True
+
+        # 模糊匹配
+        return any(
+            exec_tool.lower() in tool_lower
+            for exec_tool in self.execution_tools
         )
 
     def _make_reject_message(self, tool_name: str, reason: str) -> str:
@@ -192,6 +206,27 @@ class DiaryGate:
             self.store.mark_task_started(session_id)
 
         return True, result
+
+    def check_read_before(self, session_id: str, tool_name: str) -> tuple[bool, str]:
+        """
+        前置门禁：检查是否读了笔记（v0.9.1补：host_adapters要调这个）
+
+        Returns:
+            (allowed, reason): 是否允许+原因
+        """
+        if not self.read_before_execute:
+            return True, "门禁关闭"
+
+        if self.is_safe_tool(tool_name):
+            return True, "安全工具，放行"
+
+        if not self.is_execution_tool(tool_name):
+            return True, "非执行类工具，放行"
+
+        if self.store.has_read_diary(session_id):
+            return True, "已读笔记，放行"
+
+        return False, f"调用执行类工具 '{tool_name}' 前必须先读笔记"
 
     def check_task_completed(self, session_id: str) -> tuple[bool, str]:
         """
