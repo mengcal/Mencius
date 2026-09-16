@@ -359,6 +359,55 @@ def reject_fact(fact_id: str) -> str:
         return f"❌ 删除失败: {e}"
 
 
+@mcp.tool()
+def export_diary(output_path: str, agent_name: str = "unknown") -> str:
+    """
+    v1.1.0: 导出日记成JSON包
+
+    姐妹们互相分享经验！导出后发给别人导入。
+
+    Args:
+        output_path: 导出文件路径
+        agent_name: 你的名字
+
+    Returns:
+        导出结果
+    """
+    if store is None:
+        init_diary()
+
+    try:
+        from .exchange import DiaryExporter
+        exporter = DiaryExporter(store, agent_name=agent_name)
+        return exporter.export(output_path)
+    except Exception as e:
+        return f"❌ 导出失败: {e}"
+
+
+@mcp.tool()
+def import_diary(input_path: str) -> str:
+    """
+    v1.1.0: 导入别人的日记包
+
+    导入的知识会标记来源：shared_from_xxx
+
+    Args:
+        input_path: 导入文件路径
+
+    Returns:
+        导入结果
+    """
+    if store is None:
+        init_diary()
+
+    try:
+        from .exchange import DiaryImporter
+        importer = DiaryImporter(store)
+        return importer.import_from(input_path)
+    except Exception as e:
+        return f"❌ 导入失败: {e}"
+
+
 @mcp.resource("diary://today")
 def today_diary() -> str:
     """今天的工作日志"""
