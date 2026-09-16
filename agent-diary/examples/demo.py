@@ -11,6 +11,11 @@ AgentDiary v0.4 完整演示
 6. 搜索功能（v0.4 升级）
 """
 
+import sys
+import os
+# bug4修复：加sys.path引导，不用PYTHONPATH=.也能跑
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from agent_diary import DiaryStore, DiaryGate, make_diary_tools, AuditDashboard
 
 # 1. 初始化存储（数据存在 ./diary_data/）
