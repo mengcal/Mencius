@@ -267,23 +267,29 @@ class DiaryStore:
     # ── 会话跟踪（门禁用） ──
 
     def mark_read_diary(self, session_id: str):
-        """标记本次会话已读笔记"""
+        """标记本次会话已读笔记（v0.6修复：只更新has_read_diary字段，不影响其他标志）"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
+        # 先插入空记录（如果不存在）
+        c.execute("INSERT OR IGNORE INTO session_log (session_id) VALUES (?)", (session_id,))
+        # 只更新需要的字段
         c.execute("""
-            INSERT OR REPLACE INTO session_log (session_id, has_read_diary, task_started_at)
-            VALUES (?, 1, datetime('now'))
+            UPDATE session_log 
+            SET has_read_diary = 1, task_started_at = COALESCE(task_started_at, datetime('now'))
+            WHERE session_id = ?
         """, (session_id,))
         conn.commit()
         conn.close()
 
     def mark_written_diary(self, session_id: str):
-        """标记本次会话已写日志"""
+        """标记本次会话已写日志（v0.6修复：只更新has_written_diary字段）"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO session_log (session_id) VALUES (?)", (session_id,))
         c.execute("""
-            INSERT OR REPLACE INTO session_log (session_id, has_written_diary, task_completed_at)
-            VALUES (?, 1, datetime('now'))
+            UPDATE session_log 
+            SET has_written_diary = 1, task_completed_at = datetime('now')
+            WHERE session_id = ?
         """, (session_id,))
         conn.commit()
         conn.close()
@@ -307,12 +313,14 @@ class DiaryStore:
         return bool(row and row[0])
 
     def mark_task_started(self, session_id: str):
-        """标记任务开始（执行了工具）"""
+        """标记任务开始（执行了工具）（v0.6修复：只更新task_started字段）"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO session_log (session_id) VALUES (?)", (session_id,))
         c.execute("""
-            INSERT OR REPLACE INTO session_log (session_id, task_started, task_started_at)
-            VALUES (?, 1, datetime('now'))
+            UPDATE session_log 
+            SET task_started = 1, task_started_at = COALESCE(task_started_at, datetime('now'))
+            WHERE session_id = ?
         """, (session_id,))
         conn.commit()
         conn.close()

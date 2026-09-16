@@ -121,24 +121,27 @@ class DiaryGate:
                         tool_name, "调用执行类工具前必须先读笔记"
                     )
 
-            # 执行工具
-            result = handler(request)
-            self._pass_count += 1
-
-            # 后置门禁：标记欠一条日志
-            if self.write_after_task:
-                self.store.mark_task_started(session_id)
-
-            return True, result
-
         except Exception as e:
-            # fail-closed：门禁自己出错时默认拒
+            # 门禁自己的检查出错了
             if self.fail_closed:
                 self._block_count += 1
                 return False, f"⛔ 门禁异常（fail-closed）：{e}。请先调用 read_diary 确认上下文。"
             else:
-                # fail-open：放行但记一笔
-                return True, handler(request)
+                # fail-open：门禁检查出错了，放行但记一笔
+                self._pass_count += 1
+                # 注意：这里不能再调handler了！直接放行到handler
+                # 调用方自己处理handler的执行
+                pass
+
+        # 执行工具（v0.6修复：handler的异常不被门禁catch，直接抛出）
+        result = handler(request)
+        self._pass_count += 1
+
+        # 后置门禁：标记欠一条日志
+        if self.write_after_task:
+            self.store.mark_task_started(session_id)
+
+        return True, result
 
     async def wrap_tool_call_async(
         self,
@@ -170,23 +173,25 @@ class DiaryGate:
                         tool_name, "调用执行类工具前必须先读笔记"
                     )
 
-            # 执行工具
-            result = await handler(request)
-            self._pass_count += 1
-
-            # 后置门禁：标记欠一条日志
-            if self.write_after_task:
-                self.store.mark_task_started(session_id)
-
-            return True, result
-
         except Exception as e:
-            # fail-closed：门禁自己出错时默认拒
+            # 门禁自己的检查出错了
             if self.fail_closed:
                 self._block_count += 1
                 return False, f"⛔ 门禁异常（fail-closed）：{e}。请先调用 read_diary 确认上下文。"
             else:
-                return True, await handler(request)
+                # fail-open：门禁检查出错了，放行但记一笔
+                self._pass_count += 1
+                pass
+
+        # 执行工具（v0.6修复：handler的异常不被门禁catch，直接抛出）
+        result = await handler(request)
+        self._pass_count += 1
+
+        # 后置门禁：标记欠一条日志
+        if self.write_after_task:
+            self.store.mark_task_started(session_id)
+
+        return True, result
 
     def check_task_completed(self, session_id: str) -> tuple[bool, str]:
         """
