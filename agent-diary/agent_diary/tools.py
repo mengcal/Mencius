@@ -12,18 +12,25 @@ from .store import DiaryStore
 from .memory_gate import DiaryGate
 
 
-def make_diary_tools(store: DiaryStore, gate: DiaryGate):
+def make_diary_tools(store: DiaryStore, gate: DiaryGate, session_id: str = "default"):
     """
     创建日记工具集
 
     返回两个工具函数，可直接挂到agent上：
     - read_diary(query: str)
     - write_diary(event: str, lesson: str, significance: str = "normal")
+
+    Args:
+        store: 存储层
+        gate: 门禁中间件
+        session_id: 当前会话ID（v0.6修复：自动打标记用）
     """
 
     def read_diary(query: str = "", days: int = 3) -> str:
         """
         读笔记——搜索相关的工作日志和历史教训
+
+        调用后自动标记 has_read_diary=1（v0.6修复）
 
         Args:
             query: 搜索关键词，比如 "群发邮件"、"Cc吞信"
@@ -47,6 +54,9 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate):
             for fact in semantic_results:
                 result_parts.append(f"- **{fact['title']}**: {fact['fact']} (置信度: {fact['confidence']})")
 
+        # v0.6修复：读了笔记，自动打标记
+        store.mark_read_diary(session_id)
+
         return "\n".join(result_parts)
 
     def write_diary(
@@ -58,6 +68,8 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate):
     ) -> str:
         """
         写日志——记录本次任务的事件和教训
+
+        调用后自动标记 has_written_diary=1（v0.6修复）
 
         Args:
             event: 发生了什么事？
@@ -87,8 +99,13 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate):
                 source=path,
                 agent=agent,
             )
-            return f"✅ 日志已写入: {path}\n📚 语义知识已提取: {fact_id}"
+            result = f"✅ 日志已写入: {path}\n📚 语义知识已提取: {fact_id}"
+        else:
+            result = f"✅ 日志已写入: {path}"
 
-        return f"✅ 日志已写入: {path}"
+        # v0.6修复：写了日志，自动打标记
+        store.mark_written_diary(session_id)
+
+        return result
 
     return read_diary, write_diary
