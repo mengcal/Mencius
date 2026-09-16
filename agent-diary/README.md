@@ -128,23 +128,41 @@ agent = MyAgent(
 
 ### 启动Server
 
+## MCP Server 使用方法（v0.8）
+
+**诚实定位**（celia issue #2修正）：
+
+| 层 | 是什么 | 在哪 |
+|---|---|---|
+| **MCP面** | 存储/检索/审计 + 门禁状态查询 | MCP Server里 |
+| **强制面** | 真正的硬拦截（不读不能动手、不动不算完成） | 宿主中间件里 |
+
+⚠️ **注意**：MCP Server天然拦不住宿主那边的执行类工具！
+真正的强制门禁要在宿主家里装中间件（DiaryGate类）。
+
+MCP Server提供的是：**日记本 + 门禁状态查询**，不是强制性拦截！
+
+### 启动Server
+
 ```bash
-python -m agent_diary.mcp_server
+# v0.8必改：必须显式配置路径，不然拒绝启动！
+AGENT_DIARY_HOME=/abs/path/to/your/diary python -m agent_diary.mcp_server
 ```
 
-### 接入支持的客户端
+### 安装依赖
 
-- **Claude Desktop**：配置mcp.json，加一行就行
-- **Cursor**：直接加MCP Server配置
-- **任何支持MCP的框架**：都能接入
+```bash
+pip install -r requirements.txt
+```
 
 ### 提供的工具
 
 | 工具 | 功能 |
 |---|---|
-| `read_diary` | 读笔记，自动打标记 |
-| `write_diary` | 写日志，自动打标记 |
-| `diary_dashboard` | 审计仪表盘，看门禁工作得好不好 |
+| `read_diary` | 读笔记，自动打标记（session_id必填） |
+| `write_diary` | 写日志，自动打标记（session_id必填） |
+| `gate_check` | 【v0.8新增】收工前查询"能不能收工" |
+| `diary_dashboard` | 审计仪表盘 |
 | `diary_stats` | 机器可读的统计摘要 |
 
 ### 提供的资源
@@ -153,7 +171,17 @@ python -m agent_diary.mcp_server
 
 ### 提供的提示词
 
-- `diary_gate_rules`：给agent的规则提示词
+- `diary_gate_rules`：给agent的规则提示词（v0.8诚实修正：建议性，不是强制）
+
+### 宿主适配器（强制面）
+
+真正的强制门禁需要在宿主家里装中间件：
+- **langgraph版**：wrap_tool_call中间件（约30行，DiaryGate现成逻辑直接复用）
+- **Claude系**：pretool-use hook
+- **Cursor版**：即将支持
+
+MCP Server负责存储和查询，宿主中间件负责强制拦截。
+两层配合，才是完整的"不读不能动手、动完必记"！
 
 ## v0.2 更新：六条军规
 

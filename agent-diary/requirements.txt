@@ -1,0 +1,2 @@
+# AgentDiary 依赖
+fastmcp>=2.14.0

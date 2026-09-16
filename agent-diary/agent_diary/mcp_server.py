@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-AgentDiary MCP Server v0.7
+AgentDiary MCP Server v0.8
 
-做成MCP Server，所有支持MCP的agent都能即插即用！
-- Claude Desktop
-- Cursor
-- 各种支持MCP的IDE和agent框架
+诚实定位（celia issue #2修正）：
+- MCP面 = 存储/检索/审计 + 门禁状态查询
+- 强制面 = 宿主中间件（DiaryGate类已具备，就差宿主接线）
+
+注意：MCP server天然拦不住宿主那边的执行类工具！
+真正的强制门禁要在宿主家里装中间件（Claude pretool-use hook / langgraph wrap_tool_call）。
+这个MCP Server提供的是：日记本 + 门禁状态查询，不是强制性拦截！
 
 启动方式：
-    python -m agent_diary.mcp_server
+    AGENT_DIARY_HOME=/path/to/diary python -m agent_diary.mcp_server
 """
 
+import os
 from fastmcp import FastMCP
 from .store import DiaryStore
 from .memory_gate import DiaryGate
@@ -25,29 +29,52 @@ gate = None
 dashboard = None
 
 
-def init_diary(base_dir: str = "./diary_data"):
-    """初始化日记系统"""
+def init_diary():
+    """
+    初始化日记系统（v0.8修正：base_dir必须显式配置，不然拒绝启动）
+
+    环境变量：AGENT_DIARY_HOME
+    未配置就启动 = fail-closed 拒绝启动
+    """
     global store, gate, dashboard
+
+    # v0.8必改：base_dir必须显式配置，不能用相对路径默认值
+    base_dir = os.environ.get("AGENT_DIARY_HOME")
+    if not base_dir:
+        raise RuntimeError(
+            "AGENT_DIARY_HOME 环境变量未设置！\n"
+            "MCP Server由客户端拉起，CWD不受我们控制。\n"
+            "必须显式配置日记存储路径，不然下次启动就失忆了。\n"
+            "请在MCP配置里设置环境变量 AGENT_DIARY_HOME=/abs/path/to/diary"
+        )
+
     store = DiaryStore(base_dir)
     gate = DiaryGate(store=store)
     dashboard = AuditDashboard(store=store)
 
 
 @mcp.tool()
-def read_diary(query: str = "", days: int = 3, session_id: str = "default") -> str:
+def read_diary(
+    query: str = "",
+    days: int = 3,
+    session_id: str = "",  # v0.8必改：必填，不给默认值
+) -> str:
     """
     读笔记——搜索相关的工作日志和历史教训
 
-    调用后自动标记 has_read_diary=1，门禁放行执行类工具。
+    调用后自动标记 has_read_diary=1。
 
     Args:
         query: 搜索关键词，比如 "群发邮件"、"Cc吞信"
         days: 回顾最近几天的日志，默认3天
-        session_id: 当前会话ID，默认default
+        session_id: 【必填】当前会话ID，每个会话唯一
 
     Returns:
         相关的工作日志和语义知识
     """
+    if not session_id:
+        return "❌ 错误：session_id 是必填参数！每个会话必须有唯一ID，不然所有客户端共用一个状态，A读了笔记B的工具也算已读。"
+
     if store is None:
         init_diary()
 
@@ -79,7 +106,7 @@ def write_diary(
     significance: str = "normal",
     context: str = "",
     agent: str = "unknown",
-    session_id: str = "default",
+    session_id: str = "",  # v0.8必改：必填，不给默认值
 ) -> str:
     """
     写日志——记录本次任务的事件和教训
@@ -92,11 +119,14 @@ def write_diary(
         significance: 显著性级别 critical/important/normal
         context: 当时的上下文
         agent: 哪个智能体写的
-        session_id: 当前会话ID
+        session_id: 【必填】当前会话ID
 
     Returns:
         写入结果
     """
+    if not session_id:
+        return "❌ 错误：session_id 是必填参数！每个会话必须有唯一ID。"
+
     if store is None:
         init_diary()
 
@@ -127,6 +157,36 @@ def write_diary(
         result += f"\n📚 语义知识已提取: {fact_id}"
 
     return result
+
+
+@mcp.tool()
+def gate_check(session_id: str = "") -> str:
+    """
+    【v0.8新增】门禁状态查询——宿主收工前必查！
+
+    这是MCP模式下的门禁替代方案：
+    - MCP server天然拦不住宿主那边的工具执行
+    - 但宿主可以在收工前调这个工具，问一声"能不能收工"
+    - 把check_task_completed的判定权经MCP交出来
+
+    Args:
+        session_id: 【必填】当前会话ID
+
+    Returns:
+        能不能收工，为什么
+    """
+    if not session_id:
+        return "❌ 错误：session_id 是必填参数！"
+
+    if store is None:
+        init_diary()
+
+    allowed, reason = gate.check_task_completed(session_id)
+
+    if allowed:
+        return f"✅ 可以收工：{reason}"
+    else:
+        return f"⛔ 不能收工：{reason}\n\n请先调 write_diary 把本次任务的事件和教训记下来。"
 
 
 @mcp.tool()
@@ -177,15 +237,21 @@ def today_diary() -> str:
 def diary_gate_rules() -> str:
     """
     给agent的提示词——告诉agent怎么用日记系统
+
+    v0.8诚实修正：
+    MCP模式下没有强制性拦截！
+    真正的门禁要在宿主家里装中间件。
+    这里是建议性的规则，不是硬门禁。
     """
     return """
-    你有一个工作日志系统（AgentDiary），必须遵守以下规则：
+    你有一个工作日志系统（AgentDiary），建议遵守以下规则：
 
-    1. **动手前必读笔记**：调用任何执行类工具（写文件、跑命令、发邮件）前，必须先调用 read_diary 读取相关笔记
-    2. **完成后必写日志**：任务完成后，必须调用 write_diary 记录事件和教训
+    1. **动手前读笔记**：调用执行类工具前，最好先调用 read_diary 读取相关笔记
+    2. **完成后写日志**：任务完成后，最好调用 write_diary 记录事件和教训
 
-    不读笔记就动手 = 被门禁拦住
-    不写日志就收工 = 任务不算完成
+    注意：这是建议性规则，不是强制门禁！
+    真正的强制门禁需要在宿主家里装中间件（DiaryGate类）。
+    收工前建议调 gate_check 问一声能不能收工。
 
     显著性级别：
     - critical：爸爸铁律、关键决策、大坑
