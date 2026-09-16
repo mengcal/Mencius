@@ -64,15 +64,26 @@ index.build_index()
 results = index.search("怎么发邮件不丢信")
 ```
 
-### 🔄 v1.2.0 自动巩固
+### 🔄 v1.2.0 自动巩固 + 晋升流
 从情景日志自动提炼语义知识，把流水账变成规则：
 ```python
 from agent_diary.consolidator import AutoConsolidator
 consolidator = AutoConsolidator(store)
+
+# 1. 自动提炼 → auto_pending（待审）
 count = consolidator.consolidate(days=7)
-# 自动找出：教训/经验/踩坑/规矩/铁律
-# 写入semantic_facts表
+
+# 2. 看看待审列表
+pending = consolidator.list_pending()
+
+# 3. 确认的晋升
+consolidator.promote("fact_xxx")
+
+# 4. 不对的删掉
+consolidator.reject("fact_xxx")
 ```
+
+**晋升须签字，不能自动进正典！**
 
 ### 🔌 v1.3.0 MCP Server 7个工具
 1. read_diary - 读笔记
