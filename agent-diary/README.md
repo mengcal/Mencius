@@ -29,7 +29,7 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 
 **核心区别：他们防危险，咱们防忘事。**
 
-## 完整功能（当前 v1.3.0-mvp1）
+## 完整功能（当前 v1.3.1）
 
 ### 三层记忆结构
 - **情景日志**：按天记录的原始事件流，schema v1 §2 frontmatter 条目（id/author/kind/significance/private/source/confidence/refs/open_question）
@@ -88,14 +88,14 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 
 ## 验收（schema v1 §8 全单）
 
-验收官跑单工具（六项机械判据）：
+验收官跑单工具（七项机械判据）：
 
 ```bash
 python -m agent_diary.lint <diary_base_dir>
-# 退出码 0 = 六项全过
+# 退出码 0 = 七项全过
 ```
 
-六项：① 字段完备 ② id 唯一排序 ③ canon 纯净 ④ private 不出门 ⑤ 状态位不互噬 ⑥ 门禁双路
+七项：① 字段完备 ② id 唯一排序 ③ canon 纯净 ④ private 不出门 ⑤ 状态位不互噬 ⑥ 门禁双路 ⑦ refs 完整性
 
 ## 快速开始
 

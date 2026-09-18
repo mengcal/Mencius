@@ -22,6 +22,42 @@ class AuditDashboard:
     def __init__(self, store: DiaryStore):
         self.store = store
 
+    def _count_gate_events_today(self):
+        """
+        v1.3.1：统计今天审计流里的门禁事件（pass/block）
+
+        判断"门禁是否接入"用——纯 CLI/库直写模式没有门禁事件，
+        "拦截=0"就不该告警"门禁没生效"（那是正常直写）。
+        """
+        import json as _json
+        from datetime import datetime
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        gate_pass = gate_block = 0
+        audit_file = self.store.audit_dir / "events.jsonl"
+        if not audit_file.exists():
+            return 0, 0
+        try:
+            with open(audit_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        ev = _json.loads(line)
+                    except ValueError:
+                        continue
+                    if ev.get("ts", "")[:10] != today:
+                        continue
+                    dec = ev.get("decision", "")
+                    if dec == "pass":
+                        gate_pass += 1
+                    elif dec == "block":
+                        gate_block += 1
+        except OSError:
+            return 0, 0
+        return gate_pass, gate_block
+
     def report(self, date: Optional[str] = None) -> str:
         """
         生成审计报告
@@ -88,10 +124,16 @@ class AuditDashboard:
         read_rate = f"{read_count/total_sessions*100:.1f}%" if total_sessions else "0%"
         write_rate = f"{write_count/total_sessions*100:.1f}%" if total_sessions else "0%"
 
-        # 告警：拦截数=0
+        # v1.3.1：告警只在"门禁已接入"时有效——纯 CLI/库直写模式不误报
+        gate_pass, gate_block = self._count_gate_events_today()
+        gate_active = (gate_pass + gate_block) > 0
         alert = ""
-        if total_sessions > 0 and block_count == 0:
-            alert = "\n\n⚠️ 告警：今天有 {} 个任务，但拦截数为0！门禁可能没生效！".format(total_sessions)
+        if total_sessions > 0 and block_count == 0 and gate_active:
+            alert = ("\n\n⚠️ 告警：今天有 {} 个任务，拦截数为0，但门禁有放行记录——"
+                     "拦截可能没生效！".format(total_sessions))
+        elif total_sessions > 0 and not gate_active:
+            alert = ("\n\nℹ️ 提示：今天有 {} 个任务，但无门禁事件——"
+                     "当前为 CLI/纯库直写模式（门禁未接入），拦截=0 属正常直写。".format(total_sessions))
 
         # 生成报告
         report = f"""
@@ -142,10 +184,15 @@ class AuditDashboard:
 
         conn.close()
 
+        # v1.3.1：同 report() 口径——门禁未接入时 alert 不置位
+        gate_pass, gate_block = self._count_gate_events_today()
+        gate_active = (gate_pass + gate_block) > 0
+
         return {
             "total_today": total,
             "read_today": read,
             "write_today": write,
             "block_today": blocks,
-            "alert": total > 0 and blocks == 0,
+            "gate_active": gate_active,
+            "alert": total > 0 and blocks == 0 and gate_active,
         }

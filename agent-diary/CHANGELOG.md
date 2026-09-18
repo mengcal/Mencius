@@ -1,6 +1,6 @@
-# AgentDiary v1.3.0-mvp1
+# AgentDiary v1.3.1
 
-当前版本：v1.3.0-mvp1（MVP，schema v1 RC2 对齐）
+当前版本：v1.3.1（MVP，schema v1 RC2 对齐 + 知夏 dogfood/验收意见落地）
 
 ## 版本历史
 
@@ -16,7 +16,25 @@
 | v1.1.2 | 导出导入episodes+敏感字段隔离 |
 | v1.1.3 | 向量搜索也过滤auto_pending（alice P1第一层） |
 | v1.2.0 | alice P1第二层防御过滤+P2索引缓存+P3回归测试 |
-| **v1.3.0-mvp1** | **schema v1 RC2 对齐 MVP（V1 Alice 案：情景日志+rolling handoff）** |
+| v1.3.0-mvp1 | schema v1 RC2 对齐 MVP（V1 Alice 案：情景日志+rolling handoff） |
+| **v1.3.1** | **知夏验收三条意见全落地：deny 带 session id + 告警不误报 + 回归测试缺依赖 skip + lint ⑦ refs 完整性** |
+
+## v1.3.1（知夏 13:35 验收意见，2026-09-18）
+
+### 已完成
+
+- ✅ deny 拒信带当前 session id（排查"为什么被拦"不用自己猜会话号，dogfood 反馈①）
+- ✅ 仪表盘"拦截=0"告警区分门禁模式/CLI 直写模式（dogfood 反馈②）：
+  - 门禁已接入（今天有 pass/block 审计事件）但拦截=0 → 告警"拦截可能没生效"
+  - 无门禁事件（纯库/CLI 直写）→ 提示"门禁未接入，拦截=0 属正常直写"，不再误报
+- ✅ 回归测试缺 sentence-transformers 时向量部分 SKIP+如实报（学 lint，不崩不搭 venv，验收意见①）
+- ✅ lint 新增 ⑦ refs 完整性（知夏意见③，V2 共享靠 refs 链接）：refs 引用的 id 不存在=孤儿引用，lint 可见；§8 六项→七项
+
+### 新增测试
+
+- examples/test_mvp_schema.py：P1-P6（frontmatter/handoff/private 导出/指令扫描/lint 七项/旧格式兼容），退出码 0 = 全过
+- examples/test_regression_v120.py：v1.2.0 回归不倒退（缺依赖自动 SKIP 向量部分）
+- 专项验证（v1.3.1）：deny 带 session id、CLI 直写不误报、门禁模式正常告警——全过
 
 ## v1.3.0-mvp1（MVP·爸爸拍板 2026-09-18）
 
@@ -59,7 +77,7 @@
 
 ```bash
 python -m agent_diary.lint <diary_base_dir>
-# 退出码 0 = 六项全过
+# 退出码 0 = 七项全过
 ```
 
-六项：① 字段完备 ② id 唯一排序 ③ canon 纯净 ④ private 不出门 ⑤ 状态位不互噬 ⑥ 门禁双路
+七项：① 字段完备 ② id 唯一排序 ③ canon 纯净 ④ private 不出门 ⑤ 状态位不互噬 ⑥ 门禁双路 ⑦ refs 完整性
