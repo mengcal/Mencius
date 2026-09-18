@@ -2,17 +2,18 @@
 """
 AgentDiary — §8 验收标准 lint 工具（机械可判，验收官跑全单的抓手）
 
-schema v1 RC2 §8 六项：
+schema v1 RC2 §8 七项（v1.3.1 加 ⑦ refs 完整性，知夏意见3）：
 1. 字段完备     frontmatter 必填项缺失=0（open_question 可选，V4 决议允许缺失）
 2. id 唯一排序  正则 ^[a-z]+-\\d{8}-\\d{3}$，撞号=0
 3. canon 纯净   confidence=verified 之外条目=0（待审必须带 pending_review 标记，verified 不得带）
 4. private 不出门 导出包含 private 键值=0
 5. 状态位不互噬  三 flag 并发写测试（复现脚本 A 组）通过
 6. 门禁双路     恶意包导入→关键词/向量检索命中=0（复现脚本 B 组）
+7. refs 完整性  refs 引用的 id 必须存在于全库（孤儿引用=0，V2 共享靠 refs）
 
 用法（验收官）：
     python -m agent_diary.lint /abs/path/to/diary
-    退出码 0 = 六项全过；非 0 = 有失败项（逐项打印原因）
+    退出码 0 = 七项全过；非 0 = 有失败项（逐项打印原因）
 """
 
 import os
@@ -284,8 +285,45 @@ def check_gate_dual_path(store: DiaryStore) -> dict:
 # 汇总入口
 # ────────────────────────────────────────────────
 
+def check_refs_integrity(store: DiaryStore) -> dict:
+    """
+    v1.3.1 ⑦ refs 链接完整性（知夏意见3，V2 跨 agent 共享核心机制）：
+    共享全靠 refs 链接，指向不存在的 id = 孤儿引用，lint 必须可见。
+    判据：全库条目（情景日志 frontmatter + 语义知识）id 集合里，
+    所有 refs 引用的 id 都存在，孤儿=0。
+    """
+    # 收集全库条目 id
+    all_ids = set()
+    for _md_stem, entry_id, _fm, _block in _iter_entries(store.episodic_dir):
+        if entry_id:
+            all_ids.add(entry_id)
+    try:
+        conn = sqlite3.connect(store.db_path)
+        c = conn.cursor()
+        c.execute("SELECT id FROM semantic_facts")
+        all_ids.update(r[0] for r in c.fetchall())
+        conn.close()
+    except sqlite3.Error:
+        pass
+
+    orphans = []
+    for _md_stem, entry_id, fm, _block in _iter_entries(store.episodic_dir):
+        if not fm:
+            continue
+        refs_raw = fm.get("refs", "")
+        for rid in re.findall(r"([a-z]+-\d{8}-\d{3})", refs_raw):
+            if rid not in all_ids:
+                orphans.append((entry_id or "?unknown?", rid))
+
+    if orphans:
+        shown = "，".join(f"{a}→{b}" for a, b in orphans[:10])
+        more = f" 等 {len(orphans)} 处" if len(orphans) > 10 else ""
+        return {"pass": False, "detail": f"孤儿 refs：{shown}{more}（V2 共享靠 refs，指向不存在=断链）"}
+    return {"pass": True, "detail": f"全库 {len(all_ids)} 个条目 id，refs 无孤儿引用"}
+
+
 def lint_diary(base_dir: str) -> dict:
-    """跑 §8 六项，返回逐项结果"""
+    """跑 §8 七项（v1.3.1 加 refs 完整性），返回逐项结果"""
     store = DiaryStore(base_dir)
     results = {
         "① 字段完备": check_fields(store),
@@ -294,6 +332,7 @@ def lint_diary(base_dir: str) -> dict:
         "④ private不出门": check_private_export(store),
         "⑤ 状态位不互噬": check_flags_concurrent(store),
         "⑥ 门禁双路": check_gate_dual_path(store),
+        "⑦ refs完整性": check_refs_integrity(store),
     }
     results["_all_pass"] = all(r["pass"] for r in results.values())
     return results
@@ -316,7 +355,7 @@ def main(argv=None):
         print(f"  {mark} {name}: {r['detail']}")
     print("=" * 50)
     if results["_all_pass"]:
-        print("✅ 六项全过——§8 验收单通过")
+        print("✅ 七项全过——§8 验收单通过")
         return 0
     print("❌ 存在失败项，见上（逐项原因）")
     return 1

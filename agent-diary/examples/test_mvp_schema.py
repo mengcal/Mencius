@@ -7,7 +7,7 @@ AgentDiary v1.3.0-mvp1 验收测试（schema v1 RC2 §8 全单 + MVP 功能）
 [P2] handoff rolling 交接（四行模板、各 agent 一份）
 [P3] private 硬约束（导出剔除 private 条目+知识）
 [P4] 导入指令模式扫描（run_command/忽略指令/删除类 → flag 进审计）
-[P5] lint 六项全过（§8 验收单）
+[P5] lint 七项全过（§8 验收单，v1.3.1 加 refs完整性）
 [P6] 旧格式兼容（demo 老调用路径不炸）
 
 跑法：python examples/test_mvp_schema.py
@@ -110,7 +110,7 @@ def main():
         for name, r in results.items():
             if not name.startswith("_"):
                 check(f"lint {name}", r["pass"], r["detail"])
-        check("lint 六项全过", results["_all_pass"])
+        check("lint 七项全过", results["_all_pass"])
 
         print("\n[P6] 旧格式兼容（老 append_episodic 签名仍可用）")
         legacy = store.append_episodic(event="旧调用", lesson="老签名不炸", agent="legacy")
@@ -122,7 +122,7 @@ def main():
         if FAIL:
             print(f"❌ {FAIL} 项失败")
             sys.exit(1)
-        print("✅ v1.3.0-mvp1 验收测试全过（§8 六项 + MVP 功能）！")
+        print("✅ v1.3.1 验收测试全过（§8 七项 + MVP 功能）！")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

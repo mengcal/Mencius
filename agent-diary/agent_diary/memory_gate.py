@@ -103,11 +103,13 @@ class DiaryGate:
             return True
         return False
 
-    def _make_reject_message(self, tool_name: str, reason: str) -> str:
-        """生成带正向出口的拒信"""
+    def _make_reject_message(self, tool_name: str, reason: str, session_id: str = "") -> str:
+        """生成带正向出口的拒信（v1.3.1：带上 session id，排查"为什么被拦"不用自己猜会话号）"""
+        sid_line = f"会话：{session_id}\n" if session_id else ""
         return (
             f"⛔ 记忆门禁拦截：{reason}\n"
             f"工具：{tool_name}\n"
+            f"{sid_line}"
             f"请先调用 read_diary(关键词=本任务描述) 读取相关笔记，再重试本操作。"
         )
 
@@ -143,7 +145,7 @@ class DiaryGate:
                                          reason_code="read_not_done",
                                          note="执行类工具调用前无 read 记录")
                     return False, self._make_reject_message(
-                        tool_name, "调用执行类工具前必须先读笔记"
+                        tool_name, "调用执行类工具前必须先读笔记", session_id
                     )
 
         except Exception as e:
@@ -153,7 +155,8 @@ class DiaryGate:
                 self.store.log_block(session_id, tool_name, f"gate_error_closed: {e}",
                                      reason_code="gate_error_closed",
                                      note=str(e)[:200])
-                return False, f"⛔ 门禁异常（fail-closed）：{e}。请先调用 read_diary 确认上下文。"
+                return False, (f"⛔ 门禁异常（fail-closed）：{e}。"
+                               f"会话：{session_id}\n请先调用 read_diary 确认上下文。")
             else:
                 # fail-open：门禁检查出错了，放行但记一笔
                 self._pass_count += 1
@@ -209,7 +212,7 @@ class DiaryGate:
                                          reason_code="read_not_done",
                                          note="执行类工具调用前无 read 记录")
                     return False, self._make_reject_message(
-                        tool_name, "调用执行类工具前必须先读笔记"
+                        tool_name, "调用执行类工具前必须先读笔记", session_id
                     )
 
         except Exception as e:
@@ -219,7 +222,8 @@ class DiaryGate:
                 self.store.log_block(session_id, tool_name, f"gate_error_closed: {e}",
                                      reason_code="gate_error_closed",
                                      note=str(e)[:200])
-                return False, f"⛔ 门禁异常（fail-closed）：{e}。请先调用 read_diary 确认上下文。"
+                return False, (f"⛔ 门禁异常（fail-closed）：{e}。"
+                               f"会话：{session_id}\n请先调用 read_diary 确认上下文。")
             else:
                 # fail-open：门禁检查出错了，放行但记一笔
                 self._pass_count += 1
