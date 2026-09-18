@@ -29,12 +29,13 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 
 **核心区别：他们防危险，咱们防忘事。**
 
-## 完整功能（当前 v1.2.0）
+## 完整功能（当前 v1.3.0-mvp1）
 
 ### 三层记忆结构
-- **情景日志**：按天记录的原始事件流，带显著性标记
+- **情景日志**：按天记录的原始事件流，schema v1 §2 frontmatter 条目（id/author/kind/significance/private/source/confidence/refs/open_question）
 - **语义知识**：从日志抽象出来的规则、偏好、事实
 - **程序手册**：可复用的工作流、操作指南
+- **rolling handoff**（MVP·V1 Alice 案）：每 agent 一份 handoff.md，冷启动四行模板（在做/卡点/下一步/deadline），动手前第一眼就看它
 
 ### 门禁中间件（六条军规）
 1. 硬拒，不是提醒
@@ -42,13 +43,15 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 3. fail-closed
 4. 拒信带正向出口
 5. 只读白名单
-6. 审计对账
+6. 审计对账（§5 reason_code 稳定枚举 + JSONL 事件流）
 
-### MCP Server 12个工具
+### MCP Server 14个工具
 | 工具 | 功能 |
 |---|---|
 | read_diary | 读笔记 |
-| write_diary | 写日志 |
+| write_diary | 写日志（frontmatter 条目） |
+| read_handoff | 读 rolling 交接（MVP 新增） |
+| update_handoff | 更新 rolling 交接（MVP 新增） |
 | gate_check | 收工前问一声 |
 | diary_dashboard | 审计仪表盘 |
 | diary_stats | 统计信息 |
@@ -58,7 +61,7 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 | promote_fact | 晋升待审知识 |
 | reject_fact | 删除待审知识 |
 | export_diary | 导出日记包 |
-| import_diary | 导入别人的日记包 |
+| import_diary | 导入别人的日记包（指令模式扫描打 flag） |
 
 ### 三个宿主适配器
 - **LangGraph版**：中间件类，双钩（同步+异步）
@@ -75,12 +78,24 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 
 ## 格式标准（schema v1）
 
-智能体日记的**格式标准**正在全家投票中（草案 RC1 已入库，09-17 晚收票、09-20 定稿）：
+智能体日记的**格式标准**：RC2 已按回票归纳（09-17 23:00 收票，若若五票全回），1.0 定稿外沿 09-20。
 
-- 草案：`docs/schema-v1-draft.md`
+- 草案（RC2）：`docs/schema-v1-draft.md`
 - 框架讨论轮输入：`docs/FRAMEWORK-2026-09-16.md`
+- 差距分析与 MVP 改动清单：`docs/gap-analysis-schema-rc1-v120.md`
 
-**MVP 动工等爸爸拍板**（Cora 规矩）——格式标准只定"长什么样"，代码在拍板后动。
+**MVP 已由爸爸拍板（2026-09-18）动工**——范围 = V1 Alice 案：情景日志 + rolling handoff，语义提取缓上。
+
+## 验收（schema v1 §8 全单）
+
+验收官跑单工具（六项机械判据）：
+
+```bash
+python -m agent_diary.lint <diary_base_dir>
+# 退出码 0 = 六项全过
+```
+
+六项：① 字段完备 ② id 唯一排序 ③ canon 纯净 ④ private 不出门 ⑤ 状态位不互噬 ⑥ 门禁双路
 
 ## 快速开始
 

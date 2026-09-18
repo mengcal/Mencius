@@ -19,6 +19,8 @@ from fastmcp import FastMCP
 from .store import DiaryStore
 from .memory_gate import DiaryGate
 from .dashboard import AuditDashboard
+from .handoff import DiaryHandoff
+from .tools import _resolve_author
 
 # 创建MCP实例
 mcp = FastMCP("agent-diary")
@@ -107,19 +109,29 @@ def write_diary(
     context: str = "",
     agent: str = "unknown",
     session_id: str = "",  # v0.8必改：必填，不给默认值
+    kind: str = "lesson",
+    private: bool = False,
+    refs: str = "",        # 逗号分隔的关联条目 id 列表
+    open_question: str = "",
+    source_origin: str = "",
 ) -> str:
     """
-    写日志——记录本次任务的事件和教训
+    写日志——记录本次任务的事件和教训（schema v1 §2 frontmatter）
 
     任务完成必须调这个！不然门禁判"未完成"。
 
     Args:
         event: 发生了什么事？
-        lesson: 学到了什么教训？
+        lesson: 学到了什么教训/为什么（理由原文保留）
         significance: 显著性级别 critical/important/normal
         context: 当时的上下文
-        agent: 哪个智能体写的
+        agent: 哪个智能体写的（AGENT_DIARY_AUTHOR 派生优先，自报降权）
         session_id: 【必填】当前会话ID
+        kind: lesson|decision|pitfall|rule|promise|question
+        private: true=永不进共享层/导出/巩固（三关全跳）
+        refs: 关联条目 id，逗号分隔
+        open_question: 悬念字段（可选，V4 决议）
+        source_origin: 来源原文（默认空=本次会话直接产生）
 
     Returns:
         写入结果
@@ -130,15 +142,23 @@ def write_diary(
     if store is None:
         init_diary()
 
+    author = _resolve_author(agent)
+    refs_list = [r.strip() for r in refs.split(",") if r.strip()] if refs else []
     path = store.append_episodic(
         event=event,
         lesson=lesson,
         significance=significance,
         context=context,
-        agent=agent,
+        agent=author,
+        kind=kind,
+        private=private,
+        refs=refs_list,
+        open_question=open_question,
+        source_channel="session",
+        source_origin=source_origin,
     )
 
-    # 如果是critical/important级别，自动提取成语义知识
+    # 如果是critical/important级别，自动提取成语义知识（private 同步隔离）
     fact_id = None
     if significance in ("critical", "important"):
         fact_id = store.add_semantic_fact(
@@ -146,7 +166,8 @@ def write_diary(
             fact=lesson,
             fact_type=significance,
             source=path,
-            agent=agent,
+            agent=author,
+            private=private,
         )
 
     # 自动打标记
@@ -157,6 +178,72 @@ def write_diary(
         result += f"\n📚 语义知识已提取: {fact_id}"
 
     return result
+
+
+@mcp.tool()
+def read_handoff(agent: str = "", session_id: str = "") -> str:
+    """
+    MVP（V1 Alice 案）: 读本 agent 的 rolling 交接摘要（冷启动置顶四行）
+
+    在做 / 卡点 / 下一步 / deadline——动手前第一眼就看它。
+    调用后同样打已读标记（has_read_diary=1，门禁前置判据）。
+
+    Args:
+        agent: 哪个智能体（默认取 AGENT_DIARY_AUTHOR）
+        session_id: 【必填】当前会话ID
+
+    Returns:
+        handoff 全文
+    """
+    if not session_id:
+        return "❌ 错误：session_id 是必填参数！"
+
+    if store is None:
+        init_diary()
+
+    agent = _resolve_author(agent)
+    handoff = DiaryHandoff(store, agent=agent)
+    store.mark_read_diary(session_id)
+    return handoff.read()
+
+
+@mcp.tool()
+def update_handoff(
+    doing: str = "",
+    blocked: str = "",
+    next_step: str = "",
+    deadline: str = "",
+    note: str = "",
+    agent: str = "unknown",
+    session_id: str = "",
+) -> str:
+    """
+    MVP（V1 Alice 案）: 覆盖更新本 agent 的 rolling 交接摘要
+
+    每关键节点覆盖更新（rolling），冷启动四行固定模板：在做/卡点/下一步/deadline。
+
+    Args:
+        doing: 在做
+        blocked: 卡点（无则写"无"）
+        next_step: 下一步
+        deadline: 截止（建议日期）
+        note: 交接备注（可选）
+        agent: 哪个智能体（AGENT_DIARY_AUTHOR 派生优先）
+        session_id: 【必填】当前会话ID
+
+    Returns:
+        更新后的 handoff 全文
+    """
+    if not session_id:
+        return "❌ 错误：session_id 是必填参数！"
+
+    if store is None:
+        init_diary()
+
+    author = _resolve_author(agent)
+    handoff = DiaryHandoff(store, agent=author)
+    return handoff.update(doing=doing, blocked=blocked, next_step=next_step,
+                          deadline=deadline, note=note)
 
 
 @mcp.tool()

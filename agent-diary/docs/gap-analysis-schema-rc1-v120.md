@@ -1,8 +1,8 @@
 # AgentDiary schema v1 ↔ v1.2.0 差距分析（MVP 动代码前置）
 
 > 分析人：若若 · 2026-09-18
-> 输入：docs/schema-v1-draft.md（RC1，含全家投票意见）+ v1.2.0 全量源码通读
-> 状态：MVP 已由爸爸拍板开工；**本清单以 RC1 为基准，RC2 定稿一到即对齐，冲突处以 RC2 为准**
+> 输入：docs/schema-v1-draft.md（RC2，票果已落）+ v1.2.0 全量源码通读
+> 状态：MVP 已由爸爸拍板开工；**本清单已对齐 RC2（022ea19），冲突处已按 RC2 修正**
 > 用途：给验收官跑 §8 全单当判据，给知夏核对 RC2 覆盖面
 
 ## 判定等级
@@ -36,6 +36,7 @@
 | author=写入侧盖章（server 端派生优先） | agent 是 write_diary 手写参数 | 可伪造，无派生盖章 | **P0** |
 | significance：critical/important/normal | 有（emoji+文本） | 对齐 | — |
 | private: false 结构化键 | 无该键；导出面用 `tags NOT LIKE '%private%'` 子串匹配 | 非结构化，易漏 | **P0** |
+| open_question（V4 决议：埋但可选非必填，lint 允许缺失） | 无 | 需埋字段 | **P0（字段埋入，lint 不强制）** |
 
 > 这是 §8 验收第 1、2 项（字段完备 / id 唯一可排序）的直接判据面，MVP 必须落地。
 
@@ -101,22 +102,25 @@
 
 ---
 
-## MVP 改动清单（P0 汇总，RC2 一到即对齐执行）
+## MVP 改动清单（P0 汇总 · 已按 RC2 V1-V5 决议收敛）
 
-1. **条目 frontmatter 结构化**：write 侧落 id（`^[a-z]+-\d{8}-\d{3}$`）/author（写入侧派生盖章）/kind/significance/private/source/confidence/refs
-2. **handoff.md**：rolling 交接 + 冷启动四行固定模板（在做/卡点/下一步/deadline），每 agent 一份
+**范围 = V1 Alice 案：第一周只做情景日志 + rolling handoff，语义提取缓上。**
+
+1. **条目 frontmatter 结构化**：write 侧落 id（`^[a-z]+-\d{8}-\d{3}$`）/author（写入侧派生盖章）/kind/significance/private/source/confidence/refs/open_question（V4：埋但可选）
+2. **handoff.md**：rolling 交接 + 冷启动四行固定模板（在做/卡点/下一步/deadline），每 agent 一份（V2 决议，不合写）
 3. **private 硬约束**：结构化键 + 巩固/晋升/导出三关全跳 + 导出 lint 扫 private=0
 4. **导入指令模式扫描**：run_command/忽略指令/删除类正则，命中打 flag 进审计
 5. **lint 工具**：实现 §8 六项机械判据，验收官直接可跑
 6. **审计事件**：JSONL 事件流（拦截/放行/晋升）+ reason_code 稳定枚举 + gate_version
 7. **门禁执行类判定**：子串推断兜底记日志（对齐 §4）
-8. **状态机补 superseded**：被新条目取代时留原文+指向新 id（视 RC2 是否进 MVP）
 
-## 明确不在 MVP（待 RC2 确认）
+**RC2 决议影响**：V3（skill:名字 指针语法）与 V5（定名）不涉及本批代码改动，随 1.0 定稿入库；superseded 状态机（§3）不进本批（决策考古后置，P1）。
+
+## 明确不在 MVP（RC2 确认）
 
 - 按月文件/agent 目录层/raw jsonl 缓冲（§1 结构债，P1 后置）
 - canon 200 条向量阈值开关（数据量未到，P1）
 - skills.md 指针表（P2）
 - 语义提取（V1 Alice 案：语义提取缓上，第一周只做情景日志+rolling handoff）
 
-—— 若若（2026-09-18，MVP 开工前置产物；RC2 到后本文件升 RC2 对齐版）
+—— 若若（2026-09-18，MVP 开工前置产物；已对齐 RC2 022ea19）

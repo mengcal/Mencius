@@ -1,6 +1,6 @@
-# AgentDiary v1.2.0
+# AgentDiary v1.3.0-mvp1
 
-当前版本：v1.2.0
+当前版本：v1.3.0-mvp1（MVP，schema v1 RC2 对齐）
 
 ## 版本历史
 
@@ -16,29 +16,50 @@
 | v1.1.2 | 导出导入episodes+敏感字段隔离 |
 | v1.1.3 | 向量搜索也过滤auto_pending（alice P1第一层） |
 | v1.2.0 | alice P1第二层防御过滤+P2索引缓存+P3回归测试 |
+| **v1.3.0-mvp1** | **schema v1 RC2 对齐 MVP（V1 Alice 案：情景日志+rolling handoff）** |
 
-## 已完成
+## v1.3.0-mvp1（MVP·爸爸拍板 2026-09-18）
 
-- ✅ 三层存储（情景/语义/程序）
-- ✅ 门禁中间件（六条军规）
-- ✅ MCP Server 12个工具
-- ✅ 三个宿主适配器（LangGraph/Claude真实协议/通用）
-- ✅ 审计仪表盘
-- ✅ 向量语义搜索
-- ✅ 自动巩固+晋升流
-- ✅ 导出导入（含episodes）
-- ✅ 敏感字段隔离（private标记不导出）
-- ✅ issue#5四个bug全修
-- ✅ v1.1.3 向量路径过滤auto_pending（第一层：build_index SQL过滤）
-- ✅ v1.2.0 向量路径过滤auto_pending（第二层：search返回前按id回查confidence）
-- ✅ v1.2.0 索引内容指纹缓存（内容没变不重建，省encode）
-- ✅ v1.2.0 回归测试 examples/test_regression_v120.py（P1/P2防回归）
+### 已完成（对齐 schema v1 RC2）
 
-## 待做
+- ✅ 情景日志条目 frontmatter 结构化：id/author/kind/significance/private/source/confidence/refs/open_question
+- ✅ id 生成器（agent-YYYYMMDD-NNN，正则 `^[a-z]+-\d{8}-\d{3}$` 可判，撞号=0）
+- ✅ author 写入侧盖章（AGENT_DIARY_AUTHOR 派生优先，客户端自报降权）
+- ✅ handoff.md rolling 交接（各 agent 一份，冷启动四行模板：在做/卡点/下一步/deadline）
+- ✅ private 硬约束：结构化键 + 巩固/晋升/导出三关全跳 + 导出剔除 private 条目
+- ✅ 导入指令模式扫描（run_command/忽略指令/删除类正则），命中打 flag 进审计
+- ✅ lint 工具（`python -m agent_diary.lint <dir>`）：§8 六项机械判据，验收官跑全单
+- ✅ 审计 reason_code 稳定枚举 + JSONL 事件流（audit/events.jsonl：拦截/放行/晋升/导入）
+- ✅ 门禁子串推断兜底记日志（§4 issue #3 对齐）
+- ✅ MCP 新增 read_handoff / update_handoff 工具（14 个工具）
 
+### 顺手修的既有 bug
+
+- 🔧 search_semantic_facts：critical 无条件 +3 分导致**无关键词命中也返回**——显著性加权移到命中判据之后（MVP 测试暴露）
+
+### 新增测试
+
+- examples/test_mvp_schema.py：P1-P6（frontmatter/handoff/private 导出/指令扫描/lint 六项/旧格式兼容），退出码 0 = 全过
+- examples/test_regression_v120.py：v1.2.0 回归不倒退（全过）
+
+## 待做（MVP 后，P1/P2 后置）
+
+- [ ] 按月文件 / agent 目录层 / raw jsonl 缓冲（§1 结构债）
+- [ ] canon 200 条向量阈值开关（数据量未到）
+- [ ] skills.md L3 指针表（V3：skill:名字 语法，1.0 定稿随行）
+- [ ] superseded 状态机（决策考古）
+- [ ] 语义提取（V1 Alice 案：缓上）
 - [ ] 智能搜索（向量+关键词合一）
 - [ ] 自动巩固定时触发
 - [ ] 多智能体共享冲突处理
-- [ ] 导入episodes的"待审"概念（alice P2建议：至少来源可筛）
 - [ ] cursor适配器
 - [ ] 更多宿主支持
+
+## 验收（§8 全单，验收官跑）
+
+```bash
+python -m agent_diary.lint <diary_base_dir>
+# 退出码 0 = 六项全过
+```
+
+六项：① 字段完备 ② id 唯一排序 ③ canon 纯净 ④ private 不出门 ⑤ 状态位不互噬 ⑥ 门禁双路
