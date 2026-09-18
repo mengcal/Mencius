@@ -1,15 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-AgentDiary 导出导入 v1.4.0
+AgentDiary 导出导入 v1.4.0（MVP·schema v1 §6 对齐）
 
 把自己的日记导出成一个包，别人能导入
 姐妹们互相分享经验！
+
+§6 信任与隐私硬边界（MVP 落地）：
+- private 三关全跳：导出过滤 private 键值（结构化列 + tags 子串双保险）
+- 导入包一律压 pending + 指令模式扫描（run_command/忽略指令/删除类正则），命中打 flag 进审计
 """
 
+import re
 import json
 import shutil
 from pathlib import Path
 from datetime import datetime
+
+from .store import REASON_CODES, GATE_VERSION
+
+# §6 指令模式扫描（与 lint.py 同源：run_command/忽略指令/删除类）
+INSTRUCTION_PATTERNS = [
+    re.compile(r"run_command|execute_bash|subprocess|os\.system|Popen", re.I),
+    re.compile(r"忽略\s*(之前|以上|前面).{0,6}(指令|命令|提示)|ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?)", re.I),
+    re.compile(r"(删除|删掉|清除|移除)\s*(所有|全部|一切)?\s*(文件|记录|日志|历史|数据)", re.I),
+]
 
 
 class DiaryExporter:
@@ -30,9 +44,11 @@ class DiaryExporter:
         导出日记成JSON包
 
         包含：
-        - 语义知识（semantic_facts）
-        - 最近情景日志（最近7天）
+        - 语义知识（semantic_facts，private 已过滤）
+        - 最近情景日志（最近7天，private: true 条目已剔除）
         - 元信息（agent名、导出时间）
+
+        §8 判据面：导出包含 private 键值=0（lint 第④项复核）
         """
         data = {
             "meta": {
@@ -44,22 +60,29 @@ class DiaryExporter:
             "episodes": [],
         }
 
-        # 导出语义知识（敏感字段隔离：默认不导private的）
+        # 导出语义知识（§6 敏感字段隔离：结构化 private 列 + tags 子串双保险）
         import sqlite3
         conn = sqlite3.connect(self.store.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        # 敏感字段隔离：默认过滤private的知识，防止家事外泄
-        c.execute("SELECT * FROM semantic_facts WHERE tags NOT LIKE '%private%'")
+        c.execute("SELECT * FROM semantic_facts WHERE private = 0 AND tags NOT LIKE '%private%'")
         for row in c.fetchall():
             data["semantic_facts"].append(dict(row))
         conn.close()
 
-        # 导出最近7天情景日志
+        # 导出最近7天情景日志（剔除 private: true 条目块，§6 三关全跳）
         episodic_dir = self.store.episodic_dir
         if episodic_dir.exists():
             for md_file in sorted(episodic_dir.glob("*.md"), reverse=True)[:7]:
                 content = md_file.read_text(encoding="utf-8")
+                # 按条目块切分（兼容旧 ## 与新版 <!-- entry:），剔除 private: true 块
+                blocks = re.split(r'\n(?=## |<!-- entry:)', content)
+                clean_blocks = []
+                for b in blocks:
+                    if re.search(r"private:\s*true", b):
+                        continue
+                    clean_blocks.append(b)
+                content = "\n".join(clean_blocks)
                 data["episodes"].append({
                     "date": md_file.stem,
                     "content": content,
@@ -90,11 +113,18 @@ class DiaryImporter:
         """
         导入日记包
 
+        §6 硬边界（MVP）：
+        - 导入一律压 auto_pending（bug1 修复，不继承包内 confidence）
+        - 指令模式扫描（run_command/忽略指令/删除类正则），命中打 flag 进审计
+        - private 条目按包内标记继承（导入后仍在 pending，不进读侧）
+
         Args:
             input_path: 导出文件路径
             as_shared: 导入的知识标记为"shared"（别人分享的），不是自己的
         """
         data = json.loads(Path(input_path).read_text(encoding="utf-8"))
+        source_agent = data["meta"].get("agent", "unknown")
+        flags = []  # §6 指令模式命中 flag
 
         imported = 0
         for fact in data["semantic_facts"]:
@@ -111,9 +141,10 @@ class DiaryImporter:
 
             if count == 0:
                 # 导入的知识标记来源
-                source = f"shared_from_{data['meta']['agent']}" if as_shared else fact.get("source", "")
+                source = f"shared_from_{source_agent}" if as_shared else fact.get("source", "")
                 # bug1修复：导入一律压成auto_pending，不继承包里的confidence
                 # 防止恶意包自封verified
+                fact_private = bool(fact.get("private")) or "private" in (fact.get("tags") or [])
                 self.store.add_semantic_fact(
                     title=fact["title"],
                     fact=fact["fact"],
@@ -122,8 +153,22 @@ class DiaryImporter:
                     agent=fact.get("agent", "unknown"),
                     confidence="auto_pending",  # 导入=待审，看过才转正
                     tags=["imported", "pending_review"],
+                    private=fact_private,
                 )
                 imported += 1
+
+                # §6 指令模式扫描：命中打 flag（不拒收，但记账——聚簇报警靠审计）
+                blob = json.dumps(fact, ensure_ascii=False)
+                for pat in INSTRUCTION_PATTERNS:
+                    if pat.search(blob):
+                        flags.append({"id": fact.get("id", "?"), "pattern": pat.pattern})
+                        self.store.append_audit_event(
+                            "import", f"fact:{fact.get('id', '?')}", "import_pending",
+                            "import_pending",
+                            f"指令模式命中: {pat.pattern}",
+                            GATE_VERSION,
+                        )
+                        break
 
         # 导入episodes日志
         episodes_imported = 0
@@ -139,12 +184,13 @@ class DiaryImporter:
                 if not target_file.exists():
                     # 新文件，写入
                     target_file.write_text(
-                        f"<!-- imported from {data['meta']['agent']} -->\n{content}",
+                        f"<!-- imported from {source_agent} -->\n{content}",
                         encoding="utf-8"
                     )
                     episodes_imported += 1
 
-        return f"✅ 导入完成！从{data['meta']['agent']}导入了 {imported} 条知识 + {episodes_imported} 天日志"
+        flag_note = f"，指令模式命中 {len(flags)} 处已打 flag" if flags else ""
+        return f"✅ 导入完成！从{source_agent}导入了 {imported} 条知识 + {episodes_imported} 天日志{flag_note}"
 
 
 if __name__ == "__main__":

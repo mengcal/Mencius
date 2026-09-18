@@ -12,7 +12,7 @@ AgentDiary — 门禁中间件 v0.2
 """
 
 from typing import Any, Callable, Optional, Awaitable
-from .store import DiaryStore
+from .store import DiaryStore, REASON_CODES, GATE_VERSION
 
 
 class DiaryGate:
@@ -78,21 +78,30 @@ class DiaryGate:
         return tool_name in self.SAFE_LIST
 
     def is_execution_tool(self, tool_name: str) -> bool:
-        """判断是不是执行类工具（v0.9.1修：大小写不敏感）"""
+        """
+        判断是不是执行类工具（§4：精确匹配+显式登记表，子串推断只当兜底并记日志）
+
+        v0.9.1 起大小写不敏感；MVP 起子串兜底命中会落一行审计（note 标 substring_match）。
+        """
         if self.is_safe_tool(tool_name):
             return False
 
         tool_lower = tool_name.lower()
+        exec_lower = [t.lower() for t in self.execution_tools]
 
-        # 精确匹配
-        if tool_lower in [t.lower() for t in self.execution_tools]:
+        # 精确匹配（显式登记表，主判定）
+        if tool_lower in exec_lower:
             return True
 
-        # 模糊匹配
-        return any(
-            exec_tool.lower() in tool_lower
-            for exec_tool in self.execution_tools
-        )
+        # 子串推断（只当兜底，并记日志——§4 issue #3 教训）
+        hit = [t for t in exec_lower if t in tool_lower]
+        if hit:
+            self.store.append_audit_event(
+                "gate", tool_name, "pass", "",
+                f"substring_match: '{tool_lower}' 命中兜底 '{hit[0]}'", GATE_VERSION,
+            )
+            return True
+        return False
 
     def _make_reject_message(self, tool_name: str, reason: str) -> str:
         """生成带正向出口的拒信"""
@@ -130,7 +139,9 @@ class DiaryGate:
             if self.read_before_execute:
                 if not self.store.has_read_diary(session_id):
                     self._block_count += 1
-                    self.store.log_block(session_id, tool_name, "read_not_done")
+                    self.store.log_block(session_id, tool_name, "read_not_done",
+                                         reason_code="read_not_done",
+                                         note="执行类工具调用前无 read 记录")
                     return False, self._make_reject_message(
                         tool_name, "调用执行类工具前必须先读笔记"
                     )
@@ -139,6 +150,9 @@ class DiaryGate:
             # 门禁自己的检查出错了
             if self.fail_closed:
                 self._block_count += 1
+                self.store.log_block(session_id, tool_name, f"gate_error_closed: {e}",
+                                     reason_code="gate_error_closed",
+                                     note=str(e)[:200])
                 return False, f"⛔ 门禁异常（fail-closed）：{e}。请先调用 read_diary 确认上下文。"
             else:
                 # fail-open：门禁检查出错了，放行但记一笔
@@ -150,6 +164,15 @@ class DiaryGate:
         # 执行工具（v0.6修复：handler的异常不被门禁catch，直接抛出）
         result = handler(request)
         self._pass_count += 1
+
+        # §5 放行审计：execution 放行落一行（旁路证据制——execution 放行但无 read 记 bypass_suspect）
+        if not self.store.has_read_diary(session_id):
+            self.store.append_audit_event(
+                session_id, tool_name, "pass", "bypass_suspect",
+                "execution 放行但 session 无 read 记录", GATE_VERSION)
+        else:
+            self.store.append_audit_event(
+                session_id, tool_name, "pass", "", "", GATE_VERSION)
 
         # 后置门禁：标记欠一条日志
         if self.write_after_task:
@@ -182,7 +205,9 @@ class DiaryGate:
             if self.read_before_execute:
                 if not self.store.has_read_diary(session_id):
                     self._block_count += 1
-                    self.store.log_block(session_id, tool_name, "read_not_done")
+                    self.store.log_block(session_id, tool_name, "read_not_done",
+                                         reason_code="read_not_done",
+                                         note="执行类工具调用前无 read 记录")
                     return False, self._make_reject_message(
                         tool_name, "调用执行类工具前必须先读笔记"
                     )
@@ -191,6 +216,9 @@ class DiaryGate:
             # 门禁自己的检查出错了
             if self.fail_closed:
                 self._block_count += 1
+                self.store.log_block(session_id, tool_name, f"gate_error_closed: {e}",
+                                     reason_code="gate_error_closed",
+                                     note=str(e)[:200])
                 return False, f"⛔ 门禁异常（fail-closed）：{e}。请先调用 read_diary 确认上下文。"
             else:
                 # fail-open：门禁检查出错了，放行但记一笔
@@ -200,6 +228,15 @@ class DiaryGate:
         # 执行工具（v0.6修复：handler的异常不被门禁catch，直接抛出）
         result = await handler(request)
         self._pass_count += 1
+
+        # §5 放行审计（旁路证据制）
+        if not self.store.has_read_diary(session_id):
+            self.store.append_audit_event(
+                session_id, tool_name, "pass", "bypass_suspect",
+                "execution 放行但 session 无 read 记录", GATE_VERSION)
+        else:
+            self.store.append_audit_event(
+                session_id, tool_name, "pass", "", "", GATE_VERSION)
 
         # 后置门禁：标记欠一条日志
         if self.write_after_task:
@@ -245,6 +282,10 @@ class DiaryGate:
         if self.store.has_written_diary(session_id):
             return True, "已写日志，放行"
 
+        # §5：收工判定不过 = log_not_done，落审计（reason_code 枚举）
+        self.store.append_audit_event(
+            session_id, "gate_check", "block", "log_not_done",
+            "task_started 后未 write，收工判定不过", GATE_VERSION)
         return False, (
             "任务完成后必须写工作日志（调用 write_diary）。"
             "写日志才算完成，不然不算完。"
