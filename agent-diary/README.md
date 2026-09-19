@@ -29,7 +29,7 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 
 **核心区别：他们防危险，咱们防忘事。**
 
-## 完整功能（当前 v1.3.1）
+## 完整功能（当前 v1.3.2）
 
 ### 三层记忆结构
 - **情景日志**：按天记录的原始事件流，schema v1 §2 frontmatter 条目（id/author/kind/significance/private/source/confidence/refs/open_question）

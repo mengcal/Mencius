@@ -114,9 +114,48 @@ def main():
 
         print("\n[P6] 旧格式兼容（老 append_episodic 签名仍可用）")
         legacy = store.append_episodic(event="旧调用", lesson="老签名不炸", agent="legacy")
-        check("旧签名调用成功", "2026" in legacy)
+        # v1.3.2：append 返回条目 id（refs 引用语义），不再是文件路径
+        check("旧签名调用成功（返回 id）",
+              bool(re.match(r"^[a-z]+-\d{8}-\d{3}$", legacy)), legacy)
         search_ok = store.search_episodic("旧调用", days=1)
         check("旧格式可被搜索", len(search_ok) > 0)
+
+        print("\n[P7] refs 链接完整性（issue #8 判据：断链 error/格式 error/superseded warning）")
+        from agent_diary.lint import check_refs_integrity
+        # 1. 断链：A→ref 不存在的 id → error
+        store.append_episodic(
+            event="引用断链", lesson="指向不存在的条目", agent="lyra",
+            refs=["lyra-20990101-999"],
+        )
+        r = check_refs_integrity(store)
+        check("P7-1 断链报 error", r["pass"] is False and "断链=1" in r["detail"], r["detail"])
+        # 2. 格式不合规 → error（复用 §8 ② 正则，不另立）
+        store.append_episodic(
+            event="格式错引用", lesson="ref 不匹配正则", agent="lyra",
+            refs=["NOT-A-VALID-ID"],
+        )
+        r = check_refs_integrity(store)
+        check("P7-2 格式不合规报 error", r["pass"] is False and "格式不合规" in r["detail"], r["detail"])
+        # 3. 存在即过：干净目录写 B 存在 + A→ref B → 断链=0
+        store3 = DiaryStore(os.path.join(tmp, "p7_ok"))
+        b_id = store3.append_episodic(event="B 存在", lesson="被引用方", agent="lyra")
+        store3.append_episodic(
+            event="A 引用 B", lesson="引用存在的条目", agent="lyra", refs=[b_id],
+        )
+        r3 = check_refs_integrity(store3)
+        check("P7-3 引用存在→过（断链=0）", r3["pass"] is True, r3["detail"])
+        # 4. 指向 superseded → warning +1，error 仍 0
+        store4 = DiaryStore(os.path.join(tmp, "p7_sup"))
+        s_id = store4.append_episodic(
+            event="旧条目", lesson="将转 superseded", agent="lyra", confidence="superseded",
+        )
+        store4.append_episodic(
+            event="A 引用旧条目", lesson="指向 superseded", agent="lyra", refs=[s_id],
+        )
+        r4 = check_refs_integrity(store4)
+        check("P7-4 superseded 引用→warning 不算 error",
+              r4["pass"] is True and "warning" in r4["detail"] and "断链=0" in r4["detail"],
+              r4["detail"])
 
         print(f"\n{'=' * 50}")
         if FAIL:

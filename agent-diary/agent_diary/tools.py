@@ -127,7 +127,7 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate, session_id: str = "defa
             写入结果
         """
         author = _resolve_author(agent)
-        path = store.append_episodic(
+        entry_id = store.append_episodic(
             event=event,
             lesson=lesson,
             significance=significance,
@@ -140,6 +140,9 @@ def make_diary_tools(store: DiaryStore, gate: DiaryGate, session_id: str = "defa
             source_channel="session",
             source_origin=source_origin,
         )
+        # v1.3.2：append 返回 id（refs 引用语义）；path 供 source/展示用
+        from datetime import datetime as _dt
+        path = str(store.get_episodic_path(_dt.now().strftime("%Y-%m-%d")))
 
         # 如果是critical/important级别，自动提取成语义知识
         if significance in ("critical", "important"):
