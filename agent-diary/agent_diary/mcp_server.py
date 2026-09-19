@@ -144,7 +144,7 @@ def write_diary(
 
     author = _resolve_author(agent)
     refs_list = [r.strip() for r in refs.split(",") if r.strip()] if refs else []
-    path = store.append_episodic(
+    entry_id = store.append_episodic(
         event=event,
         lesson=lesson,
         significance=significance,
@@ -157,6 +157,9 @@ def write_diary(
         source_channel="session",
         source_origin=source_origin,
     )
+    # v1.3.2：append 返回 id（refs 引用语义）；path 供 source/展示用
+    from datetime import datetime as _dt
+    path = str(store.get_episodic_path(_dt.now().strftime("%Y-%m-%d")))
 
     # 如果是critical/important级别，自动提取成语义知识（private 同步隔离）
     fact_id = None

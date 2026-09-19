@@ -176,7 +176,7 @@ class DiaryStore:
             confidence: verified=本人写入；auto_pending=机器提名/导入（不许直写 canon）
 
         Returns:
-            条目文件路径
+            条目 id（lyra-YYYYMMDD-NNN；v1.3.2 起返回 id 供 refs 引用，需路径用 get_episodic_path）
         """
         date = datetime.now().strftime("%Y-%m-%d")
         path = self.get_episodic_path(date)
@@ -217,7 +217,9 @@ open_question: "{open_question}"
         with open(path, "a", encoding="utf-8") as f:
             f.write(entry)
 
-        return str(path)
+        # v1.3.2 修复：返回条目 id（refs 引用语义）——此前返回文件路径，
+        # 调用方拿不到 id 就写不出正确 refs（V2 共享靠 refs 链接，P7 暴露）
+        return entry_id
 
     def read_recent_episodic(self, days: int = 3) -> str:
         """读取最近N天的情景日志摘要"""

@@ -1,6 +1,6 @@
-# AgentDiary v1.3.1
+# AgentDiary v1.3.2
 
-当前版本：v1.3.1（MVP，schema v1 RC2 对齐 + 知夏 dogfood/验收意见落地）
+当前版本：v1.3.2（MVP，schema v1 RC2 对齐 + refs-lint ⑦ 判据定稿落地）
 
 ## 版本历史
 
@@ -17,7 +17,27 @@
 | v1.1.3 | 向量搜索也过滤auto_pending（alice P1第一层） |
 | v1.2.0 | alice P1第二层防御过滤+P2索引缓存+P3回归测试 |
 | v1.3.0-mvp1 | schema v1 RC2 对齐 MVP（V1 Alice 案：情景日志+rolling handoff） |
-| **v1.3.1** | **知夏验收三条意见全落地：deny 带 session id + 告警不误报 + 回归测试缺依赖 skip + lint ⑦ refs 完整性** |
+| v1.3.1 | 知夏验收三条意见全落地：deny 带 session id + 告警不误报 + 回归测试缺依赖 skip + lint ⑦ refs 完整性 |
+| **v1.3.2** | **refs-lint ⑦ 判据定稿（issue #8 评估落地：格式 error/断链 error/superseded warning）+ 修 append_episodic 返回 id（refs 引用链路）+ P7 验收测试** |
+
+## v1.3.2（知夏 issue #8 提案评估定稿，2026-09-19）
+
+### 已完成
+
+- ✅ lint ⑦ 完整对齐 issue #8 判据（v1.3.1 只查孤儿引用，本次按知夏口径定稿）：
+  - 存在性：ref 指向的 id 必须在全库 id 全集（episodic + canon + pending 都算，pending 可引用）
+  - 格式：严格匹配 `^[a-z]+-\d{8}-\d{3}$`（复用 §8 ② 同一正则，不另立），不匹配 = error
+  - 前缀：全小写；不做 agent 前缀白名单——悬空就是悬空，谁的都算断
+  - superseded 被引用 = warning（历史考古合法），不算 error
+  - 输出：`refs 断链=N（error）+ 指向 superseded=M（warning）`，N=0 才算过
+- ✅ **修 append_episodic 返回条目 id**（P7 暴露的隐藏 bug）：此前返回文件路径，调用方拿不到 id 就写不出正确 refs——V2 共享靠 refs 链接，这是断链源头；mcp_server/tools 改用 get_episodic_path 补路径（source/展示用）
+- ✅ 验收测试补 P7（issue #8 要求）：断链 error / 格式 error / 存在即过 / superseded warning 四项全过
+- ✅ superseded 状态机未实现（待做），lint ⑦ 按 confidence='superseded' 预留判定
+
+### 新增测试
+
+- examples/test_mvp_schema.py：P1-P7（P7=refs 链接完整性四场景），退出码 0 = 全过
+- examples/test_regression_v120.py：v1.2.0 回归不倒退（缺依赖自动 SKIP 向量部分）
 
 ## v1.3.1（知夏 13:35 验收意见，2026-09-18）
 

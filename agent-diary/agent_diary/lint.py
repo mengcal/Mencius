@@ -285,41 +285,72 @@ def check_gate_dual_path(store: DiaryStore) -> dict:
 # 汇总入口
 # ────────────────────────────────────────────────
 
+def _split_refs(refs_raw: str) -> list:
+    """解析 frontmatter refs 字段（`[a, b]` / `[a]` / 空）为 id token 列表"""
+    s = (refs_raw or "").strip().strip("[]").strip()
+    if not s:
+        return []
+    return [t.strip().strip('"\'') for t in re.split(r"[\s,，]+", s) if t.strip()]
+
+
 def check_refs_integrity(store: DiaryStore) -> dict:
     """
-    v1.3.1 ⑦ refs 链接完整性（知夏意见3，V2 跨 agent 共享核心机制）：
-    共享全靠 refs 链接，指向不存在的 id = 孤儿引用，lint 必须可见。
-    判据：全库条目（情景日志 frontmatter + 语义知识）id 集合里，
-    所有 refs 引用的 id 都存在，孤儿=0。
+    §8 ⑦ refs 链接完整性（知夏提案 issue #8，v1.3.2 对齐判据）：
+    V2 共享靠 refs 链接——断链必须机器可见，不靠谁翻日记时想起来。
+
+    判据（issue #8）：
+    1. 存在性：每个 ref 指向的 id 必须存在于当前库 id 全集
+       （episodic + canon + pending 都算，pending 可引用）；
+    2. 格式：严格匹配 ^[a-z]+-\\d{8}-\\d{3}$（复用 §8 ②同一正则），不匹配 = error；
+    3. 前缀：全小写；不做 agent 前缀白名单——悬空就是悬空，谁的都算断；
+    4. superseded 被引用 = warning（历史考古合法，提示改指新 id），不算 error。
+    输出：refs 断链=N（error）+ 指向 superseded=M（warning），N=0 才算过。
+    注：canon（semantic_facts）暂无 refs 字段建模，refs 检查范围=episodic 条目；
+        superseded 状态机尚未实现，按 confidence='superseded' 预留判定。
     """
-    # 收集全库条目 id
-    all_ids = set()
+    # 全库 id 集合 + 状态：id -> confidence
+    id_status = {}
     for _md_stem, entry_id, _fm, _block in _iter_entries(store.episodic_dir):
         if entry_id:
-            all_ids.add(entry_id)
+            id_status.setdefault(entry_id, "verified")
     try:
         conn = sqlite3.connect(store.db_path)
         c = conn.cursor()
-        c.execute("SELECT id FROM semantic_facts")
-        all_ids.update(r[0] for r in c.fetchall())
+        c.execute("SELECT id, confidence FROM semantic_facts")
+        for rid, conf in c.fetchall():
+            id_status[rid] = conf or "verified"
         conn.close()
     except sqlite3.Error:
         pass
 
-    orphans = []
+    errors = []     # (from_entry, ref, reason)
+    warnings = 0    # 指向 superseded 的计数
+
     for _md_stem, entry_id, fm, _block in _iter_entries(store.episodic_dir):
         if not fm:
             continue
-        refs_raw = fm.get("refs", "")
-        for rid in re.findall(r"([a-z]+-\d{8}-\d{3})", refs_raw):
-            if rid not in all_ids:
-                orphans.append((entry_id or "?unknown?", rid))
+        src = entry_id or _md_stem
+        for ref in _split_refs(fm.get("refs", "")):
+            if not ID_RE.match(ref):
+                errors.append((src, ref, "格式不合规"))
+                continue
+            if ref not in id_status:
+                errors.append((src, ref, "指向不存在"))
+                continue
+            if id_status[ref] == "superseded":
+                warnings += 1
 
-    if orphans:
-        shown = "，".join(f"{a}→{b}" for a, b in orphans[:10])
-        more = f" 等 {len(orphans)} 处" if len(orphans) > 10 else ""
-        return {"pass": False, "detail": f"孤儿 refs：{shown}{more}（V2 共享靠 refs，指向不存在=断链）"}
-    return {"pass": True, "detail": f"全库 {len(all_ids)} 个条目 id，refs 无孤儿引用"}
+    if errors:
+        shown = "，".join(f"{a}→{b}({why})" for a, b, why in errors[:8])
+        more = f" 等 {len(errors)} 处" if len(errors) > 8 else ""
+        return {
+            "pass": False,
+            "detail": f"refs 断链={len(errors)}（error）+ 指向 superseded={warnings}（warning）{shown}{more}",
+        }
+    return {
+        "pass": True,
+        "detail": f"refs 断链=0（error）+ 指向 superseded={warnings}（warning）；全库 {len(id_status)} 个条目 id",
+    }
 
 
 def lint_diary(base_dir: str) -> dict:
