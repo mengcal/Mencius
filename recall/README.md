@@ -35,6 +35,11 @@ python recall.py X 处理
 日记=notes/diary/*.md
 ```
 
+> **glob 口径**：`*` 只匹配**一层**目录（标准 glob 语义），子目录要逐层写（`notes/diary/*/*.md`）。
+> 配置查找顺序：`--sources` 指定 → 环境变量 `RECALL_SOURCES` → 当前目录 `./recall-sources.txt`
+> → 用户主目录（Windows `%USERPROFILE%` / Linux `~`）`.recall-sources.txt`。
+> 命中的行太长时摘录会截断到 300 字——**搜到 ≠ 核实**，按 `文件:行号` 回原文件看全句。
+
 ## 用法
 
 ```bash

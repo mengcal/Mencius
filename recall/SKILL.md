@@ -22,8 +22,9 @@ python <skill_dir>/recall.py 关键词1 [关键词2 ...] [--days N]
 
 ## 前置
 
-数据源配置 `recall-sources.txt` 需存在于工作目录或用户目录（格式见 README）。
-没有配置时先引导用户创建，不要瞎猜路径。
+数据源配置 `recall-sources.txt` 需存在于工作目录（`./recall-sources.txt`）或用户主目录
+（Windows `%USERPROFILE%\.recall-sources.txt` / Linux `~/.recall-sources.txt`），格式见 README。
+注意 glob 只匹配一层目录，子目录逐层写。没有配置时先引导用户创建，不要瞎猜路径。
 
 ## 家规
 
