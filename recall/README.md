@@ -78,6 +78,18 @@ python recall.py --sources my.txt foo   # 指定数据源配置
 
 互补不冲突：存档工具负责"留下"，recall 负责"想起来"。
 
+## 实测环境（诚实清单）
+
+| 环境 | 状态 |
+|---|---|
+| Windows + Python 3.10（ZCode 宿主） | ✅ 实测通过（GBK 配置、含空格引号路径均验过） |
+| Windows + Python 3.12（CodeBuddy CLI 冷启动） | ✅ 陌生 agent 只读文档独立完成三任务 |
+| Linux 容器 + Python 3.12（Docker） | ✅ 实测通过（路径分隔自动适配） |
+| Linux 物理环境（第三方用户） | ✅ 编译+实跑通过 |
+| Qoder / 豆包 / 其他宿主 | ⚪ 未实测——理论兼容（纯标准库、零依赖），但按"发布声明与实况对齐"原则如实标注 |
+
+欢迎跑通后提 issue 报环境，这张表会一直诚实下去。
+
 ## 许可
 
 MIT © 2026 Mencius
