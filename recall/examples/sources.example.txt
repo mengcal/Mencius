@@ -1,0 +1,8 @@
+# recall-sources.txt 示例 — 复制为 recall-sources.txt 放进工作目录或用户目录
+# 格式：标签=路径或glob（每行一条，# 注释）
+# 只列纯文本档案；敏感目录（图片视频/密钥）不要进配置。
+
+对话全量=exports/conversations.md
+工程账本=notes/eng-log.md
+日记=notes/diary/*.md
+信箱=notes/inbox/*.txt
