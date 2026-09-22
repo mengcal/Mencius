@@ -138,9 +138,8 @@ def main():
         for n, line in enumerate(lines, 1):
             s = line.rstrip()
             body = s.strip("#>- ")
-            m = DATE_RE.match(body)
-            if m and len(body) - m.end() <= 1:      # 纯标题行（可带尾点）
-                cur = m.group(1)
+            if DATE_RE.fullmatch(body) or re.match(r"^\d{4}-\d\d-\d\d \d\d:\d\d(:\d\d)?$", body):
+                cur = body[:10]                  # 纯日期/日期时间行=标题，继承之
                 date = cur
             else:
                 im = DATE_RE.search(s)              # 行内显式日期优先
