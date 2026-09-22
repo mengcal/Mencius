@@ -1,6 +1,6 @@
-# AgentDiary v1.3.2
+# AgentDiary v1.3.3
 
-当前版本：v1.3.2（MVP，schema v1 RC2 对齐 + refs-lint ⑦ 判据定稿落地）
+当前版本：v1.3.3（MVP，schema v1 RC2 对齐 + lint ⑧ 版本一致收口，知夏 09-22 两单 bug 回执）
 
 ## 版本历史
 
@@ -18,7 +18,24 @@
 | v1.2.0 | alice P1第二层防御过滤+P2索引缓存+P3回归测试 |
 | v1.3.0-mvp1 | schema v1 RC2 对齐 MVP（V1 Alice 案：情景日志+rolling handoff） |
 | v1.3.1 | 知夏验收三条意见全落地：deny 带 session id + 告警不误报 + 回归测试缺依赖 skip + lint ⑦ refs 完整性 |
-| **v1.3.2** | **refs-lint ⑦ 判据定稿（issue #8 评估落地：格式 error/断链 error/superseded warning）+ 修 append_episodic 返回 id（refs 引用链路）+ P7 验收测试** |
+| v1.3.2 | refs-lint ⑦ 判据定稿（issue #8 评估落地：格式 error/断链 error/superseded warning）+ 修 append_episodic 返回 id（refs 引用链路）+ P7 验收测试 |
+| **v1.3.3** | **lint ⑧ 版本一致（__version__==CHANGELOG 头，机器拦，知夏二犯复盘）+ 白名单盲区回执（仓库侧精确匹配无病灶）** |
+
+## v1.3.3（知夏 09-22 两单 bug 回执，2026-09-22）
+
+### 已完成
+
+- ✅ lint 新增 ⑧ 版本一致：`agent_diary/__init__.py __version__ == CHANGELOG.md 头版本号`（机械可判）
+  - 背景：版本串滞后**二犯**（v1.1.0 串 v1.2.0、v1.3.0-mvp1 串 v1.3.2）——不能靠自觉，必须机器拦
+  - 与 scripts/check_version.py（e447138 已加）同判据；lint 收口进验收单，验收官跑全单即抓
+  - §8 七项→八项
+- ✅ 白名单盲区回执（bug 1）：仓库侧 memory_gate.py 的 `is_safe_tool` 是**精确集合匹配**（`tool_name in SAFE_LIST`），无 startswith 引号/复合命令盲区；知夏宿主侧 gate_hook v1.1 已自修（shlex 分词+段头 basename+sed 有 -n 无 -i 收口），本仓库无对应代码需改
+- ✅ 测试文案同步 §8 八项（test_mvp_schema P5/README/lint 头注释）
+
+### 新增测试
+
+- examples/test_mvp_schema.py：P1-P7（P5 lint 八项自动覆盖 ⑧），退出码 0 = 全过
+- scripts/check_version.py：机械自检 __version__ == CHANGELOG 头（e447138 引入，本版双处同步验证）
 
 ## v1.3.2（知夏 issue #8 提案评估定稿，2026-09-19）
 

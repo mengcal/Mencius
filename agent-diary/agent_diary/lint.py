@@ -2,7 +2,7 @@
 """
 AgentDiary — §8 验收标准 lint 工具（机械可判，验收官跑全单的抓手）
 
-schema v1 RC2 §8 七项（v1.3.1 加 ⑦ refs 完整性，知夏意见3）：
+schema v1 RC2 §8 八项（v1.3.1 加 ⑦ refs 完整性；v1.3.3 加 ⑧ 版本一致，知夏二犯复盘）：
 1. 字段完备     frontmatter 必填项缺失=0（open_question 可选，V4 决议允许缺失）
 2. id 唯一排序  正则 ^[a-z]+-\\d{8}-\\d{3}$，撞号=0
 3. canon 纯净   confidence=verified 之外条目=0（待审必须带 pending_review 标记，verified 不得带）
@@ -10,10 +10,12 @@ schema v1 RC2 §8 七项（v1.3.1 加 ⑦ refs 完整性，知夏意见3）：
 5. 状态位不互噬  三 flag 并发写测试（复现脚本 A 组）通过
 6. 门禁双路     恶意包导入→关键词/向量检索命中=0（复现脚本 B 组）
 7. refs 完整性  refs 引用的 id 必须存在于全库（孤儿引用=0，V2 共享靠 refs）
+8. 版本一致     agent_diary/__init__.py __version__ == CHANGELOG.md 头版本号
+               （两次复发 v1.1.0→v1.2.0、v1.3.0-mvp1→v1.3.2，必须机器拦）
 
 用法（验收官）：
     python -m agent_diary.lint /abs/path/to/diary
-    退出码 0 = 七项全过；非 0 = 有失败项（逐项打印原因）
+    退出码 0 = 八项全过；非 0 = 有失败项（逐项打印原因）
 """
 
 import os
@@ -353,8 +355,44 @@ def check_refs_integrity(store: DiaryStore) -> dict:
     }
 
 
+def check_version_consistency(store: DiaryStore) -> dict:
+    """
+    §8 ⑧ 版本一致（知夏 09-22 二犯复盘：v1.1.0→v1.2.0、v1.3.0-mvp1→v1.3.2）：
+    agent_diary/__init__.py 的 __version__ 必须 == CHANGELOG.md 第一行的版本号。
+    两次复发证明不能靠自觉——验收官跑 lint 单就能抓，不用记得单独跑 check_version.py。
+    """
+    repo_root = Path(__file__).resolve().parent.parent  # agent_diary/ 的父目录
+    init_path = repo_root / "agent_diary" / "__init__.py"
+    changelog_path = repo_root / "CHANGELOG.md"
+
+    if not init_path.exists():
+        return {"pass": False, "detail": "缺 agent_diary/__init__.py，无法比对版本"}
+    if not changelog_path.exists():
+        return {"pass": False, "detail": "缺 CHANGELOG.md，无法比对版本"}
+
+    init_text = init_path.read_text(encoding="utf-8")
+    m_init = re.search(r'__version__\s*=\s*"([^"]+)"', init_text)
+    if not m_init:
+        return {"pass": False, "detail": "__init__.py 无 __version__ 定义"}
+
+    changelog_text = changelog_path.read_text(encoding="utf-8")
+    m_chg = re.match(r"#\s*AgentDiary\s+v([\w.\-]+)", changelog_text.strip().splitlines()[0])
+    if not m_chg:
+        return {"pass": False, "detail": "CHANGELOG.md 首行不是 `# AgentDiary vX.Y.Z` 格式"}
+
+    init_ver = m_init.group(1).strip()
+    chg_ver = m_chg.group(1).strip()
+    if init_ver != chg_ver:
+        return {
+            "pass": False,
+            "detail": f"版本串滞后：__version__={init_ver} ≠ CHANGELOG 头=v{chg_ver}"
+                      f"（两次复发，进 lint 机器拦）",
+        }
+    return {"pass": True, "detail": f"__version__={init_ver} == CHANGELOG 头 v{chg_ver}"}
+
+
 def lint_diary(base_dir: str) -> dict:
-    """跑 §8 七项（v1.3.1 加 refs 完整性），返回逐项结果"""
+    """跑 §8 八项（v1.3.1 加 refs 完整性，v1.3.3 加版本一致），返回逐项结果"""
     store = DiaryStore(base_dir)
     results = {
         "① 字段完备": check_fields(store),
@@ -364,6 +402,7 @@ def lint_diary(base_dir: str) -> dict:
         "⑤ 状态位不互噬": check_flags_concurrent(store),
         "⑥ 门禁双路": check_gate_dual_path(store),
         "⑦ refs完整性": check_refs_integrity(store),
+        "⑧ 版本一致": check_version_consistency(store),
     }
     results["_all_pass"] = all(r["pass"] for r in results.values())
     return results
@@ -386,7 +425,7 @@ def main(argv=None):
         print(f"  {mark} {name}: {r['detail']}")
     print("=" * 50)
     if results["_all_pass"]:
-        print("✅ 七项全过——§8 验收单通过")
+        print("✅ 八项全过——§8 验收单通过")
         return 0
     print("❌ 存在失败项，见上（逐项原因）")
     return 1
