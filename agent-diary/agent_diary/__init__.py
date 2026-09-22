@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-AgentDiary v1.3.0-mvp1 📔
+AgentDiary v1.3.2 📔
 
 给智能体的工作日志系统——不是人类日记，是触发式记忆门禁
 
@@ -48,7 +48,7 @@ def run_mcp_server():
     main()
 
 
-__version__ = "1.3.0-mvp1"
+__version__ = "1.3.2"
 __all__ = [
     "DiaryStore", "DiaryGate", "make_diary_tools", "AuditDashboard",
     "LangGraphDiaryMiddleware", "ClaudePreToolUseHook", "DiaryMiddleware",
