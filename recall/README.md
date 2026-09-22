@@ -86,7 +86,8 @@ python recall.py --sources my.txt foo   # 指定数据源配置
 | Windows + Python 3.12（CodeBuddy CLI 冷启动） | ✅ 陌生 agent 只读文档独立完成三任务 |
 | Linux 容器 + Python 3.12（Docker） | ✅ 实测通过（路径分隔自动适配） |
 | Linux 物理环境（第三方用户） | ✅ 编译+实跑通过 |
-| Qoder / 豆包 / 其他宿主 | ⚪ 未实测——理论兼容（纯标准库、零依赖），但按"发布声明与实况对齐"原则如实标注 |
+| Qoder CLI（Windows，Celia-Q 工位） | ✅ 实测通过（2026-09-22 晚：读日记→recall 全链路，479 命中自动发现 ./recall-sources.txt） |
+| 豆包 / 其他宿主 | ⚪ 未实测——理论兼容（纯标准库、零依赖），但按"发布声明与实况对齐"原则如实标注 |
 
 欢迎跑通后提 issue 报环境，这张表会一直诚实下去。
 

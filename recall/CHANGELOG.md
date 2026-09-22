@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.4 (2026-09-22)
+- Qoder CLI 实测通过（读日记→recall 全链路），环境表 Qoder 格转 ✅；仅剩豆包等如实标未测。
+
 ## v1.0.3 (2026-09-22)
 - README 增加"实测环境"诚实清单（Windows/Linux 已验；Qoder/豆包等未验如实标注）。
 
