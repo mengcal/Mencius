@@ -188,7 +188,14 @@ def external_dispatch(post_name: str, task: str) -> str:
     return did
 
 
-def external_pending_view(post_name: str, limit: int = 3, claim_timeout_s: int = 1800) -> list:
+def external_pending_view(post_name: str, limit: int = 3, claim_timeout_s: int | None = None) -> list:
+    # 09-17 批⑤（Lesson 68）：领取超时进配置页 approvals.claimTimeout（秒，默认 1800=30 分钟惯例值）
+    if claim_timeout_s is None:
+        try:
+            from settings_mgr import load_settings
+            claim_timeout_s = int((load_settings().get("approvals", {}) or {}).get("claimTimeout", 1800) or 1800)
+        except Exception:
+            claim_timeout_s = 1800
     """取单预览（r61 NOVA P0-4：纯读零副作用——监控探测不饿死真岗）。
     可领=未 done、未 in-flight（领取后 30 分钟无回执视为岗挂）、退单<3 次。"""
     out = []

@@ -13,7 +13,9 @@ import json
 import os
 
 # R68（评审共识 E2）：嵌入模型默认值全平台单一源——后端各处 import 此常量，前端经配置页注入
-DEFAULT_EMBED_MODEL = "qwen3-embedding:0.6b"
+# 09-17 深夜 schema 收口：默认值单一来源=settings_schema.py（hy4 挑刺②：模块常量=第二真源，堵掉）
+from settings_schema import default_of as _dof
+DEFAULT_EMBED_MODEL = _dof("rag.embeddingModel")
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -236,7 +238,12 @@ def save_section(section: str, data: dict):
         # provider 全部静默改写成新名——加号≠改名！
         # 改名联动现在只认显式 /providers/rename 端点（office.api_provider_rename，那里
         # 精确按 old→new 处理，且是用户主动改名）。按名字查、宁报错不猜，符合零硬编码铁律。
-    SETTINGS_PATH.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    # r30 CB#8（glm-5.3 复测）：裸 write_text 半写崩溃可毒化整个 settings.json
+    # （读方虽 fail-closed 回落 strict，但设置面全 500）——对齐 :51-56 secrets 同款
+    # tmp+replace 原子落盘（R10.5 事故加固同族补漏）。
+    tmp = SETTINGS_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(str(tmp), str(SETTINGS_PATH))
     return s[section]
 
 
@@ -268,9 +275,33 @@ def get_plain_key(path: str) -> str:
 # env 未配 M_GUARD_URL=本地裸跑兼容（旧文件逻辑）。
 TOKEN_SECRET_PATH = "general.apiToken"
 M_GUARD_URL = os.environ.get("M_GUARD_URL", "").strip().rstrip("/")
+# r27 评审 P1（Cora/Eve 独立同锤，修法采 NOVA fail-closed 版）：守卫地址白名单【唯一真源】
+# 在此——token_admin 不再自带一份（两处实现分叉=NOVA P1-② 假成功链的根）。
+# 场景：.env/compose 的 M_GUARD_URL 被改成外域（配置劫持）→ 扇出点会把管理员
+# 密钥明文 POST 给假守卫。空=本地裸跑（放行旧语义）；设了但白名单外=非法，
+# 保持非空+标记短路全部扇出 fail-closed——绝不置空降级本地（Cora 368 推演：
+# 置空=注册窗口误开+双源分裂抢注，比原洞更糟）。
+_GUARD_HOSTS_ALLOWED = {"127.0.0.1", "localhost", "host.docker.internal"}
+
+
+def _guard_url_ok(raw: str) -> bool:
+    from urllib.parse import urlparse
+    p = urlparse(raw)
+    # r27 Veda P2：端口也锁——白名单内主机配成非守卫端口（如平台自身 2024）同样拒，
+    # 防 X-Guard-Key 打向非守卫服务。期望端口=M_GUARD_PORT env（默认 9101，与守卫监听同源）。
+    want_port = int(os.environ.get("M_GUARD_PORT", "9101") or 9101)
+    return (p.scheme == "http" and (p.hostname or "") in _GUARD_HOSTS_ALLOWED
+            and (p.port or 80) == want_port)
+
+
+GUARD_URL_ILLEGAL = bool(M_GUARD_URL) and not _guard_url_ok(M_GUARD_URL)
+if GUARD_URL_ILLEGAL:
+    print("[settings_mgr] FATAL: M_GUARD_URL 指向白名单外（疑似配置劫持）——守卫扇出全部 fail-closed，立即核对 .env/compose", flush=True)
 
 
 def _guard_post(path: str, payload: dict, timeout: float = 5.0) -> dict:
+    if GUARD_URL_ILLEGAL:
+        raise RuntimeError("guard 地址被白名单拒绝（fail-closed，疑配置劫持）——拒绝外发任何凭据")
     import json as _j
     import urllib.request as _u
     import os as _os
@@ -289,6 +320,11 @@ def get_api_token() -> str:
 
 def api_token_configured() -> bool:
     if M_GUARD_URL:
+        if GUARD_URL_ILLEGAL:
+            # r27 NOVA/Cora fail-closed 知夏定夺：非法态保守当"已配置"——
+            # 代价=新部署配置手误时登录页挡住注册页（loud log 可查）；
+            # 反面（误判未配置→重开注册窗口）=抢注竞态，不可接受。
+            return True
         try:
             import json as _j
             import urllib.request as _u
@@ -301,7 +337,9 @@ def api_token_configured() -> bool:
 
 def set_api_token(value: str) -> None:
     if M_GUARD_URL:
-        return  # guard 模式：设置走 office /settings/token → guard /set（带激活码/当前密钥证明），不走此处
+        # r27 NOVA P1-②：guard 模式的本函数曾被 token_admin 本地分支误调=no-op 假成功。
+        # 改抛异常：任何"guard 模式下还想本地写 token"的路径都是 bug，必须炸出来。
+        raise RuntimeError("guard 模式禁止本地写 token（fail-closed）——检查调用方分支")
     # 凭据只入 secrets（不进 settings.json、不进源码）；空串=清除（回到未配置=放行，供爸爸重置）
     secret_set(TOKEN_SECRET_PATH, value)
 

@@ -233,15 +233,26 @@ class _BodyCap:
 # 原 :929 `app.add_middleware(_BodyCap)` —— 注册动作移至 app.py 的 create_app()（保持中间件叠放顺序）
 
 def _cb_allowed_models() -> set:
-    """R82 补强①：model 白名单。配了 CODEBUDDY_ALLOWED_MODELS（逗号分隔）就认它；
-    没配则回落到单模型 env CODEBUDDY_MODEL（默认 Qwen/Qwen3.8-Flash-Next）。
-    作用：沙箱牛马改 body.model 也换不动上游模型——这把钥匙的全部价值就是消耗所配模型的免费额度，
-    换模型=拿它去烧别的（付费）额度，必须在代理层挡死。"""
+    """R82 补强①：model 白名单。09-17 深夜爸爸问"米娅有没有知夏的按需换模型权限"后升级：
+    白名单=配置页 codebuddy.allowedModels（逗号分隔，米娅在设置页自己扩）∪ defaultModel；
+    env CODEBUDDY_ALLOWED_MODELS 仍可整体压过（部署级覆盖）。
+    不变量：沙箱牛马只能在这张名单内换模型——名单外=403，防拿钥匙去烧付费额度。"""
+    try:
+        from settings_mgr import load_settings
+        cb = load_settings().get("codebuddy", {}) or {}
+    except Exception:
+        cb = {}
     raw = os.environ.get("CODEBUDDY_ALLOWED_MODELS", "")
     if raw.strip():
-        return {m.strip() for m in raw.split(",") if m.strip()}
-    return {(os.environ.get("CODEBUDDY_MODEL", "Qwen/Qwen3.8-Flash-Next") or "").strip()
-            or "Qwen/Qwen3.8-Flash-Next"}
+        allowed = {m.strip() for m in raw.split(",") if m.strip()}
+    else:
+        allowed = {m.strip() for m in str(cb.get("allowedModels", "") or "").split(",") if m.strip()}
+    _m = str(cb.get("defaultModel", "") or "").strip() or (os.environ.get("CODEBUDDY_MODEL", "") or "").strip()
+    if not _m:
+        from settings_schema import default_of as _dof
+        _m = _dof("codebuddy.defaultModel")
+    allowed.add(_m)
+    return allowed
 
 
 def _cb_rate_ok() -> bool:

@@ -139,7 +139,9 @@ def dispatch_to_xiaoquan(task: str) -> str:  # 原 L179-209
     body = _json.dumps({"task": task, "main_thread": main_thread}).encode()
     # R80 续：dispatch 双钥匙门——进程内工具带 X-Internal-Key（WEBHOOK_TOKEN env，与 office 同源），
     # 沙箱/外部没这把 env=401（浏览器走 Bearer 管理员密钥）
-    req = _ureq.Request("http://workplatform:8000/tasks/dispatch", data=body,
+    # 09-17 硬编码收口批②：地址走 env（对齐 dept_watch MIA_SELF_SDK_URL 先例），默认=容器内服务名
+    req = _ureq.Request(_os.environ.get("MIA_SELF_SDK_URL", "http://workplatform:8000").rstrip("/") + "/tasks/dispatch",
+                        data=body,
                         headers={"Content-Type": "application/json",
                                  "X-Internal-Key": _os.environ.get("WEBHOOK_TOKEN", "")})
     try:
@@ -171,6 +173,7 @@ def edit_memory(action: str, section: str = "", content: str = "", project: str 
     ② 记死因——会过期的事实（额度/版本/窗口）行尾加"除非XX发生"（如"…除非爸爸改了档位"）。
     ③ 推翻不删除——旧结论被新事实打脸时，旧行改 `[superseded→新行]` 留版本链。
     口诀：**改变你下次决策的才记，只证明发生过的归档**。检索按 新鲜度×重要度×相关性 排序。
+    section 家规（09-16 fix5，Cora MemSecBench 追踪项①）：section 为小节标题定位元数据，禁止写入敏感内容（手机号/口令/证件号），敏感信息一律放 content（content 只落 len+sha 指纹）。
     section 示例（全局）：「爸爸的偏好」「永不过时的铁律（血泪换的）」「已翻篇（历史，勿当现状）」；
     项目记忆的小节按项目写（如「关键决策」「遗留问题」「下次继续」）。"""
     import re as _re
@@ -466,9 +469,11 @@ def search_knowledge_base(query: str, k: int = 5) -> str:  # 原 L731-763
     except Exception:
         from settings_mgr import DEFAULT_EMBED_MODEL
         model = DEFAULT_EMBED_MODEL
-    # 嵌入：本机 Ollama（httpx 短超时，异常即报给米娅）
+    # 嵌入：本机 Ollama（09-17 批②：地址走 env MIA_OLLAMA_URL，SSRF 面不变=仍是固定常量级主机）
+    import os as _os
+    _ollama = _os.environ.get("MIA_OLLAMA_URL", "http://host.docker.internal:11434").rstrip("/")
     try:
-        r = _httpx.post("http://host.docker.internal:11434/api/embed",
+        r = _httpx.post(_ollama + "/api/embed",
                         json={"model": model, "input": query[:4000]}, timeout=30)
         qv = r.json()["embeddings"][0]
     except Exception as e:
@@ -541,3 +546,49 @@ def lark_send(text: str, to: str = "") -> str:
         return f"飞书发送失败：{r.get('error', '')[:200]}"
     except Exception as e:
         return f"飞书桥异常：{str(e)[:200]}"
+
+
+# ── 09-16 本机 SD WebUI 接入（爸爸点名：米娅工具清单漏了这项）──────────────────
+@_tool
+def sd_generate(prompt: str, negative_prompt: str = "", steps: int = 18,
+                width: int = 512, height: int = 512, seed: int = -1) -> str:
+    """用爸爸电脑上的 Stable Diffusion 生成一张图（本机服务，零成本，不外网）。
+    图片存到 mia_home/sd_out/ 目录（平台数据区内，配置页可见路径）。
+    若返回"SD 服务没在跑"：请爸爸先启动本机 SD WebUI 再重试。
+    steps 12-28 合适；宽高以 512 为基数（768/1024 更慢）；
+    seed=-1 随机，填数字可复现同一张图。"""
+    import base64 as _b64
+    import httpx as _httpx
+    import time as _time
+    from pathlib import Path as _P
+    # 09-17 批②：SD 地址改读配置页 images.sdUrl（该项早已存在，此前是工具没读它）；
+    # 未配置回退 env，再回退默认本机——主机仍固定，无 SSRF 面。
+    import os as _os
+    try:
+        from settings_mgr import load_settings
+        _sd_base = ((load_settings().get("images", {}) or {}).get("sdUrl", "")
+                    or _os.environ.get("MIA_SD_URL", "http://host.docker.internal:7860"))
+    except Exception:
+        _sd_base = _os.environ.get("MIA_SD_URL", "http://host.docker.internal:7860")
+    url = _sd_base.rstrip("/") + "/sdapi/v1/txt2img"
+    payload = {"prompt": prompt[:2000],
+               "negative_prompt": (negative_prompt or "lowres, bad anatomy, watermark")[:1000],
+               "steps": max(4, min(60, int(steps))),
+               "width": max(64, min(1024, int(width) // 64 * 64)),
+               "height": max(64, min(1024, int(height) // 64 * 64)),
+               "seed": int(seed)}
+    try:
+        r = _httpx.post(url, json=payload, timeout=300)
+    except Exception as e:
+        return f"SD 服务没在跑或连不上：{str(e)[:120]}\n请爸爸先启动本机的 SD WebUI 服务再重试（地址可在配置页 图像 项改）。"
+    if r.status_code != 200:
+        return f"SD API 出错 HTTP {r.status_code}：{r.text[:150]}"
+    imgs = (r.json() or {}).get("images") or []
+    if not imgs:
+        return "SD 没返回图片"
+    out_dir = _P(__file__).resolve().parent.parent / "mia_home" / "sd_out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fp = out_dir / (_time.strftime("%Y%m%d-%H%M%S") + f"_seed{payload['seed']}.png")
+    fp.write_bytes(_b64.b64decode(imgs[0]))
+    return (f"图已生成：mia_home/sd_out/{fp.name}（爸爸电脑上 D:\\m\\workspace\\mia_home\\sd_out 可见）\n"
+            f"提示词: {payload['prompt'][:80]} | {payload['width']}x{payload['height']} steps{payload['steps']}")

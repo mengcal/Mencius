@@ -13,6 +13,8 @@ office.routers.providers —— Settings API v1 + /providers* + /models/all + SS
 路由注册顺序：本模块必须在 token_admin 之后 include——POST /settings/token（token_admin 实名路由）
 必须抢在 POST /settings/{section}（本模块路径参数路由）之前，见 app.py create_app。
 """
+import os  # 09-17 深夜：_runtime.visionEndpoint 读 env
+
 import httpx as _httpx  # 原 :1619
 
 from fastapi import APIRouter, Body, Request
@@ -34,7 +36,17 @@ async def api_get_settings():
         s["_rev"] = int((BASE / "settings.json").stat().st_mtime)
     except Exception:
         pass
+    # 09-17 深夜（hy4 挑刺·ChatInterface 内嵌地址收口）：容器侧运行时端点由后端下发，
+    # 前端提示词不再写死 host.docker.internal:2024（env 可覆盖，单一来源）
+    s["_runtime"] = {"visionEndpoint": os.environ.get("MIA_VISION_ENDPOINT", "http://host.docker.internal:2024/vision")}
     return s
+
+
+@router.get("/settings/schema")
+async def api_settings_schema():
+    """配置总表（settings_schema.py 的机器可读下发）——前端与验收官的单一键源（09-17 深夜，Lesson 68）。"""
+    from settings_schema import schema_json
+    return schema_json()
 
 @router.post("/settings/{section}")
 async def api_set_settings(section: str, data: dict = Body(...), request: Request = None):
@@ -58,6 +70,13 @@ async def api_set_settings(section: str, data: dict = Body(...), request: Reques
         # R75：confirmLevel 回归 settings.general（设置页/顶栏快切同一真源），统一 token 守写入（米娅无 token 改不动）。
         # R79④拆假注释：R74 的"带外 :ro 文件地板（两路取严）"已随"设置页 supreme/政令必通"定调整体退役——
         # _level() 单源读 settings.general.confirmLevel，未配置/非法 fail-closed strict；MIA_TIER_FILE 死配置已从 compose 撤除。
+        # r29 焊档（爸爸 09-24 令+全家判词收敛：方向性人证）：档位不再经通用保存通道写——
+        # 放宽必须走 /settings/confirm-level 的"旧密码人质"门（token_admin.py），收紧同走专端点。
+        # 持 Cookie 的 XSS 脚本此前一条 POST /settings/general {confirmLevel:"full"} 即可
+        # 替米娅松档（与 r28 改密旁路同族病），此路自此关闭。
+        if section == "general" and "confirmLevel" in data:
+            return {"ok": False,
+                    "error": "确认分档须走专用通道（设置页档位行；顶栏只许收紧）——放宽需管理员密码验证"}
         result = save_section(section, data)
         # agents 已由 save_section 深度合并进 settings.agents（配置页=唯一真源）；不再回写 agents_config.json
         return {"ok": True, "saved": section, "data": result}

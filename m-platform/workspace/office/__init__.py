@@ -8,7 +8,7 @@ office —— 米娅「工作平台·小全车间」服务包（由 D:\\m\\works
 - office.routers.rag         RAG 存储层 + 五个 /rag/* 端点（第三扇代理门 /rag/query）
 - office.routers.gates       _BodyCap 中间件类 + /vision + /codebuddy（前两扇代理门）
 - office.routers.tasks       TASKS 账本 + /tasks/dispatch|webhook|list + /files/save + /threads/title
-- office.routers.token_admin 激活码 + /settings/token（首设/轮换/清除）+ /auth/*
+- office.routers.token_admin /settings/token（注册首设/轮换/清除）+ /auth/*（登录/改密）
 - office.routers.misc        /skills、/usage、/context、/stats、/health、/approvals、旧路径指引
 详见包内 REFACTOR_NOTES.md（原行号 → 新文件对照表）。
 """

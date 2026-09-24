@@ -25,5 +25,4 @@ timeout /t 4 /nobreak >nul
 curl -s -m 5 http://127.0.0.1:9101/status
 echo.
 echo DONE. Refresh the platform page - the setup wizard will appear.
-echo Activation code file: D:\m\guard\.token_bootstrap
 pause

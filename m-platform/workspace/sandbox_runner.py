@@ -1,10 +1,10 @@
 """R76 沙箱执行服务：跑在 m-sandbox 容器内（只挂数据区 /data/mia_home）。
 workplatform 的 execute 经宿主回环 POST 到这里执行——沙箱容器里【没有】settings.json/源码/档位文件，
 所以米娅的 shell 物理上碰不到平台的"锁和脑"（对标 ZCode：执行面与守卫面分离）。
-端口经宿主回环发布 127.0.0.1:9090；请求头 X-Token 须等于宿主 .env 的 SANDBOX_TOKEN。
+端口经宿主回环发布 127.0.0.1:9099（09-17 让位爸爸 OWUI 的 9090）；请求头 X-Token 须等于宿主 .env 的 SANDBOX_TOKEN。
 
 R10.5（Eve 战场移交：宿主侧 runner 频控+审计）：
-- 频控：全局滑动窗口 60s ≤120 次（米娅正常干活远低于此；本机任意进程可打 9090，
+- 频控：全局滑动窗口 60s ≤120 次（米娅正常干活远低于此；本机任意进程可打 9099，
   窗口防"无限并发压死 runner"）；窗口内存态，重启清零=可接受（runner 无持久义务）。
 - 审计：每次 /exec 落一行到容器本地 /var/log/runner_audit.jsonl（时间/来源IP/命令头/退出码）。
   容器本地文件米娅摸不到（她只有 /data 卷的写权）；她能自残 runner 但删不到 docker logs——
@@ -120,4 +120,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     _audit("runner_start", data_dir=DATA_DIR)
-    ThreadingHTTPServer(("0.0.0.0", 9000), Handler).serve_forever()
+    # R10.313（灰区②清零）：监听端口入 env（默认 9000 不变，compose 映射 9099->9000 不受影响）
+    _LISTEN_PORT = int(os.environ.get("SANDBOX_RUNNER_PORT", "9000"))
+    ThreadingHTTPServer(("0.0.0.0", _LISTEN_PORT), Handler).serve_forever()

@@ -24,6 +24,8 @@
 """
 print("[office] STEP0 start", flush=True)  # 原 :22
 
+import os  # R10.313（灰区③ CORS env 化引入）
+
 from . import core  # noqa: F401  —— .env 加载 + 公共纯函数层（core 内打印 STEP0.5）
 
 print("[office] STEP1 import agent_multimodel", flush=True)  # 原 :31
@@ -53,7 +55,7 @@ from .routers.gates import _BodyCap  # 原 :875-926（类本体在 gates.py，�
 # R79 补（hy4 自检：名单外写端点自查）：/files/save 直写 mia_home/files/（与沙箱共享卷）入守；
 #   前端 providerApi.saveFile 同步带 Bearer（爸爸的浏览器有钥匙，米娅没有=改不动）。
 # /threads/title（hy4 低危项）：无鉴权可往任意线程写垃圾标题+白烧 LLM，入守；前端 ChatProvider 同步带 token。
-_TOKEN_GUARDED = ("/settings/", "/providers/", "/approvals", "/rag/ingest", "/rag/rebuild", "/files/save", "/threads/title", "/skills/rehash", "/lark/", "/remember-rules", "/memory/", "/external/register")  # 原 :1171；r41 飞书桥外发端点进门；r49 双钮规则增删进门（精确路由避 /settings/{section} 通配）；r51 reflect 做梦进门；r61 外部岗登记/摘除进门（hy4 B-1 P0：docstring 承诺了"登记走 token 门"但门没建——注释与实现两张皮；只收 register 精确前缀，pending/callback 走子钥不受 token 门管辖）
+_TOKEN_GUARDED = ("/settings/", "/providers/", "/approvals", "/rag/ingest", "/rag/rebuild", "/files/save", "/threads/title", "/skills/", "/lark/", "/remember-rules", "/memory/", "/external/register")  # 原 :1171；r41 飞书桥外发端点进门；r49 双钮规则增删进门（精确路由避 /settings/{section} 通配）；r51 reflect 做梦进门；r61 外部岗登记/摘除进门（hy4 B-1 P0：docstring 承诺了"登记走 token 门"但门没建——注释与实现两张皮；只收 register 精确前缀，pending/callback 走子钥不受 token 门管辖）；W3：/skills/rehash 前缀放宽为 /skills/——新建/编辑/删除技能三端点与 rehash 同门（技能写面=改米娅技能库，必须管理员钥匙）
 # R80 续（NOVA 旁路实锤+Eve P1 收口）：langgraph auth 罩不到 office 路由（实测 office 路由 200 直通），
 # 沙箱虽已出 mia 网，但 Docker Desktop 所有容器都能解析 host.docker.internal → 宿主回环 → 2024 发布口
 # （实测沙箱 curl host.docker.internal:2024/settings=200）。敏感【读面】也进 token 门：
@@ -61,7 +63,7 @@ _TOKEN_GUARDED = ("/settings/", "/providers/", "/approvals", "/rag/ingest", "/ra
 # R10.3（Lyra 唯一未修 + NOVA ⚪F）：/models/all /usage/today /stats 三统计端点补齐——
 # 前端 providerApi 早已带 Bearer（NOVA 51 实证），只差端点门，凑齐读面全收口。
 _GET_GUARDED = ("/settings", "/providers", "/tasks/list", "/context/", "/rag/", "/models/all", "/usage/today", "/stats", "/skills", "/remember-rules", "/external/list")  # 原 :1178；r49 双钮规则读面进门；r61b 外部岗名册读面进门（hy4 P2-1：岗名/URL/端口侦察面，前端尚未消费此端点零误伤）
-# 读面豁免：token 状态（bootstrap 首部署没钥匙也能看到"先生成密钥"）、webhook（w 内部钥匙自证）、health
+# 读面豁免：token 状态（未注册时前端要知道"该出注册向导了"）、webhook（w 内部钥匙自证）、health
 _GET_EXEMPT = ("/settings/token/status", "/tasks/webhook", "/health")  # 原 :1180
 
 
@@ -78,7 +80,8 @@ async def api_token_guard(request, call_next):
     if guarded:
         # R79③（小蝶 P0）：fail-closed。原实现"未配 token 则整个守卫跳过"=新部署默认失守
         # （沙箱一条 POST /settings/general 改 confirmLevel=full 即全开，实测复现 200）。
-        # 现未配置时写端点一律 401，首设只走 /settings/token（X-Bootstrap 激活码，R10 修二）——首部署须先生成密钥。
+        # 现未配置时写端点一律 401，注册只走 /settings/token（R10.408 起=用户名+密码，
+        # 谁先注册谁是主人；激活码机制已废除）——首部署须先完成注册。
         if not _token_ok(_presented_token(request)):
             return _JSONResp({"ok": False, "error": "需要管理员密钥（改设置/服务商/批准/知识库写入是爸爸的权柄，米娅无此钥匙）"}, status_code=401)
     return await call_next(request)
@@ -102,9 +105,14 @@ def create_app() -> FastAPI:
 
     # R68 P0（评审 A 面）：CORS 从 * 收紧——只放行本机/局域网来源的前端页面（dev:3000、:2024 自带页）。
     # 服务端到服务端（米娅 curl、webhook、compose 内部）不经浏览器 CORS，不受影响。
+    # R10.313（灰区③清零）：网段正则入 env（默认=原值零变化；Tailscale 网段 100.64/10 可经 .env 追加）
+    _cors_regex = os.environ.get(
+        "MIA_CORS_ORIGIN_REGEX",
+        r"^https?://(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$",
+    )
     _app.add_middleware(  # 原 :1318-1324
         CORSMiddleware,
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$",
+        allow_origin_regex=_cors_regex,
         allow_methods=["*"], allow_headers=["*"],
         # R10.5（XSS L2，官方建议+LibreChat 等主流开源模式）：httpOnly Cookie 跨源携带需要 credentials
         allow_credentials=True,  # R10.8g：Cookie 模式必须；401 响应也要带跨域头

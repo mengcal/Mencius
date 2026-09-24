@@ -17,8 +17,8 @@
   —— 这就是"概略记录"，米娅事后整理正式笔记的素材
 
 R51 新增（Mem0 式事实抽取 + notes aging，爸爸 2026-08-31 拍板）：
-- 事实抽取：模型回复累积 >600 字 → 后台线程调书生 intern-latest（月免费 9000 万，
-  不占日额度）抽取结构化事实 → 追加到 mia_home/memory/facts-YYYY-MM.md（带 [MM-DD] 时间戳，
+- 事实抽取：模型回复累积 >600 字 → 后台线程按牛马配置取模型（archivist→scribe→boss 顺序），
+  抽取结构化事实 → 追加到 mia_home/memory/facts-YYYY-MM.md（带 [MM-DD] 时间戳，
   行级去重）。后台线程不阻塞对话。
 - notes aging：每天一次扫描 notes/**/*.md（排除 auto_log/aging_report/共享区），
   超 30 天未动的写进 notes/aging_report.md 建议归档（只报告不动文件，安全）
@@ -149,9 +149,28 @@ def build_card_inject(memory_dir) -> str:
 
 
 # ── R51 事实抽取节流与缓冲 ──
-_EXTRACT_THRESHOLD = 600      # 累积字数触发抽取
-_EXTRACT_MIN_INTERVAL = 300   # 两次抽取最小间隔秒
-_AGING_DAYS = 30              # 笔记 aging 阈值（天）
+from settings_schema import default_of as _dof  # 09-17 深夜：默认值单一来源=总表
+_EXTRACT_THRESHOLD = _dof("scribe.extractThreshold")
+_EXTRACT_MIN_INTERVAL = 300   # 两次抽取最小间隔秒（内部节流，非业务配置）
+_AGING_DAYS = _dof("scribe.agingDays")
+
+
+def _cfg_int(section: str, key: str, default: int) -> int:
+    """09-17 批⑤（Lesson 68）：整数配置统一读法——配置页优先，缺省/非法回默认。"""
+    try:
+        from settings_mgr import load_settings
+        v = int((load_settings().get(section, {}) or {}).get(key, default))
+        return v if v > 0 else default
+    except Exception:
+        return default
+
+
+def _extract_threshold() -> int:
+    return _cfg_int("scribe", "extractThreshold", _EXTRACT_THRESHOLD)
+
+
+def _aging_days() -> int:
+    return _cfg_int("scribe", "agingDays", _AGING_DAYS)
 
 
 def _enabled() -> bool:
@@ -222,7 +241,7 @@ class ScribeMiddleware(AgentMiddleware):
             self._buf.append(text[:1500])
             total = sum(len(t) for t in self._buf)
         now = time.time()
-        if total >= _EXTRACT_THRESHOLD and now - self._last_extract >= _EXTRACT_MIN_INTERVAL:
+        if total >= _extract_threshold() and now - self._last_extract >= _EXTRACT_MIN_INTERVAL:
             with self._buf_lock:
                 batch = "\n".join(self._buf)[-4000:]
                 self._buf.clear()
@@ -249,6 +268,7 @@ class ScribeMiddleware(AgentMiddleware):
             facts_file.parent.mkdir(parents=True, exist_ok=True)
             existing = facts_file.read_text(encoding="utf-8") if facts_file.exists() else ""
             added = 0
+            appended = []
             with open(facts_file, "a", encoding="utf-8") as f:
                 for line in text.splitlines():
                     line = line.strip().lstrip("-").strip()
@@ -259,11 +279,26 @@ class ScribeMiddleware(AgentMiddleware):
                         continue  # 行级去重
                     f.write(entry + "\n")
                     existing += entry + "\n"
+                    appended.append(entry)
                     added += 1
             if added:
                 self._log_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(self._log_file, "a", encoding="utf-8") as f:
                     f.write(f"- `{datetime.now().strftime('%m-%d %H:%M:%S')}` **事实抽取** 抽到 {added} 条 → memory/facts 文件\n")
+                # G-5 旁路补账（09-16 fix5，Veda P1①）：抽取通道直写 memory/facts-*.md 曾绕过
+                # edit_memory 的 memory_change 审计——此处补落 ev=memory_change/action=extract。
+                # 脱敏家规同 edit_memory：明文绝不进账，只落 file 相对路径 + 长度 + sha256 前 16 位指纹。
+                # 落账独立 try 包住，失败出声（后台线程本不挡主链，但漏账不可静默）。
+                try:
+                    import hashlib as _hashlib
+                    import approvals as _ap
+                    _chg = "\n".join(appended)
+                    _ap._audit("memory_change", action="extract",
+                               file=str(facts_file.relative_to(self._root)).replace("\\", "/"),
+                               content_len=len(_chg),
+                               content_sha16=_hashlib.sha256(_chg.encode("utf-8")).hexdigest()[:16])
+                except Exception as _ae:
+                    print(f"[scribe] ⚠ 事实抽取审计落账失败（facts 已写入，需排查）：{type(_ae).__name__}: {_ae}", flush=True)
         except Exception:
             pass  # 抽取失败绝不影响主流程
 
@@ -283,12 +318,12 @@ class ScribeMiddleware(AgentMiddleware):
                 rel = str(p.relative_to(notes_dir))
                 if any(k in rel for k in ("auto_log", "aging_report", "owui_shared", "owui_archive")):
                     continue
-                if now_ts - p.stat().st_mtime > _AGING_DAYS * 86400:
+                if now_ts - p.stat().st_mtime > _aging_days() * 86400:
                     stale.append(rel)
             if stale:
                 rpt = notes_dir / "aging_report.md"
                 with open(rpt, "a", encoding="utf-8") as f:
-                    f.write(f"\n## {today} aging 巡检\n以下笔记超 {_AGING_DAYS} 天未更新，建议归档或复核：\n")
+                    f.write(f"\n## {today} aging 巡检\n以下笔记超 {_aging_days()} 天未更新，建议归档或复核：\n")
                     for s in stale:
                         f.write(f"- {s}\n")
             state_f.write_text(today, encoding="utf-8")

@@ -12,7 +12,7 @@ import { ragIngest, ragQuery, ragStats, setEmbedModel } from '@/lib/ragClient';
 import { apiFetch } from '@/lib/apiBase';
 import { authHeaders } from '@/lib/providerApi';
 import { API, useSettings } from '../context';
-import { Section, Row, inputC } from '../ui';
+import { Section, Row, inputC, cardClass, pageTitleClass, pageSubtitleClass } from '../ui';
 
 export default function DocumentsTab() {
   const { val, set, flash } = useSettings();
@@ -46,17 +46,17 @@ export default function DocumentsTab() {
 
   return (
     <>
-      <h2 className="mb-1 text-lg font-medium">文档知识库（RAG）</h2>
-      <p className="mb-5 text-xs text-gray-500">
+      <h2 className={pageTitleClass}>文档知识库（RAG）</h2>
+      <p className={pageSubtitleClass}>
         嵌入走本机 Ollama（浏览器直连），服务器只存向量。前置：Windows 环境变量 OLLAMA_ORIGINS=* 并重启 Ollama
       </p>
       <Section first title="嵌入模型（全库唯一真源）">
         <Row label="向量模型" description="所有入库/检索/米娅查询统一用这一个模型（单模型跨语言，旧中英文双模型已退役）。推荐 qwen3-embedding:0.6b（1024维，本机显卡带得动）。⚠️ 换模型后必须点右边「重建全库」，否则新旧向量不同空间、检索全乱。">
           <div className="flex gap-2">
-            <input className={inputC + ' w-52'} defaultValue={val('rag.embeddingModel', 'qwen3-embedding:0.6b')}
+            <input className={inputC + ' w-52'} defaultValue={val('rag.embeddingModel', '')} placeholder="留空=后端默认 qwen3-embedding:0.6b"
               onChange={(e) => { set('rag.embeddingModel', e.target.value); setEmbedModel(e.target.value); }} />
             <button
-              className="shrink-0 rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900"
+              className="shrink-0 rounded-[10px] border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
               onClick={async () => {
                 try {
                   setRagBusy(true);
@@ -68,11 +68,15 @@ export default function DocumentsTab() {
             >重建全库</button>
           </div>
         </Row>
+        <Row label="向量维度" description="嵌入模型输出维度（rag.embeddingDim，默认 1024）。换不同维度的模型时改这里再重建全库——维度不符迁移会跳过并报警（09-17 起不再静默丢块）。">
+          <input className={inputC + ' w-24'} type="number" defaultValue={val('rag.embeddingDim', 1024)}
+            onBlur={(e) => set('rag.embeddingDim', Number(e.target.value) || 1024)} />
+        </Row>
       </Section>
       <Section title="入库">
         <div className="flex gap-2">
           <input className={inputC + ' w-40 shrink-0'} placeholder="文档名" value={ragName} onChange={(e) => setRagName(e.target.value)} />
-          <button className="shrink-0 rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-black" onClick={ragIngestNow}>
+          <button className="shrink-0 rounded-[10px] bg-gray-900 px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-black" onClick={ragIngestNow}>
             {ragBusy ? '嵌入中…' : '入库'}
           </button>
         </div>
@@ -81,21 +85,21 @@ export default function DocumentsTab() {
       <Section title="检索测试">
         <div className="flex gap-2">
           <input className={inputC + ' flex-1'} placeholder="问一句，看能召回哪段…" value={ragQ} onChange={(e) => setRagQ(e.target.value)} />
-          <button className="shrink-0 rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-black" onClick={ragQueryNow}>检索</button>
+          <button className="shrink-0 rounded-[10px] bg-gray-900 px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-black" onClick={ragQueryNow}>检索</button>
         </div>
         {ragResults.length > 0 && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             {ragResults.map((r, i) => (
-              <div key={i} className="rounded-lg border border-gray-100 p-2 dark:border-gray-900">
-                <div className="text-[0.625rem] text-gray-500">{r.name} · 相关度 {r.score}</div>
-                <div className="mt-1 whitespace-pre-wrap text-xs">{r.text}</div>
+              <div key={i} className={cardClass + ' p-3'}>
+                <div className="text-xxs text-muted-foreground">{r.name} · 相关度 {r.score}</div>
+                <div className="mt-1 whitespace-pre-wrap text-sm">{r.text}</div>
               </div>
             ))}
           </div>
         )}
       </Section>
       <Section title="库存">
-        <div className="text-xs text-gray-500">{ragStatsData.chunks} 个片段 · {Object.keys(ragStatsData.docs || {}).length} 份文档：{Object.entries(ragStatsData.docs || {}).map(([n, c]) => `${n}(${c})`).join('、') || '空'}</div>
+        <div className="text-sm text-muted-foreground">{ragStatsData.chunks} 个片段 · {Object.keys(ragStatsData.docs || {}).length} 份文档：{Object.entries(ragStatsData.docs || {}).map(([n, c]) => `${n}(${c})`).join('、') || '空'}</div>
       </Section>
     </>
   );

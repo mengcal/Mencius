@@ -11,7 +11,8 @@
 
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode, MutableRefObject } from 'react';
-import { postSettings, getSettings } from '@/lib/providerApi';
+import { postSettings, getSettings, authHeaders } from '@/lib/providerApi';
+import { API as _API, apiFetch as _apiFetch } from '@/lib/apiBase';
 import { setEmbedModel } from '@/lib/ragClient';
 
 /** 后端基址（R10.11 千问 P1-2：改走 @/lib/apiBase 的同源 /lg 基址——旧值 127.0.0.1:2024 直连是跨源，
@@ -46,6 +47,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [S, setS] = useState<any>({});
   const [msg, setMsg] = useState('');
   const draftRef = useRef<any>({});
+  // 09-17 深夜 schema 收口：配置总表（后端 settings_schema.py 经 GET /settings/schema 下发）
+  // 作为默认值唯一来源——前端各输入框 val(key, 字面量) 的字面量退为 schema 未达时的最后兜底。
+  const schemaRef = useRef<Record<string, any>>({});
 
   const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(''), 3000); };
 
@@ -54,6 +58,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const s = await getSettings();
       setS(s);
       setEmbedModel((s?.rag?.embeddingModel || ''));  // R67：嵌入模型唯一真源=配置页，加载/保存后即时注入 ragClient
+      try {
+        const sc = await _apiFetch(`${_API}/settings/schema`, { headers: authHeaders() });
+        if (sc.ok) {
+          const j = await sc.json();
+          const m: Record<string, any> = {};
+          for (const [k, v] of Object.entries(j as any)) m[k] = (v as any).default;
+          schemaRef.current = m;
+        }
+      } catch { /* schema 拉不到=退回各输入框自带兜底，不崩 */ }
       draftRef.current = {};
     } catch {
       // 后端未启动或不可达：空配置展示，不让页面崩
@@ -66,7 +79,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const val = (path: string, dflt: any = '') => {
     const p = draftRef.current[path] !== undefined ? draftRef.current[path]
       : path.split('.').reduce((o: any, k) => (o ?? {})[k], S);
-    return p ?? dflt;
+    return p ?? schemaRef.current[path] ?? dflt;
   };
   const set = (path: string, v: any) => { draftRef.current[path] = v; flash('未保存'); };
 

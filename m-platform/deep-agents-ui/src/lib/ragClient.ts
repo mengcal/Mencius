@@ -10,14 +10,17 @@
 import { API, apiFetch } from './apiBase';
 import { authHeaders } from './providerApi';
 
-let EMBED_MODEL = 'qwen3-embedding:0.6b';
+// 09-17 批④（Lesson 68）：不再镜像后端默认模型名——未注入就调用=显式报错，绝不静默用错模型。
+let EMBED_MODEL = '';
 export function setEmbedModel(m: string) { if (m && m.trim()) EMBED_MODEL = m.trim(); }
 export function getEmbedModel() { return EMBED_MODEL; }
 
+// Ollama 默认端口（浏览器直连本机/局域网 Ollama；与后端容器侧 MIA_OLLAMA_URL env 是两个网络语境，各自单源）
+const OLLAMA_PORT = 11434;
 export function ollamaUrl() {
-  // 本机访问用 localhost；局域网其他设备访问时也走同一台机的 11434
-  if (typeof window === 'undefined') return 'http://localhost:11434';
-  return `http://${window.location.hostname}:11434`;
+  // 本机访问用 localhost；局域网其他设备访问时也走同一台机的 Ollama 端口
+  if (typeof window === 'undefined') return `http://localhost:${OLLAMA_PORT}`;
+  return `http://${window.location.hostname}:${OLLAMA_PORT}`;
 }
 
 export function ragLang(text: string): 'zh' | 'en' {
@@ -26,6 +29,7 @@ export function ragLang(text: string): 'zh' | 'en' {
 }
 
 export async function embed(text: string): Promise<number[]> {
+  if (!EMBED_MODEL) throw new Error('嵌入模型未注入：请刷新页面（模型读自配置页 rag.embeddingModel）');
   const r = await fetch(`${ollamaUrl()}/api/embed`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

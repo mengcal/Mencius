@@ -94,10 +94,9 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
                        （实测关闭思考 9.7s vs 开启 14.6s，省34%时间）
         **kwargs:      透传 ChatOpenAI 参数（temperature/max_tokens 等）
 
-    用法：
-        main = make_model("temp", "glm-4.5-air")          # 主模型
-        coder = make_model("ds", "deepseek-v4-flash")     # 代码子代理
-        visual = make_model("ss", "intern-latest", thinking=True)  # 识图要思考
+    用法（09-17 修正示例：旧例钉死 ss/temp 遗留键已失效，服务商名以设置页为准）：
+        main = make_model("<设置页里的服务商名>", "<模型名>")      # 主模型
+        visual = make_model("<服务商名>", "<模型名>", thinking=True)  # 识图要思考
     """
     providers = load_providers()
     if provider_name not in providers:
@@ -105,14 +104,32 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
     p = providers[provider_name]
     model = model_name or p.get("model", "")
     # 魔搭偶发 429 限流/响应慢 → 给模型加自动重试 + 请求超时
-    max_retries = kwargs.pop("max_retries", 3)
-    request_timeout = kwargs.pop("request_timeout", 90)
+    # 09-17 批⑤（Lesson 68）：优先级=调用方显式传参 > 配置页 model.maxRetries/requestTimeout > 代码默认
+    try:
+        from settings_mgr import load_settings as _ls
+        _mcfg = _ls().get("model", {}) or {}
+    except Exception:
+        _mcfg = {}
+    _mr = kwargs.pop("max_retries", None)
+    _rt = kwargs.pop("request_timeout", None)
+    try:
+        from settings_schema import default_of as _dof
+        max_retries = int(_mr if _mr is not None else _mcfg.get("maxRetries", _dof("model.maxRetries")))
+    except (TypeError, ValueError):
+        max_retries = 3
+    try:
+        request_timeout = int(_rt if _rt is not None else _mcfg.get("requestTimeout", _dof("model.requestTimeout")))
+    except (TypeError, ValueError):
+        request_timeout = 90
 
     # ===== 思考控制（爸爸四档：关闭/低/中/高；字符串档位或 True/False）=====
     # 各家协议不同，按 base_url 域名适配；档位只分"关/开"两级的厂商，低中高都按开处理。
-    thinking = kwargs.pop("thinking", None)  # None=不动（但书生默认关思考，见下）
-    if thinking is None and provider_name == "ss":
-        thinking = False  # 历史行为：书生默认关思考（省 token 快）
+    thinking = kwargs.pop("thinking", None)  # None=不动
+    # 09-17 批③（Lesson 68）：旧 `provider_name == "ss"` 写死判断=死代码（providers.json 遗留表
+    # 已空，现役服务商名是"书生N号"）——删。思考默认改读服务商配置字段 thinking_default
+    # （设置页服务商条目可配 false/off；未配=None 维持原行为），零行为变化。
+    if thinking is None and p.get("thinking_default") in (False, "off", "关闭"):
+        thinking = False
     extra_body = dict(kwargs.pop("extra_body", {}) or {})
     if thinking is not None:
         host = (p.get("base_url") or "").split("//")[-1].split("/")[0]

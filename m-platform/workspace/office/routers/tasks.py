@@ -95,7 +95,7 @@ def _sdk_client():
     from settings_mgr import get_api_token
     from internal_key import INTERNAL_KEY
     _tok = get_api_token()
-    return get_client(url="http://localhost:8000",
+    return get_client(url=os.environ.get("MIA_SELF_SDK_URL", "http://localhost:8000"),
                       headers={"X-Internal-Key": INTERNAL_KEY,
                                **({"Authorization": f"Bearer {_tok}"} if _tok else {})})
 
@@ -124,7 +124,9 @@ _WHBK = os.environ.get("WEBHOOK_TOKEN", "")
 
 
 def _webhook_url(tid: str) -> str:
-    return f"http://workplatform:8000/tasks/webhook?tid={tid}&w={_WHBK}"
+    # 09-17 批②：回调基址走 env（compose 可覆盖），默认=本容器服务名
+    base = os.environ.get("MIA_WEBHOOK_BASE", "http://workplatform:8000").rstrip("/")
+    return f"{base}/tasks/webhook?tid={tid}&w={_WHBK}"
 
 
 @router.post("/tasks/dispatch")
@@ -339,10 +341,29 @@ async def threads_title(req: dict = Body(...)):
         if not human:
             return {"ok": True, "skipped": "还没有用户消息"}
         from providers import make_model
-        from settings_mgr import load_agents_config
-        _ac = load_agents_config()
-        _tc = _ac.get("scribe") or _ac.get("boss") or {}
-        m = make_model(_tc.get("provider", ""), _tc.get("model", ""), thinking="off", temperature=0.3)
+        from settings_mgr import load_agents_config, load_settings
+        # W5（界面→任务模型可选）：settings.task.model 优先；留空=回退主管链路（scribe→boss，
+        # 与旧行为一致，不动主管模型本体）。设了却对不上任何启用服务商的模型=明确报错并指向配置页
+        # 哪一项（家规第 1 条：不许静默兜底）。
+        _s = load_settings()
+        _tm = str((_s.get("task") or {}).get("model") or "").strip()
+        m = None
+        if _tm:
+            for _p in (_s.get("external", {}) or {}).get("providers", []):
+                if not _p.get("enabled", True) or _tm not in (_p.get("models_cache") or []):
+                    continue
+                try:
+                    m = make_model(_p.get("name", ""), _tm, thinking="off", temperature=0.3)
+                except Exception:
+                    m = None
+                break
+            if m is None:
+                return {"ok": False, "error": f"任务模型「{_tm}」在启用服务商的模型列表里找不到"
+                                               "——请到 管理→界面→任务模型 重选，或清空改为跟随主管模型"}
+        else:
+            _ac = load_agents_config()
+            _tc = _ac.get("scribe") or _ac.get("boss") or {}
+            m = make_model(_tc.get("provider", ""), _tc.get("model", ""), thinking="off", temperature=0.3)
         prompt = ("给这段对话起一个不超过12个字的标题，概括用户的核心意图。"
                   "只输出标题本身，不要引号不要句号。\n\n用户说："
                   + str(_mc(human))[:300])

@@ -34,11 +34,12 @@ print("[office] STEP0.5 .env loaded", flush=True)
 
 
 # ===== R10 修四①：宿主侧 secrets 卷目录（被审计方摸不到的地方）=====
-# 账本/激活码一律挪到这个目录：沙箱与牛马进程不可达 secrets 卷，因此改不动账本、读不到激活码。
+# 账本一律挪到这个目录：沙箱与牛马进程不可达 secrets 卷，因此改不动账本。
 # R10.2（hy4 ②-1，实测坐实）：env MIA_SECRETS_PATH 的真语义=密钥【文件】路径
 # （settings_mgr:24 同用此值且按文件读写）——旧实现把文件路径当目录返回，
-# 生产下 .token_bootstrap/两本账全落在 "/data/secrets/.settings_secrets/xxx" 这种不可能路径上，
-# mkdir 必炸→激活码静默不生成→首设永久不可用、账本形同虚设。取 .parent 才是所在目录。
+# 生产下两本账全落在 "/data/secrets/.settings_secrets/xxx" 这种不可能路径上，
+# mkdir 必炸→账本形同虚设。取 .parent 才是所在目录。
+# （r27 若若 P3-4：原注释提及的 .token_bootstrap 激活码已随 R10.408 注册流程反转退役。）
 def _secrets_dir() -> Path:
     p = os.environ.get("MIA_SECRETS_PATH", "").strip()
     return (Path(p).parent if p else (BASE.parent / "secrets"))
@@ -87,9 +88,11 @@ def _rotate_log(p: Path) -> None:
         pass  # 旋转失败不影响记账（观测面）
 
 
-def _token_audit(action: str, ok: bool, **extra) -> None:
+def _token_audit(action: str, ok: bool, strict: bool = False, **extra) -> None:
     """R10.2（hy4 ②-2/②-3）：首设/清除/删码这类最高权动作必须有账——
-    被抢注至少可追溯（时间+动作+结果+IP）。落 secrets 卷（被审计方摸不到）；写失败只出声。"""
+    被抢注至少可追溯（时间+动作+结果+IP）。落 secrets 卷（被审计方摸不到）；写失败只出声。
+    r30 CB#2：strict=True 时写失败 raise（confirm-level 放宽专用——审计落不下=动作回滚，
+    不许无痕生效）；其余调用方维持原语义（吞异常只出声，观测面不拖垮主流程）。"""
     try:
         import datetime as _dt
         import json as _j
@@ -103,6 +106,8 @@ def _token_audit(action: str, ok: bool, **extra) -> None:
             f.write(_j.dumps(rec, ensure_ascii=False) + "\n")
     except Exception as e:
         print(f"[token] 审计日志写入失败：{e}", flush=True)
+        if strict:
+            raise
 
 
 def _presented_token(request) -> str:

@@ -12,9 +12,9 @@
 端点：
 - GET  /status            → {"configured": bool}（无敏感）
 - POST /verify {token}    → {"ok": bool}（常数时间；限频；审计；永不回明文）
-- POST /set    {token, bootstrap?} → 设置密钥：未配置态须 bootstrap 激活码正确（guard 自己生成/验证/兑现激活码）
-- POST /clear  {token}    → 清除（须当前密钥）；清后重建激活码
-- GET  /bootstrap/status  → {"exists": bool}
+- POST /set    {token, password?} → 设置密钥：未配置态=注册窗口，谁先注册谁是主人
+  （R10.408 爸爸 09-23："没注册之前不该上锁"——激活码机制废除；用户名/密码强度校验在 office 层）
+- POST /clear  {token}    → 清除（须当前密钥）；未配置态=无操作
 审计：每动作落 guard 目录 token_audit.jsonl + stdout（双通道）。
 """
 import ctypes
@@ -30,7 +30,6 @@ GUARD_DIR = Path(__file__).resolve().parent
 TOKEN_BLOB = GUARD_DIR / "token.bin"
 PASSWORD_BLOB = GUARD_DIR / "password.bin"
 AUDIT_LOG = GUARD_DIR / "token_audit.jsonl"
-BOOTSTRAP_FILE = Path(os.environ.get("M_GUARD_BOOTSTRAP", str(GUARD_DIR / ".token_bootstrap")))
 HOSTCOPY = Path(os.environ.get("M_GUARD_HOSTCOPY", str(GUARD_DIR / "hostcopy.token")))
 _PORT = int(os.environ.get("M_GUARD_PORT", "9101"))
 
@@ -57,6 +56,10 @@ _load_dotenv_mini()
 
 _LOGIN_HITS: list = []  # /login 严格限频（10/min）：防密码爆破
 _LOGIN_FAILS = {"n": 0, "until": 0.0}  # R10.8（Eve P2-2）：连续失败≥5 → 锁 300s
+# r30 Veda F4：/verify_password 用【独立】锁桶，不与 /login 共桶——
+# 共桶时持 token 者填 5 次错密码即可锁死爸爸登录（DoS 牵连）；
+# 分桶后爆炸半径=放宽通道自身（该通道本就需 token，攻击者锁它无收益）。
+_VERIFY_FAILS = {"n": 0, "until": 0.0}
 GUARD_KEY = os.environ.get("M_GUARD_KEY", "")  # R10.8（NOVA 🔴A/Eve P1-1）：通信钥匙——
 # 宿主回环被 host.docker.internal 转发成"所有容器可达"，且转发后源 IP 一律 127.0.0.1
 # （实测 token_audit 证实）——网络位置不再构成身份，/verify /set /set_password /clear
@@ -64,7 +67,9 @@ GUARD_KEY = os.environ.get("M_GUARD_KEY", "")  # R10.8（NOVA 🔴A/Eve P1-1）�
 # 它是唯一能签发新管理员密钥的端点且 office 调用本就带钥匙；/status 保持无钥匙可达（信息量极低）。
 
 _HITS: list = []  # verify 限频（300/min）
-_SET_HITS: list = []      # R10.7b（hy4 P1-3）：/set 与 /set_password 独立限频桶（10/min）
+_SET_HITS: list = []      # R10.7b（hy4 P1-3）：/set 与 /set_password 共用此桶（10/min，
+                          # 与 verify 的 _HITS 分桶）——r27 若若 P3-5：原注释"独立限频桶"
+                          # 与实际共桶不符，共桶更严格无害，文案对齐实现。
 # R10.8（hy4 测试套抓到死锁）：_write_token 持锁路径里 hostcopy 失败会调 _audit →
 # _audit 也用同一把锁 → threading.Lock 不可重入=自锁死。换 RLock（重入安全）。
 _LOCK = threading.RLock()
@@ -255,45 +260,6 @@ def _ck(a: str, b: str) -> bool:
         return False
 
 
-def _bootstrap_read() -> str:
-    try:
-        return BOOTSTRAP_FILE.read_text(encoding="utf-8").strip()
-    except Exception:
-        return ""
-
-
-def _bootstrap_ensure() -> str:
-    cur = _bootstrap_read()
-    if cur:
-        return cur
-    import secrets as _s
-    try:
-        BOOTSTRAP_FILE.parent.mkdir(parents=True, exist_ok=True)
-        BOOTSTRAP_FILE.write_text(_s.token_hex(16), encoding="utf-8")
-        # R10.6b（hy4 F17）：旧版用 chmod(0o600)——Windows 上无效语义。改用 icacls 收紧 ACL：
-        # 只留 SYSTEM、Administrators 与【当前运行账户】（非提权令牌不在 Administrators 组里，
-        # 不加这一条守卫自己都读不回激活码——hy4 测试套当场抓到）。
-        try:
-            import subprocess as _sp
-            user = os.environ.get("USERNAME", "")
-            grants = ["SYSTEM:F", "Administrators:F"] + ([f"{user}:F"] if user else [])
-            _sp.run(["icacls", str(BOOTSTRAP_FILE), "/inheritance:r", "/grant:r", *grants],
-                    capture_output=True, timeout=10)
-        except Exception as e:
-            _audit("bootstrap_acl_failed", err=type(e).__name__)  # R10.11（千问）：注释说"只审计"就真审计——此前 except pass 静默
-        _audit("bootstrap_ensure")
-    except Exception as e:
-        _audit("bootstrap_failed", err=type(e).__name__)
-    return _bootstrap_read()
-
-
-def _bootstrap_drop() -> None:
-    try:
-        BOOTSTRAP_FILE.unlink(missing_ok=True)
-    except OSError:
-        pass
-
-
 def _rate_ok() -> bool:
     now = time.time()
     with _LOCK:
@@ -322,8 +288,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/status":
             self._send(200, {"configured": bool(_read_token()), "service": "m-guard"})
-        elif self.path == "/bootstrap/status":
-            self._send(200, {"exists": bool(_bootstrap_read())})
         else:
             self._send(404, {"error": "not found"})
 
@@ -390,10 +354,8 @@ class Handler(BaseHTTPRequestHandler):
                 _audit("set_no_key", ip=ip)
                 self._send(403, {"ok": False, "error": "missing guard key"})
                 return
-            # R10.7b（hy4 P1-1 死锁修复）：首设原子化——token+密码（可选）+删激活码
-            # 在同一持锁段一次完成，不存在"码已废、密码未落"的中间态。
+            # R10.7b（hy4 P1-1 死锁修复）：首设原子化——token+密码在同一持锁段一次完成。
             val = str(req.get("token") or "").strip()
-            boot = str(req.get("bootstrap") or "").strip()
             pwd = str(req.get("password") or "")
             if not val:
                 self._send(400, {"ok": False, "error": "token required"})
@@ -419,21 +381,22 @@ class Handler(BaseHTTPRequestHandler):
                     _audit("rotate", ip=ip, with_password=bool(pwd))
                     self._send(200, {"ok": True})
                     return
-                # 未配置（首设）：须激活码——带外文件只在宿主，谁拿得出谁是管理员
-                expect = _bootstrap_read()
-                if not expect or not _ck(expect, boot):
-                    _audit("bootstrap_denied", ip=ip)
-                    self._send(403, {"ok": False,
-                                     "error": "首设需激活码（部署目录 guard 文件夹的 .token_bootstrap 文件内容，注册页可粘贴）"})
-                    return
+                # 未配置（首设）：注册窗口开放——谁先注册谁是主人（R10.408 爸爸 09-23 令，
+                # 激活码废除）。X-Guard-Key 门仍在（office 进程独有，沙箱没有钥匙进不来这一层）；
+                # 用户名/密码强度校验在 office 层，本层只保证写入原子性+留审计。
                 if pwd and len(pwd) < 8:
                     self._send(400, {"ok": False, "error": "密码至少 8 位"})
                     return
                 _write_token(val)
                 if pwd:
-                    _write_password_hash(_hash_password(pwd))
-                _bootstrap_drop()  # 兑现即删——与写 token/密码同持锁段（P1-1：无中间态）
-            _audit("bootstrap_first_set", ip=ip, with_password=bool(pwd))
+                    # r27 评审 P2-4（CB）：密码写失败必须回滚 token——否则留下"有密钥无密码"
+                    # 半注册态（找回通道缺失）。回滚后原样抛出→顶层 400+审计。
+                    try:
+                        _write_password_hash(_hash_password(pwd))
+                    except Exception:
+                        _del_token()
+                        raise
+            _audit("first_set", ip=ip, with_password=bool(pwd))
             self._send(200, {"ok": True})
             return
         if self.path == "/set_password":
@@ -452,10 +415,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             cur = _read_token()
             stored = _read_password_hash()
-            # R10.8d（爸爸："怎么修改密码"）：修改找回密码的证明路径——
-            #   ① 旧密码验证通过（知道旧密码=有权改，最用户友好）
-            #   ② 当前密钥证明（CLI/API 场景）
-            # 两者任一通过即可。防持久化攻击：旧密码验证仍然必须。
+            # R10.8d（爸爸："怎么修改密码"）+r27 评审 P1-1 分层定稿：
+            #   守卫层证明=①旧密码 或 ②当前密钥——密钥路径专供【宿主直连】场景
+            #   （reset_password.cmd 物理访问=信任锚，带 hostcopy 作 current）。
+            #   浏览器/XSS 面在 office 层已收紧（/auth/set_password 只转旧密码，
+            #   不再代转 current），所以这里的②路径对持 Cookie 的脚本不可达。
             old_pwd = str(req.get("old_password") or "")
             proved = False
             if stored and old_pwd and _check_password(old_pwd, stored):
@@ -528,7 +492,7 @@ class Handler(BaseHTTPRequestHandler):
                 _audit("verify_password_rate_limited", ip=ip)
                 self._send(429, {"ok": False, "error": "尝试过于频繁"})
                 return
-            if _LOGIN_FAILS["n"] >= 5 and time.time() < _LOGIN_FAILS["until"]:
+            if _VERIFY_FAILS["n"] >= 5 and time.time() < _VERIFY_FAILS["until"]:
                 _audit("verify_password_locked", ip=ip)
                 self._send(429, {"ok": False, "error": "连续失败已锁定，请 5 分钟后再试"})
                 return
@@ -537,11 +501,11 @@ class Handler(BaseHTTPRequestHandler):
             ok = bool(cur and stored and _check_password(str(req.get("password") or ""), stored))
             with _LOCK:
                 if not ok:
-                    _LOGIN_FAILS["n"] += 1
-                    if _LOGIN_FAILS["n"] >= 5:
-                        _LOGIN_FAILS["until"] = time.time() + 300.0
+                    _VERIFY_FAILS["n"] += 1
+                    if _VERIFY_FAILS["n"] >= 5:
+                        _VERIFY_FAILS["until"] = time.time() + 300.0
                 else:
-                    _LOGIN_FAILS["n"] = 0  # 验对=证明持密码者本人，计数清零（与 /login 一致）
+                    _VERIFY_FAILS["n"] = 0  # r30 Veda F4：独立桶，验对只清自己，不再牵登录桶
             _audit("verify_password", ok=ok, ip=ip)
             self._send(200, {"ok": ok})
             return
@@ -550,8 +514,8 @@ class Handler(BaseHTTPRequestHandler):
                 _audit("clear_no_key", ip=ip)
                 self._send(403, {"ok": False, "error": "missing guard key"})
                 return
-            # R10.7b（hy4 P1-2）：未配置态的 clear 也要激活码证明——
-            # 否则任何调用方可免凭证反复删密码+覆盖别人尚未使用的激活码（重置干扰）。
+            # R10.408（激活码废除）：未配置态的 clear=无操作——本来就没东西可清，
+            # 不再写任何文件（此前"清后重建激活码"的门已随注册流程反转一起拆除）。
             cur = _read_token()
             if cur:
                 if not _ck(str(req.get("token") or ""), cur):
@@ -559,14 +523,11 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"ok": False, "error": "清除需当前密钥"})
                     return
             else:
-                expect = _bootstrap_read()
-                if not expect or not _ck(expect, str(req.get("bootstrap") or "")):
-                    _audit("clear_denied_unconfigured", ip=ip)
-                    self._send(403, {"ok": False, "error": "未配置态清除需激活码证明"})
-                    return
+                _audit("clear_noop_unconfigured", ip=ip)
+                self._send(200, {"ok": True, "cleared": False})
+                return
             _del_token()
             _del_password()
-            _bootstrap_ensure()
             _audit("token_clear", ip=ip)
             self._send(200, {"ok": True, "cleared": True})
             return
@@ -605,8 +566,7 @@ if __name__ == "__main__":
     # 不再出现"两进程都写 token.bin 后才抢端口"的损坏窗口
     _httpd = ThreadingHTTPServer(("127.0.0.1", _PORT), Handler)
     _migrate_from_legacy()
-    if not _read_token():
-        _bootstrap_ensure()
+    # R10.408：不再预生成激活码——未配置态=注册窗口开放，谁先注册谁是主人。
     # R10.8：hostcopy 挪路径后的衔接——守卫自己解得开 token.bin，把明文副本补写到新位置
     if _read_token() and not HOSTCOPY.exists():
         try:

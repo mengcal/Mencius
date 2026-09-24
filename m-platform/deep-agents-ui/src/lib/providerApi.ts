@@ -49,15 +49,12 @@ export function postSettings(section: string, body: Record<string, unknown>) {
 export function tokenStatus(): Promise<{ configured: boolean }> {
   return apiFetch(`${API}/settings/token/status`).then((r) => r.json()).catch(() => ({ configured: false }));
 }
-export function tokenRotate(newToken?: string, bootstrapCode?: string): Promise<{ ok?: boolean; token?: string; error?: string }> {
+export function tokenRotate(newToken?: string): Promise<{ ok?: boolean; token?: string; error?: string }> {
   return apiFetch(`${API}/settings/token`, {
     method: 'POST',
-    // R10.5 事故修复：首设（未配置态）必须带 X-Bootstrap 激活码（宿主 .token_bootstrap 文件里的值）——
-    // 此前前端没有激活码输入框，爸爸清钥后 4 连 403（审计实锤），UI 断层当场爆发。
-    headers: authHeaders({
-      'Content-Type': 'application/json',
-      ...(bootstrapCode ? { 'X-Bootstrap': bootstrapCode } : {}),
-    }),
+    // R10.408：X-Bootstrap 激活码头已随注册流程反转退役（后端不再读取）。
+    // 轮换（已配置态）证明=当前密钥（Cookie/Bearer 由 authHeaders 携带）。
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ token: newToken || '' }),
   }).then((r) => r.json()).catch(() => ({ error: '无法连接后端' }));
 }

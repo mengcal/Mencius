@@ -32,11 +32,13 @@ def _search_setting(key: str, dflt):
         return dflt
 
 
-BOCHA_URL = "https://api.bochaai.com/v1/web-search"
-TAVILY_URL = "https://api.tavily.com/search"
-METASO_URL = "https://metaso.cn/api/mcp"
-SEARXNG_URL = "http://searxng:8080/search"
-BING_URL = "https://www.bing.com/search"
+# 09-17 深夜 schema 收口：默认值单一来源=settings_schema.py
+from settings_schema import default_of as _dof
+BOCHA_URL = _dof("search.bochaUrl")
+TAVILY_URL = _dof("search.tavilyUrl")
+METASO_URL = _dof("search.metasoUrl")
+SEARXNG_URL = _dof("search.searxngUrl")
+BING_URL = _dof("search.bingUrl")
 
 
 def _count() -> int:
@@ -45,6 +47,15 @@ def _count() -> int:
         return int(_search_setting("resultCount", 5))
     except Exception:
         return 5
+
+
+def _engine_url(key: str, default: str) -> str:
+    """09-17 批②（Lesson 68）：搜索端点进配置（settings.search.<key>），代码常量退为默认值；
+    公网引擎只许 https，非法值回落默认（同 searxng R10.11 轻闸门思路）。"""
+    v = str(_search_setting(key, default)).strip()
+    if not v.lower().startswith("https://"):
+        v = default
+    return v
 
 
 def _fmt(results, max_n=5):
@@ -61,7 +72,7 @@ def _bocha(query, count=5):
     if not _key("bochaKey"):
         return _no_key("博查")
     body = json.dumps({"query": query, "count": count, "summary": True}).encode()
-    req = urllib.request.Request(BOCHA_URL, data=body, headers={
+    req = urllib.request.Request(_engine_url("bochaUrl", BOCHA_URL), data=body, headers={
         "Authorization": f"Bearer {_key('bochaKey')}", "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=20) as r:
         d = json.load(r)
@@ -74,7 +85,7 @@ def _bocha(query, count=5):
 
 def _mcp_call(method, params):
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    req = urllib.request.Request(METASO_URL, data=body, headers={
+    req = urllib.request.Request(_engine_url("metasoUrl", METASO_URL), data=body, headers={
         "Authorization": f"Bearer {_key('metasoKey')}", "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=25) as r:
         return json.load(r)
@@ -131,7 +142,7 @@ import re, html as _html
 def _bing(query, count=5):
     """必应(cn.bing.com)免代理搜索，解析HTML标题+链接。"""
     q = urllib.parse.quote(query)
-    url = f"{BING_URL}?q={q}&setlang=zh-hans&count={count}"
+    url = f"{_engine_url('bingUrl', BING_URL)}?q={q}&setlang=zh-hans&count={count}"
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
         "Accept-Language": "zh-CN,zh;q=0.9"})
@@ -157,7 +168,7 @@ def _tavily(query, count=5):
     if not _key("tavilyKey"):
         return _no_key("Tavily")
     body = json.dumps({"api_key": _key("tavilyKey"), "query": query, "max_results": count}).encode()
-    req = urllib.request.Request(TAVILY_URL, data=body, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(_engine_url("tavilyUrl", TAVILY_URL), data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=20) as r:
         d = json.load(r)
     return _fmt(d.get("results", []))

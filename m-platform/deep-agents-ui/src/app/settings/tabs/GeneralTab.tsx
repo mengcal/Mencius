@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSettings } from '../context';
-import { Section, Row, Switch, inputC, autoGrow } from '../ui';
+import { Section, Row, Switch, inputC, autoGrow, pageTitleClass, pageSubtitleClass } from '../ui';
 
 export default function GeneralTab() {
   const { val, set, flash } = useSettings();
@@ -21,8 +21,8 @@ export default function GeneralTab() {
   const [paramsOpen, setParamsOpen] = useState(true);
   return (
     <>
-      <h2 className="mb-1 text-lg font-medium">通用</h2>
-      <p className="mb-5 text-xs text-gray-500">米娅人设、高级参数与对话显示偏好（R10.11 头部排版统一）</p>
+      <h2 className={pageTitleClass}>通用</h2>
+      <p className={pageSubtitleClass}>米娅人设、高级参数与对话显示偏好</p>
       <Section first title="系统提示词">
         <textarea
           className={inputC}
@@ -33,11 +33,11 @@ export default function GeneralTab() {
           onChange={(e) => { set('general.system_prompt', e.target.value); const t = e.currentTarget; t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight, 112) + 'px'; }}
         />
         {/* R80（Cora ⑧ 半条）：人设/系统提示词区补"需重启"提示——牛马矩阵区有、这里两轮漏了 */}
-        <p className="mt-1 text-[0.6875rem] text-gray-400 dark:text-gray-600">保存后需重启容器生效（米娅启动时读取 system_prompt）。</p>
+        <p className="mt-1 text-xxs text-muted-foreground">保存后需重启容器生效（米娅启动时读取 system_prompt）。</p>
       </Section>
       <Section title="高级参数">
-        <Row label="Model parameters" description="Show or hide custom generation parameters.（温度/max_tokens 已生效，其余参数存配置待接线）">
-          <button className="text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200" onClick={() => setParamsOpen(!paramsOpen)}>
+        <Row label="模型参数 (Model parameters)" description="显示或隐藏自定义生成参数（温度/max_tokens 已生效，其余参数存配置待接线）">
+          <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setParamsOpen(!paramsOpen)}>
             {paramsOpen ? '关闭' : '显示'}
           </button>
         </Row>
@@ -63,11 +63,11 @@ export default function GeneralTab() {
             />
           </Row>
         ))}
-        {paramsOpen && <div className="pt-1 text-center text-xs text-gray-500">＋ 增加自定义参数（后续支持）</div>}
+        {paramsOpen && <div className="pt-1 text-center text-sm text-muted-foreground">＋ 增加自定义参数（后续支持）</div>}
       </Section>
       <Section title="对话压缩">
         <Row label="Context Compaction" description="已归位：在 管理 → 界面 设置（对话压缩，官方 SummarizationMiddleware）">
-          <span className="text-xs text-gray-500">见"界面"页</span>
+          <span className="text-sm text-muted-foreground">见「界面」页</span>
         </Row>
         <Row label="显示工具调用" description="对话里显示牛马干活的工具卡片（可折叠展开）。关闭后隐藏，界面更清爽">
           <Switch

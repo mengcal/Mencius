@@ -18,6 +18,7 @@ import { ThreadList } from "@/app/components/ThreadList";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ChatInterface } from "@/app/components/ChatInterface";
 import { getSettings, postSettings, tokenStatus } from "@/lib/providerApi";
+import { API, apiFetch } from "@/lib/apiBase";
 import { SetupWizard, LoginGate } from "@/app/components/SetupWizard";
 
 /** 顶栏快捷开关：确认分档 / 米娅管牛马 / 工具显隐——不进设置页直接切（2026-08-30 知夏）
@@ -44,9 +45,25 @@ function QuickToggles() {
     setTools(localStorage.getItem("mia.showToolCalls") !== "false");
   }, []);
 
-  const pickConfirm = (v: string) => {
+  const pickConfirm = async (v: string) => {
+    // r29 焊档（全家判词收敛）：顶栏只做紧急刹车——放宽方向一律挡回设置页走旧密码人质门，
+    // 收紧方向即时生效（非对称设计：降权限不设槛）。
+    const RANK: Record<string, number> = { plan: 0, strict: 1, auto_edit: 2, full: 3 };
+    if ((RANK[v] ?? 1) > (RANK[confirmLevel] ?? 1)) {
+      window.alert("放宽档位须到设置页经管理员密码验证；顶栏只做收紧（紧急刹车）。");
+      return;
+    }
+    const prev = confirmLevel;
     setConfirmLevel(v);
-    postSettings("general", { confirmLevel: v });  // 即时生效无需重启（门每轮现读）
+    try {
+      const r = await apiFetch(`${API}/settings/confirm-level`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level: v }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!j?.ok) { setConfirmLevel(j?.previous || prev); window.alert(j?.error || "档位切换失败"); }
+    } catch { setConfirmLevel(prev); window.alert("无法连接后端"); }
   };
   const toggleMia = () => {
     const next = !miaManage;

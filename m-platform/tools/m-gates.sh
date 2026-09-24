@@ -142,7 +142,7 @@ echo "── R10.8：guard 通信钥匙（无 X-Guard-Key → 403，沙箱挤兑
 NK=$(curl -s -o /dev/null -w "%{http_code}" -m 8 -X POST http://127.0.0.1:9101/verify -H 'Content-Type: application/json' -d '{"token":"x"}')
 if [ "$NK" = "403" ]; then echo "✓ guard 无钥匙 verify = 403"; else echo "✗ guard 无钥匙实得 $NK"; FAILS=$((FAILS+1)); fi
 echo "── secrets 卷账本实锤（②-1 修正=office 侧账本真落 /data/secrets/）──"
-LED=$(docker exec m-workplatform-1 sh -c 'ls /data/secrets/ | grep -cE "usage|audit|bootstrap"' 2>/dev/null)
+LED=$(docker exec m-workplatform-1 sh -c 'ls /data/secrets/ | grep -cE "usage|audit"' 2>/dev/null)
 if [ "${LED:-0}" -ge 1 ]; then echo "✓ secrets 卷账本/服务商密钥文件数 = $LED"; else echo "✗ secrets 卷文件缺失"; FAILS=$((FAILS+1)); fi
 echo "── 总结 ──"
 if [ "$FAILS" = "0" ]; then echo "ALL GREEN"; exit 0; else echo "FAILURES: $FAILS"; exit 1; fi

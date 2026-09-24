@@ -2,7 +2,7 @@
 office.routers.misc —— /skills、/usage、/context、/stats、/health、/approvals、旧路径指引页（APIRouter）
 =====================================================================
 来源：D:\\m\\workspace\\office.py（1901 行）拆分。本文件对应原行号段：
-- :239-267   skills_lock 管理端点（GET /skills/list、POST /skills/rehash）
+- :239-267   skills_lock 管理端点（GET /skills/list、POST /skills/rehash；W3 增 /skills/create|update|delete）
 - :643-724   GET /usage/today、GET /context/threads、GET /stats
 - :1106-1142 GET /health、POST /approvals、DELETE /approvals
 - :1552-1574 /config（已删除指引）、/settings_page、/office、/（根跳转）
@@ -14,7 +14,11 @@ office.routers.misc —— /skills、/usage、/context、/stats、/health、/app
 注：原 :1148 的 `import json as _json` 延迟导入提到顶部（/usage、/context 需要）。
 """
 import json as _json  # 原 :1148（提到顶部）
+import os  # W3：技能目录 realpath 前缀校验
+import re  # W3：技能名白名单
+import shutil  # W3：删技能目录
 import threading  # r51b reflect daemon 用（模块级统一）
+from pathlib import Path  # W3：技能路径运算
 
 import skills_lock as _skills_lock  # 原 :240
 
@@ -28,12 +32,104 @@ router = APIRouter()
 
 _SKILLS_DIR = BASE / "mia_home" / "skills"  # 原 :241（原 Path(__file__).parent=workplatform 根；包化后改用 BASE，语义等价）
 
+# W3：技能名白名单——只许小写字母/数字/-/_，2-41 位，首字符限字母或数字（天然拒 "/" 与 ".."，堵路径穿越）。
+_SKILL_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,40}$")
+
+
+def _skill_dir(name: str):
+    """技能名 → 目录 Path（非法返回 None）。白名单正则 + realpath 前缀双保险（必须正好落在 _SKILLS_DIR 之下）。"""
+    n = str(name or "").strip()
+    if not _SKILL_NAME_RE.match(n):
+        return None
+    base = Path(os.path.realpath(_SKILLS_DIR))
+    d = Path(os.path.realpath(base / n))
+    if d.parent != base:  # 白名单已挡穿越；此处再确认没有借软链/相对路径跑出技能目录
+        return None
+    return d
+
+
+def _parse_skill_md(md: Path):
+    """解析 SKILL.md → (name, description, body)。body=正文（去掉 frontmatter），供设置页编辑回显。
+    逐行解析，不引 yaml 依赖。"""
+    try:
+        text = md.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return "", "", ""
+    lines = text.splitlines()
+    name = desc = ""
+    body = text.strip("\n")
+    if lines and lines[0].strip() == "---":
+        end = None
+        for i, ln in enumerate(lines[1:], start=1):
+            if ln.strip() == "---":
+                end = i
+                break
+            if ":" not in ln:
+                continue
+            k, _, v = ln.partition(":")
+            k = k.strip().lower()
+            v = v.strip().strip('"').strip("'")
+            if k == "name" and not name:
+                name = v
+            elif k == "description" and not desc:
+                desc = v
+        if end is not None:
+            body = "\n".join(lines[end + 1:]).strip("\n")
+    return name, desc, body
+
+
+def _render_skill_md(name: str, description: str, content: str) -> str:
+    """拼出 <name>/SKILL.md 全文：frontmatter(name/description) + 正文。"""
+    desc = (description or "").replace("\n", " ").strip()
+    body = (content or "").replace("\r\n", "\n").strip("\n")
+    return f"---\nname: {name}\ndescription: {desc}\n---\n\n{body}\n"
+
+
+def _discover_skills() -> list:
+    """扫 _SKILLS_DIR 下的顶层技能目录（含 SKILL.md）名列表。"""
+    base = Path(_SKILLS_DIR)
+    if not base.is_dir():
+        return []
+    return [p.name for p in sorted(base.iterdir()) if p.is_dir() and (p / "SKILL.md").is_file()]
+
+
+def _after_skill_change(name: str, removed: bool = False) -> dict:
+    """W3：技能文件改动后更新 skills_lock 基线并回新哈希。
+
+    r27 评审 P2（Eve B2 尾注 + Veda 耦合提醒，知夏采纳）：旧实现调 rehash() 全目录重建
+    基线——workplatform 挂载改 rw 后这就是洗白洞：任何一次合法写操作会把越权者偷偷
+    塞进技能目录的文件一并"登记为合法"。现改为【只并入/摘除本次变更条目】：
+    基线其余条目原样保留，未登记的 extra 仍会在 verify 报出、由爸爸 rehash 定夺。"""
+    if not _skills_lock.enabled():
+        return {"rehashed": False, "reason": "skills_lock 未启用，跳过重登记"}
+    rel = f"{name}/SKILL.md"
+    md = Path(_SKILLS_DIR) / rel
+    manifest = _skills_lock.ensure_baseline(_SKILLS_DIR)
+    if removed or not md.is_file():
+        manifest.pop(rel, None)
+        new_hash = ""
+    else:
+        new_hash = _skills_lock._sha256(md)
+        manifest[rel] = new_hash
+    mp = _skills_lock._manifest_path()
+    try:
+        tmp = mp.with_name(mp.name + ".tmp")
+        tmp.write_text(_json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(str(tmp), str(mp))
+        _skills_lock.audit("skill_entry_update", f"{rel} {'removed' if (removed or not md.is_file()) else new_hash[:12]}")
+    except Exception as e:
+        return {"rehashed": False, "reason": f"基线写入失败：{str(e)[:60]}"}
+    bad = _skills_lock.verify(_SKILLS_DIR, manifest, audit_on=False)
+    return {"rehashed": True, "hash": new_hash[:12],
+            "clean": not (bad["missing"] or bad["mismatch"] or bad["extra"])}
+
 
 @router.get("/skills/list")
 async def skills_list():
-    """技能清单+校验状态（设置页「技能清单」卡消费；audit_on=False 不刷审计）。"""
+    """技能清单+校验状态（设置页「技能清单」卡消费；audit_on=False 不刷审计）。
+    W3：每项技能=一个目录里的 SKILL.md，附 frontmatter description 与整体校验状态。"""
     if not _skills_lock.enabled():
-        return {"enabled": False, "clean": True, "files": []}
+        return {"enabled": False, "clean": True, "files": [], "skills": []}
     manifest = _skills_lock.ensure_baseline(_SKILLS_DIR)
     bad = _skills_lock.verify(_SKILLS_DIR, manifest, audit_on=False)
     okset = set(manifest) - set(bad["missing"]) - set(bad["mismatch"])
@@ -41,8 +137,23 @@ async def skills_list():
               "status": "✓" if rel in okset else "✗"}
              for rel, h in sorted(manifest.items())]
     files += [{"name": rel, "hash": "", "status": "未登记"} for rel in bad["extra"]]
+    # W3 技能卡数据：磁盘上的顶层技能目录 ∪ 基线里的顶层 <name>/SKILL.md
+    # r27 评审 P2-8（CB）：基线键必须过技能名白名单才进列表——被篡改的 manifest
+    # 曾可用 "../x/SKILL.md" 让下面 Path 拼接读到技能目录外一层。
+    manifest_skills = {rel[: -len("/SKILL.md")] for rel in manifest
+                       if rel.endswith("/SKILL.md")
+                       and _SKILL_NAME_RE.match(rel[: -len("/SKILL.md")])}
+    skills = []
+    for n in sorted(manifest_skills | set(_discover_skills())):
+        rel = f"{n}/SKILL.md"
+        if rel in manifest:
+            status, h = ("✓" if rel in okset else "✗"), manifest[rel][:12]
+        else:
+            status, h = "未登记", ""
+        _, desc, body = _parse_skill_md(Path(_SKILLS_DIR) / rel)
+        skills.append({"name": n, "description": desc, "body": body, "hash": h, "status": status})
     return {"enabled": True, "clean": not (bad["missing"] or bad["mismatch"] or bad["extra"]),
-            "files": files}
+            "files": files, "skills": skills}
 
 
 @router.post("/skills/rehash")
@@ -51,10 +162,73 @@ async def skills_rehash():
     注：图构建时校验的是启动快照——重建后如技能被停用状态未恢复，重启一次即生效。"""
     if not _skills_lock.enabled():
         # d2v03fix3⑨（若若 P1-③必改类）：ok:False+error 并存帧→reason 单键形，
-        # 与 SkillsLockRow.tsx 消费点同批改（前端已改读 j.reason）
+        # 与设置页技能区消费点同批改（W3 起为 SkillsManager.tsx，已改读 j.reason）
         return {"ok": False, "reason": "skills_lock 未启用（设置页先开启）"}
     manifest = _skills_lock.rehash(_SKILLS_DIR)
     return {"ok": True, "count": len(manifest), "note": "基线已重建；若此前技能被停用，重启后生效"}
+
+
+@router.post("/skills/create")
+async def skills_create(req: dict = Body(...)):
+    """W3：新建技能 = 建 <name>/SKILL.md（frontmatter name/description + 正文）。
+    name 走白名单正则（拒路径穿越）；已存在=拒（改内容请用 /skills/update）。管理员 token 门内。"""
+    name = str(req.get("name") or "").strip()
+    d = _skill_dir(name)
+    if d is None:
+        return {"ok": False, "reason": "技能名不合法：只许小写字母/数字/-/_，2-41 位，且首字符为字母或数字"}
+    if d.exists():
+        return {"ok": False, "reason": f"技能「{name}」已存在（改内容请用编辑）"}
+    try:
+        d.mkdir(parents=True, exist_ok=False)
+        (d / "SKILL.md").write_text(
+            _render_skill_md(name, str(req.get("description") or ""), str(req.get("content") or "")),
+            encoding="utf-8")
+    except Exception as e:
+        return {"ok": False, "reason": f"写入失败：{str(e)[:80]}"}
+    _token_audit("skills_create", True, name=name)
+    return {"ok": True, "name": name, **_after_skill_change(name)}
+
+
+@router.post("/skills/update")
+async def skills_update(req: dict = Body(...)):
+    """W3：覆写该技能的 SKILL.md（frontmatter + 正文）。description 缺省时保留原描述。管理员 token 门内。"""
+    name = str(req.get("name") or "").strip()
+    d = _skill_dir(name)
+    if d is None:
+        return {"ok": False, "reason": "技能名不合法：只许小写字母/数字/-/_，2-41 位，且首字符为字母或数字"}
+    md = d / "SKILL.md"
+    if not md.is_file():
+        return {"ok": False, "reason": f"技能「{name}」不存在"}
+    # r27 评审 P2-7（CB）：SKILL.md 本体若是软链，write_text 会顺链写穿技能目录——拒。
+    if md.is_symlink():
+        _token_audit("skills_update", False, name=name, reason="SKILL.md 为软链")
+        return {"ok": False, "reason": "该技能的 SKILL.md 是符号链接，拒写（防写穿技能目录）"}
+    desc = req.get("description")
+    if desc is None:
+        _, desc, _ = _parse_skill_md(md)
+    try:
+        md.write_text(_render_skill_md(name, str(desc), str(req.get("content") or "")), encoding="utf-8")
+    except Exception as e:
+        return {"ok": False, "reason": f"写入失败：{str(e)[:80]}"}
+    _token_audit("skills_update", True, name=name)
+    return {"ok": True, "name": name, **_after_skill_change(name)}
+
+
+@router.post("/skills/delete")
+async def skills_delete(req: dict = Body(...)):
+    """W3：删该技能目录（仅限 _SKILLS_DIR 之下，realpath 前缀双保险）。管理员 token 门内。"""
+    name = str(req.get("name") or "").strip()
+    d = _skill_dir(name)
+    if d is None:
+        return {"ok": False, "reason": "技能名不合法：只许小写字母/数字/-/_，2-41 位，且首字符为字母或数字"}
+    if not d.is_dir():
+        return {"ok": False, "reason": f"技能「{name}」不存在"}
+    try:
+        shutil.rmtree(d)
+    except Exception as e:
+        return {"ok": False, "reason": f"删除失败：{str(e)[:80]}"}
+    _token_audit("skills_delete", True, name=name)
+    return {"ok": True, "name": name, **_after_skill_change(name, removed=True)}
 
 
 @router.get("/usage/today")
@@ -94,7 +268,21 @@ async def context_threads():
     """R53 上下文容量图数据源：usage.jsonl 按线程取最近一次模型调用的 input_tokens。
     基线（系统提示词+工具+技能）取全部记录中的最小 input 估算；差额即对话消息。"""
     f = BASE / "mia_home" / "usage.jsonl"
-    LIMITS = {"glm-4.7": 200000, "glm-4.5-air": 131072, "glm-4.6v": 65536}
+    # 09-17 批③（Lesson 68）：上下文窗口表进配置页 models.contextLimits（键=模型名 值=窗口），
+    # 代码表退为默认值；未知模型兜底窗读 models.contextLimitDefault（默认 131072）。
+    from settings_mgr import load_settings
+    _m = (load_settings().get("models", {}) or {})
+    from settings_schema import default_of as _dof  # 09-17 深夜：默认表单一来源=总表
+    LIMITS = dict(_dof("models.contextLimits") or {})
+    for _k, _v in (_m.get("contextLimits") or {}).items():
+        try:
+            LIMITS[str(_k)] = int(_v)
+        except (TypeError, ValueError):
+            pass
+    try:
+        _DEF_LIMIT = int(_m.get("contextLimitDefault", _dof("models.contextLimitDefault")) or _dof("models.contextLimitDefault"))
+    except (TypeError, ValueError):
+        _DEF_LIMIT = 131072  # schema 读取失败时的最后防线
     per: dict = {}
     all_inputs = []
     if f.exists():
@@ -118,7 +306,7 @@ async def context_threads():
     baseline = min(all_inputs) if all_inputs else 0
     out = []
     for t in per.values():
-        limit = LIMITS.get(t["model"], 131072)
+        limit = LIMITS.get(t["model"], _DEF_LIMIT)
         msgs = max(t["input"] - baseline, 0)
         out.append({**t, "limit": limit, "baseline": baseline, "messages": msgs,
                     "pct": round(t["input"] / limit * 100, 1) if limit else 0})

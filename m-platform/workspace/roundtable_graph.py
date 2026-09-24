@@ -83,18 +83,15 @@ def _seat_model(seat: str, **kw):
     s = _settings()
     cfg = s.get("roundtable", {}).get(seat) or {}
     boss = s.get("agents", {}).get("boss", {})
-    # r61e（Veda 发现，爸爸令洗门牌）：不硬写账号名——未配置取第一个 provider，
-    # 一个都没有则 make_model("") 构造即炸（占位护栏）。
-    _provs = s.get("providers") or []
-    _first = (_provs[0].get("name", "") if _provs and isinstance(_provs[0], dict) else "")
-    fallback = {
-        "A": (_first, "intern-latest"),
-        "B": (_first, "intern-latest"),
-        "host": (boss.get("provider", _first), boss.get("model", "intern-latest")),
-    }[seat]
-    prov = cfg.get("provider") or fallback[0]
+    # r61e（Veda 发现，爸爸令洗门牌）：不硬写账号名。
+    # 09-17 批①+夜 hy4 复测补刀（Lesson 68+checklist 第 1 条）：A/B 位服务商与模型都必须显式配置，
+    # 删 `or _first` 静默回退（悄悄换服务商=计费/额度全变）；host 位回退 boss 是注释明示的有意设计，保留。
+    prov = cfg.get("provider") or (boss.get("provider") or "" if seat == "host" else "")
+    model = cfg.get("model") or (boss.get("model") or "" if seat == "host" else "")
+    if not prov or not model:
+        raise ValueError(f"圆桌 {seat} 位未配置服务商/模型：请到 设置→圆桌 两项都选好")
     try:
-        return make_model(prov, cfg.get("model") or fallback[1], **kw)
+        return make_model(prov, model, **kw)
     except Exception as e:
         # r39（Lyra 新炮3）：provider 名写错/被改名→给可读错误，不裸 KeyError 崩图
         raise ValueError(f"座位 {seat} 模型初始化失败（provider={prov}）：{e}") from e

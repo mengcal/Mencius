@@ -3,7 +3,7 @@
 运行：cd D:\\m\\guard && python test_m_guard.py   （225 断言，全绿为验收线）
 
 纪律：
-- 只 import D:\\m\\guard\\m_guard.py；所有落盘常量（TOKEN_BLOB / BOOTSTRAP_FILE / HOSTCOPY /
+- 只 import D:\\m\\guard\\m_guard.py；所有落盘常量（TOKEN_BLOB / HOSTCOPY /
   AUDIT_LOG）在每次测试前 monkeypatch 到 tempfile 临时目录，测试后还原；
 - sys.dont_write_bytecode = True，防止 import 时向 D:\\m\\guard\\__pycache__ 落 .pyc；
 - tearDownModule 有真实文件"绊线"（Canary）：跑完必须证明没碰到真实数据。
@@ -48,8 +48,16 @@ def _load_guard():
 
 mg = _load_guard()
 
-# 每次测试都要改写的模块常量（R10.7b：含 password.bin——防测试写进真实 DPAPI 文件）
-_PATCHED_CONSTS = ("TOKEN_BLOB", "PASSWORD_BLOB", "BOOTSTRAP_FILE", "HOSTCOPY", "AUDIT_LOG", "GUARD_KEY")
+# 测试夹具口令（非真实凭据，Mimosa 门：以常量注入避免字面量误报）
+PW_OK = "hunter2pass"
+PW_LONG = "a-long-password"
+PW_OLD1 = "old-pass-alpha"
+PW_NEW2 = "new-pass-beta"
+PW_NEW3 = "new-pass-gamma"
+
+# 每次测试都要改写的模块常量（R10.7b：含 password.bin——防测试写进真实 DPAPI 文件；
+# R10.408：BOOTSTRAP_FILE 已随激活码机制退役）
+_PATCHED_CONSTS = ("TOKEN_BLOB", "PASSWORD_BLOB", "HOSTCOPY", "AUDIT_LOG", "GUARD_KEY")
 
 # ── 绊线（Canary）：证明测试没碰真实守卫数据 ─────────────────────
 # 注意：D:\m\guard\token_audit.jsonl 故意不纳入——真实守卫服务正在运行，
@@ -57,7 +65,6 @@ _PATCHED_CONSTS = ("TOKEN_BLOB", "PASSWORD_BLOB", "BOOTSTRAP_FILE", "HOSTCOPY", 
 _CANARY_PATHS = (
     GUARD_DIR / "token.bin",
     GUARD_DIR / "password.bin",
-    GUARD_DIR / ".token_bootstrap",
     GUARD_DIR / "hostcopy.token",
 )
 
@@ -108,7 +115,6 @@ class GuardTestCase(unittest.TestCase):
         self._saved_consts = {n: getattr(mg, n) for n in _PATCHED_CONSTS}
         mg.TOKEN_BLOB = self.base / "token.bin"
         mg.PASSWORD_BLOB = self.base / "password.bin"
-        mg.BOOTSTRAP_FILE = self.base / ".token_bootstrap"
         mg.HOSTCOPY = self.base / ".api_token_hostcopy"
         mg.AUDIT_LOG = self.base / "token_audit.jsonl"
         self._saved_time = mg.time
@@ -133,14 +139,12 @@ class GuardTestCase(unittest.TestCase):
         getattr(mg, "_SET_HITS", []).clear()
         getattr(mg, "_LOGIN_HITS", []).clear()
         getattr(mg, "_LOGIN_FAILS", None) and mg._LOGIN_FAILS.update({"n": 0, "until": 0.0})
+        getattr(mg, "_VERIFY_FAILS", None) and mg._VERIFY_FAILS.update({"n": 0, "until": 0.0})
         self._tmp.cleanup()
 
     # 便捷断言/工具
     def set_token(self, value):
         mg._write_token(value)
-
-    def put_bootstrap(self, code):
-        mg.BOOTSTRAP_FILE.write_text(code, encoding="utf-8")
 
 
 class HttpTestCase(GuardTestCase):
@@ -315,107 +319,60 @@ class TestDpapiRoundTrip(GuardTestCase):
 
 
 # ══════════════════════════════════════════════════════════════
-# 4. bootstrap_ensure 创建 / 幂等 / drop
+# 4. 激活码机制退役（R10.408 爸爸令："注册之前不该上锁"）——回归钉
 # ══════════════════════════════════════════════════════════════
-class TestBootstrap(GuardTestCase):
-    def test_read_missing_returns_empty(self):
-        self.assertEqual(mg._bootstrap_read(), "")
-        self.assertFalse(mg.BOOTSTRAP_FILE.exists())
+class TestBootstrapRetired(GuardTestCase):
+    def test_guard_source_has_no_bootstrap(self):
+        """激活码机制整体废除：守卫源码不得再出现 bootstrap 字样（防复活）。"""
+        src = GUARD_SRC.read_text(encoding="utf-8")
+        self.assertNotIn("bootstrap", src.lower())
 
-    def test_ensure_creates_strong_code(self):
-        code = mg._bootstrap_ensure()
-        self.assertTrue(mg.BOOTSTRAP_FILE.exists())
-        self.assertEqual(len(code), 32)          # token_hex(16) = 128 bit
-        self.assertEqual(mg.BOOTSTRAP_FILE.read_text(encoding="utf-8").strip(), code)
-
-    def test_ensure_is_idempotent(self):
-        first = mg._bootstrap_ensure()
-        size = mg.BOOTSTRAP_FILE.stat().st_size
-        second = mg._bootstrap_ensure()
-        self.assertEqual(first, second)
-        self.assertEqual(mg.BOOTSTRAP_FILE.stat().st_size, size)
-
-    def test_ensure_keeps_existing_code(self):
-        self.put_bootstrap("PRESET-CODE")
-        self.assertEqual(mg._bootstrap_ensure(), "PRESET-CODE")
-
-    def test_ensure_creates_parent_dir(self):
-        mg.BOOTSTRAP_FILE = self.base / "nested" / "deep" / ".token_bootstrap"
-        code = mg._bootstrap_ensure()
-        self.assertTrue(code)
-        self.assertTrue(mg.BOOTSTRAP_FILE.exists())
-
-    def test_drop_removes_file(self):
-        mg._bootstrap_ensure()
-        self.assertTrue(mg.BOOTSTRAP_FILE.exists())
-        mg._bootstrap_drop()
-        self.assertFalse(mg.BOOTSTRAP_FILE.exists())
-        self.assertEqual(mg._bootstrap_read(), "")
-
-    def test_drop_on_missing_is_noop(self):
-        mg._bootstrap_drop()  # 不抛异常
-        self.assertFalse(mg.BOOTSTRAP_FILE.exists())
-
-    def test_bootstrap_uses_icacls_not_chmod(self):
-        """F17 已修：Windows 上 os.chmod 无效，_bootstrap_ensure 改用 icacls
-        收紧 ACL（SYSTEM+Administrators+当前账户——非提权令牌不在管理员组，
-        不加当前账户守卫自己都读不回激活码，测试当场抓到）。"""
+    def test_hostcopy_still_uses_icacls_not_chmod(self):
+        """F17 教训保留：icacls 收紧 ACL 的机制仍在（现由 _write_hostcopy 使用）。"""
         src = GUARD_SRC.read_text(encoding="utf-8")
         self.assertIn("icacls", src)
         self.assertNotIn("os.chmod", src)
 
 
 # ══════════════════════════════════════════════════════════════
-# 5. /set 首设
+# 5. /set 首设（R10.408：注册窗口开放，谁先注册谁是主人）
 # ══════════════════════════════════════════════════════════════
 class TestSetFirstInstall(HttpTestCase):
-    def test_correct_bootstrap_succeeds_and_code_is_consumed(self):
-        self.put_bootstrap("CODE1234")
-        code, body = self.post("/set", {"token": "T-first", "bootstrap": "CODE1234"})
+    def test_first_set_open_succeeds(self):
+        """无激活码首设直接成功——注册前不上锁。"""
+        code, body = self.post("/set", {"token": "T-first"})
         self.assertEqual(code, 200)
         self.assertTrue(body["ok"])
         self.assertEqual(mg._read_token(), "T-first")
-        self.assertFalse(mg.BOOTSTRAP_FILE.exists(), "兑现后激活码文件必须消失")
 
-    def test_wrong_bootstrap_403_and_no_token_written(self):
-        self.put_bootstrap("CODE1234")
-        code, body = self.post("/set", {"token": "T-evil", "bootstrap": "WRONG"})
-        self.assertEqual(code, 403)
-        self.assertFalse(body["ok"])
-        self.assertFalse(mg.TOKEN_BLOB.exists())
-        self.assertEqual(mg._read_token(), "")
-        self.assertTrue(mg.BOOTSTRAP_FILE.exists(), "失败时激活码不能被删")
+    def test_first_set_with_password(self):
+        code, body = self.post("/set", {"token": "T-p", "password": PW_OK})
+        self.assertEqual(code, 200)
+        self.assertTrue(self.post("/login", {"password": PW_OK})[1]["ok"])
 
-    def test_missing_bootstrap_file_403(self):
-        self.assertFalse(mg.BOOTSTRAP_FILE.exists())
-        code, body = self.post("/set", {"token": "T-evil", "bootstrap": "ANY"})
-        self.assertEqual(code, 403)
-        self.assertFalse(mg.TOKEN_BLOB.exists())
+    def test_first_set_short_password_400(self):
+        code, body = self.post("/set", {"token": "T-a", "password": "short"})
+        self.assertEqual(code, 400)
+        self.assertFalse(mg.TOKEN_BLOB.exists(), "拒绝则一字不写")
 
-    def test_empty_bootstrap_403(self):
-        self.put_bootstrap("CODE1234")
-        code, _ = self.post("/set", {"token": "T-evil", "bootstrap": ""})
-        self.assertEqual(code, 403)
+    def test_first_set_ignores_stale_bootstrap_field(self):
+        """旧调用方仍带 bootstrap 字段=被忽略（机制退役，不再 403）。"""
+        code, _ = self.post("/set", {"token": "T-x", "bootstrap": "WRONG"})
+        self.assertEqual(code, 200)
 
     def test_empty_token_400(self):
-        self.put_bootstrap("CODE1234")
-        code, body = self.post("/set", {"token": "", "bootstrap": "CODE1234"})
+        code, body = self.post("/set", {"token": ""})
         self.assertEqual(code, 400)
         self.assertIn("token required", json.dumps(body, ensure_ascii=False))
 
-    def test_current_cannot_substitute_for_bootstrap(self):
-        """未配置态只认激活码：带 current 也不算证明。"""
-        self.put_bootstrap("CODE1234")
-        code, _ = self.post("/set", {"token": "T-evil", "current": "T-first"})
+    def test_second_set_requires_current(self):
+        """注册完门就焊死：第二个注册者没有 current 证明=403（轮换语义）。"""
+        self.post("/set", {"token": "T-first"})
+        code, _ = self.post("/set", {"token": "T-evil"})
         self.assertEqual(code, 403)
-        self.assertFalse(mg.TOKEN_BLOB.exists())
-
-    def test_bootstrap_is_stripped_and_compared_exactly(self):
-        self.put_bootstrap("CODE1234")
-        code, _ = self.post("/set", {"token": "T-first", "bootstrap": "  CODE1234  "})
-        self.assertEqual(code, 200, "两端空白应被 strip")
-        code, _ = self.post("/set", {"token": "T2", "bootstrap": "code1234"})
-        self.assertEqual(code, 403, "激活码大小写敏感")
+        self.assertEqual(mg._read_token(), "T-first", "拒绝后密钥原样")
+        code, _ = self.post("/set", {"token": "T2", "current": "T-first"})
+        self.assertEqual(code, 200)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -423,49 +380,43 @@ class TestSetFirstInstall(HttpTestCase):
 # ══════════════════════════════════════════════════════════════
 class TestFirstSetAtomic(HttpTestCase):
     def test_first_set_with_password_then_login(self):
-        """单请求=写密钥+写密码+兑现激活码同持锁段；随后密码找回=重签发新密钥。"""
-        self.put_bootstrap("CODE1234")
-        code, body = self.post("/set", {"token": "T-a", "bootstrap": "CODE1234", "password": "hunter2pass"})
+        """单请求=写密钥+写密码同持锁段；随后密码找回=重签发新密钥。"""
+        code, body = self.post("/set", {"token": "T-a", "password": PW_OK})
         self.assertEqual(code, 200)
         self.assertTrue(body["ok"])
         self.assertEqual(mg._read_token(), "T-a")
-        self.assertFalse(mg.BOOTSTRAP_FILE.exists())
-        code, body = self.post("/login", {"password": "hunter2pass"})
+        code, body = self.post("/login", {"password": PW_OK})
         self.assertEqual(code, 200)
         self.assertTrue(body["ok"])
         self.assertNotEqual(body["token"], "T-a", "找回=重签发，不回吐旧值")
         self.assertEqual(mg._read_token(), body["token"])
 
     def test_first_set_short_password_400_keeps_state(self):
-        """原子段内失败不留半配置态：token 不写、激活码不兑现。"""
-        self.put_bootstrap("CODE1234")
-        code, body = self.post("/set", {"token": "T-a", "bootstrap": "CODE1234", "password": "short"})
+        """校验先于写入：密码太短被拒时 token 不落盘。"""
+        code, body = self.post("/set", {"token": "T-a", "password": "short"})
         self.assertEqual(code, 400)
         self.assertFalse(mg.TOKEN_BLOB.exists())
-        self.assertTrue(mg.BOOTSTRAP_FILE.exists(), "失败时激活码不兑现")
 
     def test_set_password_requires_current(self):
-        """R10.7b：/set_password 只认当前密钥证明（bootstrap 证明已并入原子首设）。"""
+        """R10.7b：/set_password 只认当前密钥（或旧密码）证明。"""
         self.set_token("T-x")
-        code, _ = self.post("/set_password", {"password": "a-long-password", "current": "WRONG"})
+        code, _ = self.post("/set_password", {"password": PW_LONG, "current": "WRONG"})
         self.assertEqual(code, 403)
-        code, _ = self.post("/set_password", {"password": "a-long-password", "current": "T-x"})
+        code, _ = self.post("/set_password", {"password": PW_LONG, "current": "T-x"})
         self.assertEqual(code, 200)
-        self.assertTrue(self.post("/login", {"password": "a-long-password"})[1]["ok"])
+        self.assertTrue(self.post("/login", {"password": PW_LONG})[1]["ok"])
 
     def test_login_rate_limited(self):
-        self.put_bootstrap("CODE1234")
-        self.post("/set", {"token": "T-a", "bootstrap": "CODE1234", "password": "a-long-password"})
+        self.post("/set", {"token": "T-a", "password": PW_LONG})
         for _ in range(10):
             self.post("/login", {"password": "wrong"})
-        code, body = self.post("/login", {"password": "a-long-password"})
+        code, body = self.post("/login", {"password": PW_LONG})
         self.assertEqual(code, 429)
 
     def test_set_rate_limited(self):
         for _ in range(10):
-            self.post("/set", {"token": "T", "bootstrap": "WRONG"})
-        self.put_bootstrap("CODE1234")
-        code, _ = self.post("/set", {"token": "T-a", "bootstrap": "CODE1234"})
+            self.post("/set", {"token": "T"})
+        code, _ = self.post("/set", {"token": "T-a"})
         self.assertEqual(code, 429)
 
 
@@ -479,7 +430,7 @@ class TestGuardKeyAndRotate(HttpTestCase):
         self.assertEqual(code, 403)
 
     def test_no_key_set_403(self):
-        code, _ = self.post("/set", {"token": "X", "bootstrap": "CODE1234"}, key=False)
+        code, _ = self.post("/set", {"token": "X"}, key=False)
         self.assertEqual(code, 403)
         self.assertEqual(mg._read_token(), "OLD-TOK", "拒绝后密钥原样")
 
@@ -488,9 +439,8 @@ class TestGuardKeyAndRotate(HttpTestCase):
         self.assertEqual(code, 403)
         self.assertEqual(mg._read_token(), "OLD-TOK")
 
-    def test_status_and_bootstrap_status_key_free(self):
+    def test_status_is_key_free(self):
         self.assertEqual(self.get("/status", key=False)[0], 200)
-        self.assertEqual(self.get("/bootstrap/status", key=False)[0], 200)
 
     def test_login_rotates_not_replays(self):
         """千问 P0-1 已修：/login 不回旧明文——rotate 重签发新密钥并刷新 hostcopy。"""
@@ -509,31 +459,49 @@ class TestGuardKeyAndRotate(HttpTestCase):
         self.assertEqual(mg._read_token(), "OLD-TOK", "原子段内失败密钥原样")
 
     def test_change_password_requires_old_password(self):
-        """R10.8d（爸爸："怎么修改密码"）：修改找回密码有两条证明路径——
-        ① 旧密码验证（前端表单走这条，用户友好）② 当前密钥证明（CLI/API 应急找回，
-        2026-09-06 凌晨实弹验证过：爸爸锁门外，知夏持 hostcopy 副本重设密码解锁）。
-        注：持当前密钥者本就能调 /set 连密钥带密码整套更换，故 current 证明
-        不构成额外提权面（与 /set 同权限面）；无任何证明=403，旧密码错=403。"""
-        self.post("/set", {"token": "T1", "current": "OLD-TOK", "password": "old-password-1"})
+        """R10.8d（爸爸："怎么修改密码"）+r27 评审 P1-1 分层定稿：
+        守卫层保留两条证明——①旧密码 ②当前密钥（宿主救急通道 reset_password.cmd
+        直连本层，物理访问=信任锚）。浏览器面在 office 层收紧：/auth/set_password
+        不再代转 current（持 Cookie 的 XSS 脚本读得到钥匙发得出请求，但经 office
+        时只剩旧密码一条路——2026-09-23 CB 评审 P1-1 修复，本层测试口径同步）。
+        无任何证明=403，旧密码错=403。"""
+        self.post("/set", {"token": "T1", "current": "OLD-TOK", "password": PW_OLD1})
         # 无任何证明 → 403
-        code, _ = self.post("/set_password", {"password": "new-password-2"})
+        code, _ = self.post("/set_password", {"password": PW_NEW2})
         self.assertEqual(code, 403)
         # 旧密码错（且无 current）→ 403
-        code, _ = self.post("/set_password", {"password": "new-password-2", "old_password": "WRONG"})
+        code, _ = self.post("/set_password", {"password": PW_NEW2, "old_password": "WRONG"})
         self.assertEqual(code, 403)
-        # 仅当前密钥证明（应急找回）→ 成功，旧密码 /login 失效
-        code, _ = self.post("/set_password", {"password": "new-password-2", "current": "T1"})
+        # 仅当前密钥证明（宿主直连场景）→ 成功，旧密码 /login 失效
+        code, _ = self.post("/set_password", {"password": PW_NEW2, "current": "T1"})
         self.assertEqual(code, 200)
-        self.assertFalse(self.post("/login", {"password": "old-password-1"})[1]["ok"])
-        self.assertTrue(self.post("/login", {"password": "new-password-2"})[1]["ok"])
+        self.assertFalse(self.post("/login", {"password": PW_OLD1})[1]["ok"])
+        self.assertTrue(self.post("/login", {"password": PW_NEW2})[1]["ok"])
         # 仅旧密码证明（前端表单路径）→ 成功
-        code, _ = self.post("/set_password", {"password": "new-password-3", "old_password": "new-password-2"})
+        code, _ = self.post("/set_password", {"password": PW_NEW3, "old_password": PW_NEW2})
         self.assertEqual(code, 200)
-        self.assertTrue(self.post("/login", {"password": "new-password-3"})[1]["ok"])
+        self.assertTrue(self.post("/login", {"password": PW_NEW3})[1]["ok"])
+
+    def test_first_set_password_write_failure_rolls_back_token(self):
+        """r27 评审 P2-4（CB）：首设密码写失败=回滚 token，不留"有密钥无密码"半注册态。"""
+        mg._del_token()  # 本类 setUp 已配 OLD-TOK——回滚测试必须在未配置态测首设分支
+        orig = mg._write_password_hash
+        try:
+            mg._write_password_hash = lambda h: (_ for _ in ()).throw(OSError("模拟 DPAPI 写炸"))
+            code, _ = self.post("/set", {"token": "T-half", "password": PW_OK})
+            self.assertIn(code, (400, 500))
+            self.assertEqual(mg._read_token(), "", "半完成态必须回滚——密钥不得留下")
+        finally:
+            mg._write_password_hash = orig
+        # 恢复后正常注册不受影响
+        code, _ = self.post("/set", {"token": "T-ok", "password": PW_OK})
+        self.assertEqual(code, 200)
 
     def test_verify_password_key_gate_and_lockout(self):
-        """R10.9（GLM-5.3 自检 P2-2 收口）：/verify_password 补进程钥匙门+同桶 5 败锁——
-        此前该端点无钥匙门（沙箱可无限问"密码对不对"）且失败不计数（爆破旁路）。"""
+        """R10.9（GLM-5.3 自检 P2-2 收口）：/verify_password 补进程钥匙门+5 败锁——
+        此前该端点无钥匙门（沙箱可无限问"密码对不对"）且失败不计数（爆破旁路）。
+        r30 Veda F4：锁桶改【独立】（_VERIFY_FAILS），不再与 /login 共桶——
+        共桶时持 token 者填 5 次错密码即可锁死登录通道（DoS 牵连）。"""
         self.post("/set", {"token": "T1", "current": "OLD-TOK", "password": "long-enough-pw"})
         # 无进程钥匙 → 403（与 /verify /set /set_password 同面）
         code, _ = self.post("/verify_password", {"password": "long-enough-pw"}, key=False)
@@ -542,13 +510,13 @@ class TestGuardKeyAndRotate(HttpTestCase):
         code, body = self.post("/verify_password", {"password": "long-enough-pw"})
         self.assertEqual(code, 200)
         self.assertTrue(body["ok"])
-        # 5 次错密码 → 与 /login 同桶锁定：verify_password 与 /login 一并 429
+        # 5 次错密码 → verify 独立桶锁定；/login 不受牵连（r30 Veda F4 分桶断言）
         for _ in range(5):
             self.post("/verify_password", {"password": "wrong-wrong-wrong"})
         code, _ = self.post("/verify_password", {"password": "long-enough-pw"})
-        self.assertEqual(code, 429, "verify_password 失败也计入 5 败锁")
+        self.assertEqual(code, 429, "verify_password 失败计入自身 5 败锁（r30 独立桶）")
         code, _ = self.post("/login", {"password": "long-enough-pw"})
-        self.assertEqual(code, 429, "同桶：verify_password 打满后 /login 一并锁定")
+        self.assertEqual(code, 200, "r30 Veda F4：独立桶——verify 打满不锁 /login")
 
     def test_login_failure_lockout(self):
         self.post("/set", {"token": "T1", "current": "OLD-TOK", "password": "long-enough-pw"})
@@ -672,19 +640,12 @@ class TestRotate(HttpTestCase):
 # 8. /clear
 # ══════════════════════════════════════════════════════════════
 class TestClear(HttpTestCase):
-    def test_clear_unconfigured_requires_bootstrap(self):
-        """R10.7b（hy4 P1-2）：未配置态的 clear 也要激活码证明——免凭证不再能反复重置别人未用的码。"""
+    def test_clear_unconfigured_is_noop(self):
+        """R10.408：未配置态清除=无操作（没东西可清，也不再写激活码）。"""
         self.assertFalse(mg.TOKEN_BLOB.exists())
         code, body = self.post("/clear", {"token": "anything"})
-        self.assertEqual(code, 403)
-        self.assertFalse(body.get("cleared"))
-
-    def test_clear_unconfigured_with_bootstrap_rebuilds(self):
-        self.put_bootstrap("BOOT-CODE")
-        code, body = self.post("/clear", {"bootstrap": "BOOT-CODE"})
         self.assertEqual(code, 200)
-        self.assertTrue(body["cleared"])
-        self.assertTrue(mg.BOOTSTRAP_FILE.exists(), "清除后应重建激活码")
+        self.assertFalse(body["cleared"])
 
     def test_clear_with_wrong_token_403(self):
         self.set_token("T-clear")
@@ -707,14 +668,12 @@ class TestClear(HttpTestCase):
         self.assertFalse(mg.TOKEN_BLOB.exists())
         self.assertFalse(mg.HOSTCOPY.exists())
         self.assertEqual(mg._read_token(), "")
-        self.assertTrue(mg.BOOTSTRAP_FILE.exists(), "清除后重建激活码以便重新首设")
 
     def test_clear_then_first_set_roundtrip(self):
+        """清除=回到注册窗口，直接重新首设（R10.408 无激活码）。"""
         self.set_token("T1")
         self.post("/clear", {"token": "T1"})
-        fresh = mg._bootstrap_read()
-        self.assertTrue(fresh)
-        code, _ = self.post("/set", {"token": "T2", "bootstrap": fresh})
+        code, _ = self.post("/set", {"token": "T2"})
         self.assertEqual(code, 200)
         self.assertEqual(mg._read_token(), "T2")
 
@@ -725,7 +684,7 @@ class TestClear(HttpTestCase):
 
 
 # ══════════════════════════════════════════════════════════════
-# 9. /status 与 /bootstrap/status
+# 9. /status
 # ══════════════════════════════════════════════════════════════
 class TestStatus(HttpTestCase):
     def test_status_unconfigured(self):
@@ -751,21 +710,9 @@ class TestStatus(HttpTestCase):
         raw = json.dumps(self.get("/status")[1], ensure_ascii=False)
         self.assertNotIn("SUPER-SECRET", raw)
 
-    def test_bootstrap_status_false_when_absent(self):
-        code, body = self.get("/bootstrap/status")
-        self.assertEqual(code, 200)
-        self.assertFalse(body["exists"])
-
-    def test_bootstrap_status_true_when_present(self):
-        mg._bootstrap_ensure()
-        code, body = self.get("/bootstrap/status")
-        self.assertEqual(code, 200)
-        self.assertTrue(body["exists"])
-
-    def test_bootstrap_status_does_not_leak_the_code(self):
-        mg._bootstrap_ensure()
-        raw = json.dumps(self.get("/bootstrap/status")[1], ensure_ascii=False)
-        self.assertNotIn(mg._bootstrap_read(), raw)
+    def test_bootstrap_status_endpoint_retired(self):
+        """R10.408：/bootstrap/status 端点已随激活码退役——404。"""
+        self.assertEqual(self.get("/bootstrap/status")[0], 404)
 
 
 # ══════════════════════════════════════════════════════════════

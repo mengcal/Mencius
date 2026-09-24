@@ -1,0 +1,18 @@
+# M 平台 git 自动推送（R68 修：失败必出声——原版 git push 2>$null 静默吞错）
+# 凭据走 Windows 凭据管理器（git credential manager），本文件不含任何密钥
+Set-Location D:\m\workspace
+$log = 'D:\m\backups\auto_push.log'
+function Log($m) { "$((Get-Date -Format 'yyyy-MM-dd HH:mm')) $m" | Out-File $log -Append -Encoding utf8 }
+
+git add -A 2>&1 | Out-Null
+$dirty = git status --porcelain
+if ($dirty) {
+    git commit -m "auto backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')" 2>&1 | Out-Null
+}
+$out = git push origin master 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Log "push OK"
+} else {
+    Log "push 失败: $out"
+    exit 1
+}

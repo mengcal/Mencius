@@ -33,26 +33,84 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
     async def aexecute(self, cmd: str, *, timeout: int | None = None) -> _ExecResp:
         return await self._acall(cmd, timeout or 120)
 
-    def _call(self, cmd: str, timeout: int) -> _ExecResp:
+    def _route(self):
+        """09-17 深夜爸爸定纲"米娅=知夏同等权限"：confirmLevel=full 时 execute 落宿主
+        runner（同款 Git Bash、同款机器权限）；其余档位走沙箱不变。每次现读配置——
+        爸爸设置页拨回非 full，秒级关门（runner 侧还有第二道同款检查，双保险 fail-closed）。"""
+        try:
+            from settings_mgr import load_settings
+            if str((load_settings().get("general", {}) or {}).get("confirmLevel", "")) == "full":
+                return (os.environ.get("MIA_HOST_RUNNER_URL", "http://host.docker.internal:2026/exec"),
+                        os.environ.get("MIA_HOST_RUNNER_KEY", ""))
+        except Exception:
+            pass
+        return (self._URL, self._tok)
+
+    # hy4 backlog①（09-19）：宿主 runner 走短时票据——静态钥匙只在 /ticket 换票时过线，
+    # /exec 带 300s 单次票据；runner 重启会清票据（401 时换新票重试一次兜底）。
+    _TICKET = {"v": "", "exp": 0.0}
+
+    def _ticket(self, url: str, key: str) -> str:
+        import time as _t
+        now = _t.time()
+        if self._TICKET["v"] and self._TICKET["exp"] > now + 30:
+            return self._TICKET["v"]
         try:
             import httpx
+            r = httpx.Client(timeout=15).post(url.replace("/exec", "/ticket"),
+                                              headers={"X-Token": key})
+            if r.status_code == 200:
+                d = r.json()
+                self._TICKET["v"] = str(d.get("ticket", "") or "")
+                self._TICKET["exp"] = now + float(d.get("ttl", 300) or 300)
+                return self._TICKET["v"]
+        except Exception:
+            pass
+        return ""
+
+    def _headers(self, url: str, tok: str) -> tuple[dict, bool]:
+        """返回 (请求头, 是否用票据)。runner 路线优先票据，沙箱/兜底走静态 X-Token。"""
+        if url.endswith("/exec") and tok:
+            t = self._ticket(url, tok)
+            if t:
+                return {"Content-Type": "application/json", "X-Ticket": t}, True
+        return {"Content-Type": "application/json", "X-Token": tok}, False
+
+    def _call(self, cmd: str, timeout: int) -> _ExecResp:
+        url, tok = self._route()
+        try:
+            import httpx
+            headers, used_ticket = self._headers(url, tok)
             with httpx.Client(timeout=timeout + 15) as c:
-                r = c.post(self._URL, content=self._payload(cmd, timeout),
-                           headers={"Content-Type": "application/json", "X-Token": self._tok})
+                r = c.post(url, content=self._payload(cmd, timeout), headers=headers)
+                if r.status_code == 401 and used_ticket:
+                    self._TICKET["v"], self._TICKET["exp"] = "", 0.0  # runner 可能重启清了票，换新票重试一次
+                    headers, used_ticket = self._headers(url, tok)
+                    r = c.post(url, content=self._payload(cmd, timeout), headers=headers)
+                if r.status_code != 200:
+                    # 09-18 hy4 复测④：401/403/429 不许吞成空输出——米娅必须看见"门"的存在
+                    return _ExecResp(output=f"[执行门拒绝 HTTP {r.status_code}: {r.text[:200]}]", exit_code=126, truncated=False)
                 d = r.json()
         except Exception as e:
-            return _ExecResp(output=f"[沙箱执行器不可达: {e}]", exit_code=1, truncated=False)
+            return _ExecResp(output=f"[执行器不可达: {e}]", exit_code=1, truncated=False)
         return _ExecResp(output=str(d.get("output", "")), exit_code=int(d.get("exit_code", 1)),
                          truncated=bool(d.get("truncated", False)))
 
     async def _acall(self, cmd: str, timeout: int) -> _ExecResp:
+        url, tok = self._route()
         try:
             import httpx
+            headers, used_ticket = self._headers(url, tok)
             async with httpx.AsyncClient(timeout=timeout + 15) as c:
-                r = await c.post(self._URL, content=self._payload(cmd, timeout),
-                                 headers={"Content-Type": "application/json", "X-Token": self._tok})
+                r = await c.post(url, content=self._payload(cmd, timeout), headers=headers)
+                if r.status_code == 401 and used_ticket:
+                    self._TICKET["v"], self._TICKET["exp"] = "", 0.0
+                    headers, used_ticket = self._headers(url, tok)
+                    r = await c.post(url, content=self._payload(cmd, timeout), headers=headers)
+                if r.status_code != 200:
+                    return _ExecResp(output=f"[执行门拒绝 HTTP {r.status_code}: {r.text[:200]}]", exit_code=126, truncated=False)
                 d = r.json()
         except Exception as e:
-            return _ExecResp(output=f"[沙箱执行器不可达: {e}]", exit_code=1, truncated=False)
+            return _ExecResp(output=f"[执行器不可达: {e}]", exit_code=1, truncated=False)
         return _ExecResp(output=str(d.get("output", "")), exit_code=int(d.get("exit_code", 1)),
                          truncated=bool(d.get("truncated", False)))

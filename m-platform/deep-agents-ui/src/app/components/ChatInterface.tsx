@@ -26,6 +26,22 @@ import {
   Paperclip,
 } from "lucide-react";
 import { saveFile } from "@/lib/providerApi";
+import { authHeaders } from "@/lib/providerApi";
+import { API, apiFetch } from "@/lib/apiBase";
+
+// 09-17 深夜（hy4 挑刺收口）：vision 端点由后端 /settings._runtime 下发（后端 env 单一来源），
+// 前端提示词不再写死 host.docker.internal:2024；取不到才落回同一默认值。
+let _visionEp = "";
+async function visionEndpoint(): Promise<string> {
+  if (!_visionEp) {
+    try {
+      const r = await apiFetch(`${API}/settings`, { headers: authHeaders() });
+      _visionEp = String((await r.json())?._runtime?.visionEndpoint || "");
+    } catch { /* 后端未起=用默认兜一次 */ }
+    if (!_visionEp) _visionEp = "http://host.docker.internal:2024/vision";
+  }
+  return _visionEp;
+}
 import { ChatMessage } from "@/app/components/ChatMessage";
 import type {
   ActionRequest,
@@ -114,8 +130,9 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       e.target.value = "";
       // 自动派活提示（走 enqueue 队列，不卡聊天）
       if (images.length) {
+        const ep = await visionEndpoint();
         sendMessage(
-          `爸爸上传了图片：${images.join("、")}。请按流程派 visual 牛马识图：图片已落盘（files 里有确切路径），让它在沙箱里 curl -s -X POST http://host.docker.internal:2024/vision -H "Content-Type: application/json" -H "X-Proxy-Key: $VISION_PROXY_TOKEN" -d '{"image_path": "<上面的路径>", "question": "详细描述这张图片"}'，把结果汇总告诉爸爸。（R10 修 Cora 识图断链：workplatform:8000 已被 R80 物理断网，宿主回环+二级钥匙是唯一活路）`,
+          `爸爸上传了图片：${images.join("、")}。请按流程派 visual 牛马识图：图片已落盘（files 里有确切路径），让它在沙箱里 curl -s -X POST ${ep} -H "Content-Type: application/json" -H "X-Proxy-Key: $VISION_PROXY_TOKEN" -d '{"image_path": "<上面的路径>", "question": "详细描述这张图片"}'，把结果汇总告诉爸爸。（R10 修 Cora 识图断链：workplatform:8000 已被 R80 物理断网，宿主回环+二级钥匙是唯一活路）`,
           { webSearch: undefined }
         );
       } else if (texts.length) {

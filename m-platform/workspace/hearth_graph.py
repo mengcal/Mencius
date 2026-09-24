@@ -64,10 +64,14 @@ def _seat_model(seat: str):
     # r61e（Veda 发现，爸爸令洗门牌）：回退不硬写账号名（书生N号/魔搭N号=公开仓里的
     # 账号门牌）——未配置时取设置里第一个 provider；一个都没有则 make_model("")
     # 构造即炸（占位护栏，R65 规矩）。
-    provs = _settings().get("providers") or []
-    _first = (provs[0].get("name", "") if provs and isinstance(provs[0], dict) else "")
-    fallback = {"A": (_first, "intern-latest"), "B": (_first, "intern-latest")}[seat]
-    return make_model(cfg.get("provider") or fallback[0], cfg.get("model") or fallback[1])
+    # 09-17 批①（Lesson 68）：模型名不再静默回退 intern-latest——未配置=如实报错指配置页。
+    # 09-17 夜 hy4 复测补刀：服务商 `or _first` 同罪（悄悄把流量送给"第一个"服务商=计费/额度全变）
+    # ——一并 fail-closed，爸爸没指定的服务商一律不用。
+    prov = cfg.get("provider") or ""
+    model = cfg.get("model")
+    if not prov or not model:
+        raise ValueError(f"围炉 {seat} 位未配置服务商/模型：请到 设置→围炉 两项都选好（当前 provider={prov or '空'} model={model or '空'}）")
+    return make_model(prov, model)
 
 
 class HearthState(TypedDict):
@@ -133,7 +137,11 @@ def summarize(state: HearthState) -> dict:
     boss = _settings().get("agents", {}).get("boss", {})
     try:
         # r39（Cora P2-2）：归纳失败=如实说且聊天原文降级落盘，不许"说保留实际丢"
-        m = make_model(boss.get("provider", ""), boss.get("model", "intern-latest"), max_tokens=4000)
+        # 09-17 批①：boss 模型不再静默回退 intern-latest（未配置走 r39 如实降级通道）
+        _boss_model = boss.get("model") or ""
+        if not _boss_model:
+            raise ValueError("boss 未配置模型：请到 设置→牛马编制 给米娅(boss)选模型")
+        m = make_model(boss.get("provider", ""), _boss_model, max_tokens=4000)
         cloth, _complete = ask(m, [SystemMessage(PROMPT_SUMMARY), HumanMessage(chat_txt)])
         if cloth and not _complete:
             cloth += "\n\n（归纳位输出触到生成上限，可能有尾段被切。）"

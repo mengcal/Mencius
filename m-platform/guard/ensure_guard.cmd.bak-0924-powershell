@@ -1,0 +1,20 @@
+@echo off
+rem m-guard keep-alive (R10.8h): SYSTEM task, every minute + at boot.
+rem Probe: keyed POST /verify with a wrong token must return 200 {"ok":false}
+rem (KEY matches -> new code alive). 403=KEY mismatch/stale guard, no response=
+rem dead -> kill stale pythonw (matched by command line, not image name) and
+rem start fresh with current code.
+rem 09-17 修（R10.223）：删 -SkipHttpErrorCheck——本机 powershell=5.1 无此参数，
+rem 探针必抛"参数不存在"异常→catch→DEAD→每分钟杀健康守卫重启（11 天 11995 次
+rem guard_start，会话与改密请求全被 60 秒重启窗口吞掉）。5.1 下 200 不抛异常，
+rem 健康判定语义不变。
+set GK=
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_KEY=(.+)$').Matches[0].Groups[1].Value"`) do set GK=%%a
+if "%GK%"=="" goto restart
+set PROBE=
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:9101/verify' -Method Post -ContentType 'application/json' -Body '{\"token\":\"probe-x\"}' -Headers @{ 'X-Guard-Key' = '%GK%' } -TimeoutSec 3; $r.StatusCode } catch { 'DEAD' }" 2^>NUL`) do set PROBE=%%a
+if "%PROBE%"=="200" exit /b 0
+:restart
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'python(w)?\.exe' -and $_.CommandLine -like '*D:\m\guard\m_guard.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+start "" /b "D:\m\guard\run_guard.cmd"
+exit /b 0

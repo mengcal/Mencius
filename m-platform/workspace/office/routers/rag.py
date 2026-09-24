@@ -30,7 +30,18 @@ router = APIRouter()
 # 相关度语义不变：1 - 余弦距离（pgvector 的 <=> 操作符）。
 
 _RAG_VEC = BASE / "mia_home" / "rag_vectors.json"   # 兜底存储 + 一次性迁移源
-_RAG_DIM = 1024  # bge-large/mxbai 均 1024 维；2026-09-02 换 qwen3-embedding:0.6b 实测也=1024，表结构零改动（配置页 rag.embeddingModel 可再换，维度不符时重建需先改此列）
+from settings_schema import default_of as _dof  # 09-17 深夜：默认值单一来源=总表
+_RAG_DIM_DEFAULT = _dof("rag.embeddingDim")
+
+
+def _rag_dim() -> int:
+    """09-17 批③（Lesson 68）：向量维度进配置页 rag.embeddingDim——换嵌入模型改这个值+触发重建即可，
+    不再改代码；维度不符仍显式报错不静默。"""
+    try:
+        from settings_mgr import load_settings
+        return int((load_settings().get("rag", {}) or {}).get("embeddingDim", _RAG_DIM_DEFAULT) or _RAG_DIM_DEFAULT)
+    except Exception:
+        return _RAG_DIM_DEFAULT
 
 
 def _rag_pg():
@@ -47,7 +58,7 @@ def _rag_pg():
                 "CREATE TABLE IF NOT EXISTS rag_chunks("
                 "id bigserial primary key, name text not null, idx int not null default 0,"
                 "text text not null default '', lang text not null default 'zh',"
-                f"vec vector({_RAG_DIM}))"
+                f"vec vector({_rag_dim()}))"
             )
         conn.commit()
         return conn
@@ -67,16 +78,20 @@ def _rag_migrate_json(conn):
     try:
         db = _json.loads(_RAG_VEC.read_text(encoding="utf-8"))
         moved = 0
+        _skipped = 0
         with conn.cursor() as cur:
             for c in db.get("chunks", []):
                 vec = [float(x) for x in c.get("vec", [])]
-                if len(vec) != _RAG_DIM:
+                if len(vec) != _rag_dim():
+                    _skipped += 1  # 09-17 hy4 复测：维度不符不许静默丢块——计数+末尾大声报
                     continue
                 cur.execute(
                     "insert into rag_chunks(name, idx, text, lang, vec) values (%s,%s,%s,%s,%s::vector)",
                     (c["name"], c.get("idx", 0), c["text"], c.get("lang", "zh"), str(vec)))
                 moved += 1
         conn.commit()
+        if _skipped:
+            print(f"[rag] ⚠ 迁移跳过 {_skipped} 片（向量维度≠{_rag_dim()}，检查配置页 rag.embeddingDim 与旧库是否同空间）", flush=True)
         if moved:
             _RAG_VEC.rename(_RAG_VEC.with_suffix(".json.migrated"))
             print(f"[rag] 旧 JSON 迁移完成：{moved} 片 → PG", flush=True)
@@ -126,8 +141,8 @@ async def rag_ingest(req: dict = Body(...)):
                 cur.execute("delete from rag_chunks where name=%s", (name,))
                 for i, c in enumerate(chunks):
                     vec = [float(x) for x in c.get("vec", [])]
-                    if len(vec) != _RAG_DIM:
-                        return {"error": f"向量维度应为 {_RAG_DIM}，收到 {len(vec)}（检查嵌入模型）"}
+                    if len(vec) != _rag_dim():
+                        return {"error": f"向量维度应为 {_rag_dim()}，收到 {len(vec)}（检查嵌入模型/配置页 rag.embeddingDim）"}
                     cur.execute(
                         "insert into rag_chunks(name, idx, text, lang, vec) values (%s,%s,%s,%s,%s::vector)",
                         (name, i, str(c.get("text", ""))[:2000], c.get("lang", "zh"), str(vec)))
@@ -261,6 +276,14 @@ async def rag_rebuild():
         conn = _rag_pg()
         if not conn:
             return {"error": "PG 不可用，重建中止（先查 postgres 容器）"}
+        # 09-17 批②：Ollama 基址走 env（与 tools.py 同键）；env 亦按外部输入校验——
+        # 只许 http 协议+本机主机名（SSRF 边界），非法值直接中止不静默回落。
+        import os as _os
+        from urllib.parse import urlparse
+        _ollama = _os.environ.get("MIA_OLLAMA_URL", "http://host.docker.internal:11434").rstrip("/")
+        _u = urlparse(_ollama)
+        if _u.scheme != "http" or _u.hostname not in ("host.docker.internal", "localhost", "127.0.0.1"):
+            return {"error": "MIA_OLLAMA_URL 非法：只许本机 http 地址（host.docker.internal/localhost/127.0.0.1）"}
         n = 0
         try:
             import httpx
@@ -268,7 +291,7 @@ async def rag_rebuild():
                 cur.execute("select id, text from rag_chunks")
                 rows = cur.fetchall()
                 for cid, text in rows:
-                    r = httpx.post("http://host.docker.internal:11434/api/embed",
+                    r = httpx.post(_ollama + "/api/embed",
                                    json={"model": model, "input": (text or "")[:4000]}, timeout=60)
                     vec = r.json()["embeddings"][0]
                     cur.execute("update rag_chunks set vec=%s::vector where id=%s", (str(vec), cid))

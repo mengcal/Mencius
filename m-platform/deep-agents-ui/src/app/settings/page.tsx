@@ -12,7 +12,7 @@
  *   ui.tsx（Switch/Row/Section/autoGrow 基元）
  *   nav.ts（NAV 导航树 + FUTURE_ROWS 常量）
  *   context.tsx（S/draft/val/set/save/flash/providers 数据流）
- *   rows/（AdminTokenRow、SkillsLockRow、ModelConfigRow）
+ *   rows/（AdminTokenRow、SkillsManager、ModelConfigRow）
  *   tabs/（About/General/AdminGeneral/Connections/Models/Subagents/Web/Images/Interface/Documents）
  * 本文件只保留：tab 状态 + 侧栏渲染 + tab 分发 + 未实现占位页 + 保存钮。
  */
@@ -22,7 +22,10 @@ import { ChevronLeft, Search } from 'lucide-react';
 import { SettingsProvider, useSettings } from './context';
 import { NAV, ALL_TABS, FUTURE_ROWS } from './nav';
 import type { Tab } from './nav';
-import { Section, Row, Switch, tabButtonClass, groupHeadingClass } from './ui';
+import {
+  Section, Row, Switch, tabButtonClass, groupHeadingClass,
+  pageTitleClass, pageSubtitleClass,
+} from './ui';
 import AboutTab from './tabs/AboutTab';
 import GeneralTab from './tabs/GeneralTab';
 import AdminGeneralTab from './tabs/AdminGeneralTab';
@@ -42,7 +45,7 @@ function FutureTab({ id }: { id: string }) {
       {(FUTURE_ROWS[id] || [['todo', '该功能尚未实现']]).map(([k, label]) => (
         <Row key={k} label={label} description="功能尚未实现，开关状态已保存，作为后续路线图">
           <div className="flex items-center gap-2">
-            <span className="text-[0.625rem] text-yellow-600 dark:text-yellow-500 border border-yellow-600/40 dark:border-yellow-500/40 rounded px-1.5 py-px">未实现</span>
+            <span className="text-xxs text-yellow-600 dark:text-yellow-500 border border-yellow-600/40 dark:border-yellow-500/40 rounded px-1.5 py-px">未实现</span>
             <Switch checked={!!val(`future.${id}.${k}`, false)} onChange={(v) => set(`future.${id}.${k}`, v)} />
           </div>
         </Row>
@@ -60,16 +63,16 @@ function SettingsShell() {
   const visibleTab = (t: Tab) => !keyword || t.label.toLowerCase().includes(keyword) || t.id.toLowerCase().includes(keyword);
 
   return (
-    <div className="fixed inset-0 flex bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-gray-200">
-      {/* ── 左侧导航（照抄 OWUI）── */}
-      <aside className="flex w-[240px] shrink-0 flex-col border-r border-gray-100 dark:border-gray-900">
-        <button onClick={() => (window.location.href = '/')} className="flex items-center gap-1 px-4 pt-4 pb-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+    <div className="fixed inset-0 flex bg-gray-50 dark:bg-gray-950 text-foreground">
+      {/* ── 左侧导航（W6：Qoder 式分组感 + 克制的分组标题）── */}
+      <aside className="flex w-[240px] shrink-0 flex-col border-r border-border">
+        <button onClick={() => (window.location.href = '/')} className="flex items-center gap-1 px-4 pt-4 pb-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="size-4" /> 返回
         </button>
-        <div className="px-4 pb-2">
-          <div className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 bg-gray-100 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400">
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-1.5 rounded-[10px] border border-border bg-card px-2 py-1.5 text-sm text-muted-foreground">
             <Search className="size-3.5" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索" className="w-full bg-transparent outline-none" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索" className="w-full bg-transparent outline-none placeholder:text-muted-foreground" />
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto p-1 pl-2 md:pl-1">
@@ -80,10 +83,10 @@ function SettingsShell() {
             if (!groups.length) return null;
             let first = true;
             return (
-              <div key={sec.section}>
-                <span className="text-[0.625rem] text-gray-400 dark:text-gray-600 px-2 mt-1.5 mb-0.5 block">{sec.section}</span>
+              <div key={sec.section} className="mt-3 first:mt-0">
+                <span className="text-xxs text-muted-foreground px-2 mb-1 block">{sec.section}</span>
                 {groups.map((g) => (
-                  <div key={g.heading}>
+                  <div key={g.heading} className="mb-1">
                     {g.heading && <span className={groupHeadingClass(first)}>{g.heading}</span>}
                     {g.tabs.map((t) => {
                       const Icon = t.icon;
@@ -91,7 +94,7 @@ function SettingsShell() {
                         <button key={t.id} role="tab" aria-selected={tab === t.id} className={tabButtonClass(tab === t.id)} onClick={() => setTab(t.id)}>
                           <Icon className="size-3.5" strokeWidth={2} />
                           <span>{t.label}</span>
-                          {!t.real && <span className="ml-auto text-[0.5rem] text-yellow-600 dark:text-yellow-600">未实现</span>}
+                          {!t.real && <span className="ml-auto text-xxs text-yellow-600 dark:text-yellow-600">未实现</span>}
                         </button>
                       );
                     })}
@@ -104,9 +107,9 @@ function SettingsShell() {
         </nav>
       </aside>
 
-      {/* ── 右侧内容区 ── */}
-      <main className="relative flex-1 overflow-y-auto bg-white dark:bg-gray-950 border-l border-gray-100 dark:border-gray-900">
-        <div className="mx-auto max-w-2xl px-8 py-8">
+      {/* ── 右侧内容区（W6：OWUI 式宽松卡片行）── */}
+      <main className="relative flex-1 overflow-y-auto bg-white dark:bg-gray-950 border-l border-border">
+        <div className="mx-auto max-w-2xl px-8 py-10">
           {tab === 'general' && <GeneralTab />}
           {tab === 'about' && <AboutTab />}
           {tab === 'admin:general' && <AdminGeneralTab />}
@@ -121,8 +124,8 @@ function SettingsShell() {
           {/* ── 未实现占位页 ── */}
           {FUTURE_ROWS[tab] && tab !== 'general' && (
             <>
-              <h2 className="mb-1 text-lg font-medium">{ALL_TABS.find((t) => t.id === tab)?.label}</h2>
-              <p className="mb-5 text-xs text-gray-500">规划中 · 打开的开关会存入配置作为路线图</p>
+              <h2 className={pageTitleClass}>{ALL_TABS.find((t) => t.id === tab)?.label}</h2>
+              <p className={pageSubtitleClass}>规划中 · 打开的开关会存入配置作为路线图</p>
               <FutureTab id={tab} />
             </>
           )}
@@ -130,7 +133,7 @@ function SettingsShell() {
 
         {/* ── 悬浮保存按钮（照抄 OWUI）── */}
         <div className="sticky bottom-0 pointer-events-none flex justify-end">
-          <button onClick={save} className="pointer-events-auto mr-6 mb-4 rounded-full bg-gray-900 dark:bg-white px-4 py-2 text-xs font-medium text-white dark:text-black shadow-lg hover:opacity-90">
+          <button onClick={save} className="pointer-events-auto mr-6 mb-4 rounded-full bg-gray-900 dark:bg-white px-4 py-2 text-sm font-medium text-white dark:text-black shadow-lg hover:opacity-90">
             {msg || '保存'}
           </button>
         </div>
