@@ -342,7 +342,7 @@ def revoke(thread_id: str, tool: str) -> bool:
 #  - 3 张起卡面告警接线到 after_model 的 description（P1-1），不报确切数字
 #  - NO-TID 随机桶（r25 教训照抄：宁孤立失效不共享锁死）+ stderr 出声
 _CARD_WARN_AT = 3
-CARD_BUDGET = 8            # 公开常量（P2：confirm_gate 跨模块引用去私有化）
+CARD_BUDGET = 8            # r33 重定位：强提醒线（原"拒绝线"随硬预算退役）——任务累计弹卡达此数，卡面中文强提醒"建议对齐思路"。统计用途，不驱动拒绝。
 _task_cards: dict = {}     # {thread_id: [count, ts_first]}
 _counted_tc: dict = {}     # {key: 首见 ts} 已计数的 (tid,tc_id 或 fp) 幂等键（r43: set→dict 供 LRU 淘汰）
 
@@ -391,8 +391,10 @@ _turn_marks = {}          # {thread_id: 上次见过的 human 消息数}
 def card_pressure(thread_id: str) -> str:
     """卡面告警文案（<3 无；>=3 提醒但不报确切数；>=CARD_BUDGET 中文强提醒——r33 起 English 哨兵退役）。
     r2-2（09-12 基线 W2 案）：告警走软轨——爸爸每发一条新消息（=换题/给新指令）
-    告警清零重计，不拿旧任务的账挂新任务的卡；硬预算 _task_cards 不受影响
-    （防"随便发句话就无限刷卡"）。"""
+    告警清零重计，不拿旧任务的账挂新任务的卡；累计账 _task_cards 不受影响。
+    r33 重定位：硬预算退役（r32b）后 _task_cards=任务累计弹卡统计（不驱动拒绝），
+    驱动两级提醒档位（>=BUDGET-2 强提醒无视软轨换题清零；>=BUDGET 中文强提醒）。
+    CB 方案 A"收敛为软轨"经语义分析推翻：强提醒档位引擎是活功能，删=砍功能。"""
     n = task_cards(thread_id)
     # r33（CB 补审 1.2）：英文哨兵 "BUDGET" 退役——硬预算已退役（r32b），n>=8 只是
     # "这个任务弹了很多卡"，按中文告警口径出声；且全仓无 == "BUDGET" 读者，
