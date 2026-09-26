@@ -1,6 +1,6 @@
-# AgentDiary v1.3.3
+# AgentDiary v1.3.4
 
-当前版本：v1.3.3（MVP，schema v1 RC2 对齐 + lint ⑧ 版本一致收口，知夏 09-22 两单 bug 回执）
+当前版本：v1.3.4（MVP，schema v1 RC2 对齐 + gate_hook v1.2 纳仓收讫）
 
 ## 版本历史
 
@@ -19,7 +19,23 @@
 | v1.3.0-mvp1 | schema v1 RC2 对齐 MVP（V1 Alice 案：情景日志+rolling handoff） |
 | v1.3.1 | 知夏验收三条意见全落地：deny 带 session id + 告警不误报 + 回归测试缺依赖 skip + lint ⑦ refs 完整性 |
 | v1.3.2 | refs-lint ⑦ 判据定稿（issue #8 评估落地：格式 error/断链 error/superseded warning）+ 修 append_episodic 返回 id（refs 引用链路）+ P7 验收测试 |
-| **v1.3.3** | **lint ⑧ 版本一致（__version__==CHANGELOG 头，机器拦，知夏二犯复盘）+ 白名单盲区回执（仓库侧精确匹配无病灶）** |
+| v1.3.3 | lint ⑧ 版本一致（__version__==CHANGELOG 头，机器拦，知夏二犯复盘）+ 白名单盲区回执（仓库侧精确匹配无病灶） |
+| **v1.3.4** | **gate_hook v1.2 纳仓收讫（知夏 09-26 b2d4b48：九例回归+路径参数化+GATE-OFF 急停）+ README 同步 hooks 说明** |
+
+## v1.3.4（gate_hook 纳仓收讫，2026-09-26）
+
+### 已完成
+
+- ✅ gate_hook v1.2 纳仓（知夏 b2d4b48 已推）：`hooks/gate_hook.py` + `hooks/README.md` + `hooks/test_gate_hook.py`
+  - 判定链：GATE-OFF 急停 → Bash 只读白名单（shlex 分词/复合按段/前导 env 跳过/sed 仅 -n 无 -i/git 安全子命令/`diary.py read` 活路）→ 已读放行 → 否则 deny+log_block
+  - 路径参数化：`GATE_DIARY_ROOT`（默认 `~/.agent-diary/live`）、`GATE_DIARY_PKG`（默认本仓根推导），无个人机器路径
+  - 附带修复：GATE_DIARY_PKG 默认值原推导错（包目录）→ 改为仓根，`from agent_diary.store` 可导入
+- ✅ 九例回归对照通过（`python hooks/test_gate_hook.py`，14 check 全绿）
+- ✅ README 补「门禁钩子 gate_hook」段落（协议/判定/安装/急停/回归入口），对齐纳仓
+
+### 回归
+
+- 全量：验收测试（§8 八项+MVP）、v1.2.0 回归、demo、check_version——全过
 
 ## v1.3.3（知夏 09-22 两单 bug 回执，2026-09-22）
 

@@ -29,7 +29,7 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 
 **核心区别：他们防危险，咱们防忘事。**
 
-## 完整功能（当前 v1.3.3）
+## 完整功能（当前 v1.3.4）
 
 ### 三层记忆结构
 - **情景日志**：按天记录的原始事件流，schema v1 §2 frontmatter 条目（id/author/kind/significance/private/source/confidence/refs/open_question）
@@ -67,6 +67,12 @@ AgentDiary 是一套**智能体工作日志强制执行系统**，解决两个�
 - **LangGraph版**：中间件类，双钩（同步+异步）
 - **Claude版**：pretool-use hook（真实协议格式）
 - **通用装饰器版**：@middleware.wrap，任何框架都能用
+
+### 门禁钩子 gate_hook（宿主 PreToolUse 侧，v1.2 纳仓 09-26）
+- 位置：`hooks/gate_hook.py`（随仓分发）+ `hooks/README.md`（协议/判定/安装/急停）
+- 判定：GATE-OFF 急停 → Bash 只读白名单（shlex 分词、复合命令按段、前导 env 跳过、sed 仅 -n 无 -i、git 安全子命令、`diary.py read` 读日记活路）→ 已读放行 → 否则 deny+log_block
+- 路径参数化：`GATE_DIARY_ROOT`（默认 `~/.agent-diary/live`）、`GATE_DIARY_PKG`（默认本仓根自动推导），无个人路径
+- 回归：`python hooks/test_gate_hook.py`（九例对照，退出码 0 = 全过）
 
 ### 其他功能
 - 向量语义搜索（理解意思，不是字面匹配；待审过滤双路：build 过滤+search 回查，v1.2.0）

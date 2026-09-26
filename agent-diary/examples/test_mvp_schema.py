@@ -161,7 +161,7 @@ def main():
         if FAIL:
             print(f"❌ {FAIL} 项失败")
             sys.exit(1)
-        print("✅ v1.3.3 验收测试全过（§8 八项 + MVP 功能）！")
+        print("✅ v1.3.4 验收测试全过（§8 八项 + MVP 功能）！")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
