@@ -26,6 +26,8 @@ export default function ConnectionsTab() {
   const openEdit = (p: any) => { setEditName(p.name); setShowKey(false); setAddForm({ name: p.name, base_url: p.base_url || '', api_key: '', tag: p.tag || '', mode: p.mode || 'chat_completions' }); setAddOpen(true); };
   const addProvider = async () => {
     if (!addForm.name.trim() || !addForm.base_url.trim()) { flash('名称和地址都要填'); return; }
+    // r33c（爸爸报障"MK 能存进地址栏"）：URL 格式校验——非 http(s) 开头一律不保存
+    if (!/^https?:\/\//i.test(addForm.base_url.trim())) { flash('接口地址要以 http:// 或 https:// 开头（例如 https://api-inference.modelscope.cn/v1）'); return; }
     flash('保存并拉取中…');
     const j = await postProviderAction('add', { name: addForm.name, base_url: addForm.base_url, api_key: addForm.api_key });
     if (j.ok) {
@@ -37,10 +39,20 @@ export default function ConnectionsTab() {
   };
   const saveEdit = async () => {
     if (!editName) return;
+    // r33c（爸爸报障"名字不能改"）：编辑弹窗解锁改名——弹窗内直接改，走同一个 rename 端点（联动牛马配置）
+    const nw = addForm.name.trim();
+    if (!nw) { flash('名称不能为空'); return; }
+    if (!/^https?:\/\//i.test(addForm.base_url.trim())) { flash('接口地址要以 http:// 或 https:// 开头'); return; }
+    if (nw !== editName) {
+      flash('改名中…');
+      const jr = await postProviderAction('rename', { old: editName, new: nw });
+      if (!jr.ok) { flash(jr.error || '改名失败'); await reload(); return; }
+      setEditName(nw);
+    }
     const patch: Record<string, any> = { base_url: addForm.base_url, tag: addForm.tag, mode: addForm.mode };
     if (addForm.api_key.trim()) patch.api_key = addForm.api_key.trim(); // 留空=不改密钥
     flash('保存中…');
-    const j = await postProviderAction('update', { name: editName, ...patch });
+    const j = await postProviderAction('update', { name: nw, ...patch });
     if (j.ok) { flash('已更新 ✓'); setAddOpen(false); setEditName(null); await reload(); }
     else flash(j.error || '更新失败');
   };
@@ -116,8 +128,9 @@ export default function ConnectionsTab() {
           <div className="w-[480px] rounded-[10px] border border-border bg-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-base font-medium text-foreground">{editName ? `编辑连接 · ${editName}` : '添加连接'}</h3>
             <label className="mb-1 block text-sm text-muted-foreground">名称</label>
-            <input className={inputC + (editName ? ' opacity-60' : '')} readOnly={!!editName} placeholder="如：智谱 / 魔搭 / 书生 / DeepSeek" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} />
-            {editName && <p className="mt-1 text-xxs text-muted-foreground">改名请在列表行内直接改（会自动联动牛马配置）</p>}
+            {/* r33c（爸爸报障"名字不能改"）：编辑弹窗解锁改名——保存时走 rename 端点联动牛马 */}
+            <input className={inputC} placeholder="如：智谱 / 魔搭 / 书生 / DeepSeek" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} />
+            {editName && <p className="mt-1 text-xxs text-muted-foreground">改名字保存时会自动联动牛马配置。</p>}
             <label className="mb-1 mt-3 block text-sm text-muted-foreground">接口地址（URL）</label>
             <input className={inputC} placeholder="https://open.bigmodel.cn/api/paas/v4" value={addForm.base_url} onChange={(e) => setAddForm({ ...addForm, base_url: e.target.value })} />
             <label className="mb-1 mt-3 block text-sm text-muted-foreground">API 密钥（KEY）</label>

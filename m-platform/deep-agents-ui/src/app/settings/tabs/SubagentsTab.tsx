@@ -188,13 +188,19 @@ export default function SubagentsTab() {
           return (
             <div key={k} className="mb-3 flex flex-wrap items-end gap-3 text-sm">
               <span className="w-44 pb-2.5 text-foreground">{label}</span>
+              {/* r33c（爸爸 09-26："改成下拉列表"）：手填改双下拉——服务商走 providers 列表，模型走该服务商 models_cache；切服务商自动清模型防错配 */}
               <label className="flex flex-col gap-1">服务商
-                <input className={inputC + ' w-40'} defaultValue={cur.provider ?? ''} placeholder="如 ss / 魔搭0423"
-                  onBlur={(e) => commit({ provider: e.target.value })} />
+                <select className={inputC + ' w-40'} value={cur.provider ?? ''}
+                  onChange={(e) => commit({ provider: e.target.value, model: '' })}>
+                  <option value="">（选择服务商）</option>
+                  {providers.filter((p: any) => p.name).map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                </select>
               </label>
               <label className="flex flex-col gap-1">模型
-                <input className={inputC + ' w-56'} defaultValue={cur.model ?? ''} placeholder="如 intern-latest"
-                  onBlur={(e) => commit({ model: e.target.value })} />
+                <select className={inputC + ' w-56'} value={cur.model ?? ''} onChange={(e) => commit({ model: e.target.value })}>
+                  <option value="">（选择模型）</option>
+                  {(modelsByProvider[cur.provider ?? ''] || []).map((m: string) => <option key={m} value={m}>{m}</option>)}
+                </select>
               </label>
             </div>
           );
