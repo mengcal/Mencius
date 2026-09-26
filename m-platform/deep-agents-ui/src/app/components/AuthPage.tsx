@@ -154,7 +154,7 @@ export function AuthPage({ onDone, defaultMode }: { onDone: () => void; defaultM
         <div className="mt-4 text-[0.68rem] leading-relaxed text-muted-foreground">
           {/* r32 F7（五家合流）：去内部路径/去黑话——爸爸在登录页不该看到宿主目录结构，
               "HttpOnly Cookie" 是术语；找回动作=找管理员跑部署目录里的重置脚本 */}
-          登录状态保存在本机浏览器里，不上传。忘记密码？请联系本机管理员运行部署目录中的密码重置脚本。
+          登录状态保存在本机浏览器里，不上传。忘记密码？请在部署目录的 guard 文件夹中找到密码重置脚本，在宿主机上运行。
         </div>
       </div>
     </div>

@@ -24,7 +24,7 @@ from ..core import _JSONResp, _RawResp, _presented_token, _token_audit
 
 router = APIRouter()
 
-_BOOT_BUCKETS: dict = {"register": [], "clear": [], "login": [], "rotate": [], "setpwd": [], "logout": [], "confirlvl": []}  # R10.7b（hy4 P1-4）：按用途分桶（r27 若若 P3-1：bootstrap 桶名改 register，防复活 grep 面清零）；r32 F6：logout 补桶（此前全文件唯一没桶的端点）
+_BOOT_BUCKETS: dict = {"register": [], "clear": [], "login": [], "rotate": [], "setpwd": [], "logout": [], "confirm": []}  # R10.7b（hy4 P1-4）：按用途分桶（r27 若若 P3-1：bootstrap 桶名改 register，防复活 grep 面清零）；r32 F6：logout 补桶（此前全文件唯一没桶的端点）
 
 
 def _boot_rate_ok(purpose: str = "register") -> bool:
@@ -418,8 +418,8 @@ async def api_set_confirm_level(req: dict = Body(...), request: Request = None):
             pass  # _rev 非数字或 stat 失败 → 不拦截（宽松路径；r32 起护栏=审计+回滚，密码门已撤）
     # r30 CB#5（glm-5.3 复测）：office 侧限频桶——此前 missing_password 路径不出守卫、
     # 不限频，持 token 者可全速刷审计账本（10MB×5 代旋转把既有证据挤出窗口）。
-    if not _boot_rate_ok("confirlvl"):
-        _token_audit("confirm_level_rate_limited", ok=False, ip=(request.client.host if request and request.client else "?"))
+    if not _boot_rate_ok("confirm"):
+        _token_audit("confirm_rate_limited", ok=False, ip=(request.client.host if request and request.client else "?"))
         return _JSONResp({"ok": False, "error": "尝试过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
     ip = (request.client.host if request and request.client else "?")
     new = str(req.get("level") or "").strip()

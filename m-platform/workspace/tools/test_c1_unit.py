@@ -124,22 +124,11 @@ _ap._task_cards[tid_probe] = [4, 0]; _ap._card_pressure_soft[tid_probe] = 4
 T("4 张告警不报数", "⚠" in _ap.card_pressure(tid_probe) and "8" not in _ap.card_pressure(tid_probe))
 _ap._task_cards[tid_probe] = [2, 0]; _ap._card_pressure_soft[tid_probe] = 2
 T("2 张静默", _ap.card_pressure(tid_probe) == "")
-# over_budget 精准拒：被预算扣卡的拒，爸爸批过的不吞
+# r33（N1 裁定连根拔）：预算硬停退役+_over_budget 死链拆除——原"精准拒"三断言随之退役。
+# 退役回归断言：无 _over_budget 属性（连根拔实证）+ strict 档 execute 照常走卡路径。
 with patch.object(ConfirmGateMiddleware, "_level", staticmethod(lambda: "strict")):
     gate2 = ConfirmGateC1()
-    with patch.object(ConfirmGateC1, "_tid", staticmethod(lambda: tid_probe)):
-        # FakeExecReq 的 tc id="id1"：不在扣卡集合里 → 不吞（爸爸刚批的调用=这情形）
-        gate2._over_budget[tid_probe] = {"tc-other"}
-        r = gate2.wrap_tool_call(FakeExecReq("execute", {"command": "ls"}), fake_handler)
-        T("预算外调用不误伤（不吞批准）", r == "EXECUTED")
-        # 在扣卡集合里的：精准拒，且拒一次即消费
-        class DeniedReq:
-            tool_call = {"name": "execute", "args": {"command": "ls"}, "id": "tc-x"}
-        gate2._over_budget[tid_probe] = {"tc-x"}
-        r3 = gate2.wrap_tool_call(DeniedReq(), fake_handler)
-        T("被预算扣卡的精准拒", isinstance(r3, ToolMessage) and "预算" in r3.text)
-        r4 = gate2.wrap_tool_call(DeniedReq(), fake_handler)
-        T("拒一次即消费（防集合膨胀）", r4 == "EXECUTED")
+    T("预算死链已连根拔（无 _over_budget 属性）", not hasattr(gate2, "_over_budget"))
 _ap._task_cards.clear(); _ap._counted_tc.clear(); _ap._card_pressure_soft.clear(); _ap._turn_marks.clear()
 
 # NO-TID：不进桶不耗预算、卡照弹

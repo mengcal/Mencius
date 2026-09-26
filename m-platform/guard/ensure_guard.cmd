@@ -15,9 +15,9 @@ rem     - stale kill   : cscript kill_guard.vbs (WMI CommandLine match;
 rem                      wmic itself is GONE from this OS build 26200)
 rem   cscript/cmd/curl inherit the hidden console created by ensure_guard.vbs
 rem   (Run style 0) -> zero visible windows.
-rem r32c (Qoder #5): the ONLY powershell use in this script = reading M_GUARD_PORT
-rem digits from .env (ASCII key, digits-only output) - outside the GBK parsing pitfall
-rem that the powershell-free rule targets (guard OUTPUT parsing). Constraint scope noted.
+rem r33 (family review round 2): the last powershell (PORT read) is GONE too -
+rem M_GUARD_PORT now read via findstr, same native pattern as M_GUARD_KEY below.
+rem The chain is now 100% powershell-free as the 09-23/09-24 window-flash rule demands.
 rem NOTE (r32 unified): RETIRED on 09-26. The one true keepalive = Startup
 rem folder guard_boot.vbs -> run_guard.cmd (host already installed). The
 rem m-guard-task.xml service plan stays an unused backup; do not mix stories.
@@ -28,8 +28,11 @@ set GK=
 for /f "usebackq tokens=1* delims==" %%a in (`findstr /b "M_GUARD_KEY=" "D:\m\.env"`) do set GK=%%b
 if "%GK%"=="" goto restart
 set PROBE=
-for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try{(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_PORT=(.+)$').Matches[0].Groups[1].Value}catch{''}"`) do set M_GUARD_PORT=%%a
-if "%M_GUARD_PORT%"=="" set M_GUARD_PORT=9101
+set "M_GUARD_PORT="
+for /f "usebackq tokens=1* delims==" %%a in (`findstr /b "M_GUARD_PORT=" "D:\m\.env" 2^>nul`) do set "M_GUARD_PORT=%%b"
+if defined M_GUARD_PORT set "M_GUARD_PORT=%M_GUARD_PORT:~0,5%"
+if not defined M_GUARD_PORT set "M_GUARD_PORT=9101"
+
 for /f "usebackq delims=" %%a in (`curl -s -o NUL -w "%%{http_code}" -m 3 -X POST -H "Content-Type: application/json" -H "X-Guard-Key: %GK%" -d "{\"token\":\"probe-x\"}" http://127.0.0.1:%M_GUARD_PORT%/verify`) do set PROBE=%%a
 if "%PROBE%"=="200" exit /b 0
 :restart

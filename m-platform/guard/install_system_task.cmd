@@ -28,7 +28,10 @@ icacls "%GUARDDIR%" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(
 echo [4/4] Starting guard once (auto-restart on boot = Startup\guard_boot.vbs)...
 cscript //nologo "%GUARDDIR%guard_boot.vbs"
 timeout /t 4 /nobreak >nul
-for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try{(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_PORT=(.+)$').Matches[0].Groups[1].Value}catch{''}"`) do set M_GUARD_PORT=%%a
+set "M_GUARD_PORT="
+for /f "usebackq tokens=1* delims==" %%a in (`findstr /b "M_GUARD_PORT=" "D:\m\.env" 2^>nul`) do set "M_GUARD_PORT=%%b"
+if defined M_GUARD_PORT set "M_GUARD_PORT=%M_GUARD_PORT:~0,5%"
+if not defined M_GUARD_PORT set "M_GUARD_PORT=9101"
 if "%M_GUARD_PORT%"=="" set M_GUARD_PORT=9101
 curl -s -m 5 http://127.0.0.1:%M_GUARD_PORT%/status
 echo.

@@ -7,22 +7,10 @@ rem 同 .token_bootstrap 的语义）。密钥/设置/对话零改动。
 rem reset_guard.cmd 仍是"全部重置"核弹（清密钥+密码+回注册向导），两者分开。
 rem ============================================================
 set GK=
-for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_KEY=(.+)$').Matches[0].Groups[1].Value"`) do set GK=%%a
-if "%GK%"=="" (
-    echo [错误] 读不到 D:\m\.env 的 M_GUARD_KEY
-    pause & exit /b 1
-)
-set HC=
-for /f "usebackq delims=" %%a in (`type "D:\m\guard\hostcopy.token"`) do set HC=%%a
-if "%HC%"=="" (
-    echo [错误] 读不到 D:\m\guard\hostcopy.token（若刚全清过，请先走注册向导）
-    pause & exit /b 1
-)
-echo 将修改 M 平台管理员密码（设置与对话不动）。
-set NEW=
-set /p NEW=输入新管理员密码（至少 8 位；会显示在屏幕上，本机无旁观即可）:
-if "%NEW%"=="" ( echo 已取消。 & exit /b 0 )
-for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try{(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_PORT=(.+)$').Matches[0].Groups[1].Value}catch{''}"`) do set M_GUARD_PORT=%%a
+set "M_GUARD_PORT="
+for /f "usebackq tokens=1* delims==" %%a in (`findstr /b "M_GUARD_PORT=" "D:\m\.env" 2^>nul`) do set "M_GUARD_PORT=%%b"
+if defined M_GUARD_PORT set "M_GUARD_PORT=%M_GUARD_PORT:~0,5%"
+if not defined M_GUARD_PORT set "M_GUARD_PORT=9101"
 if "%M_GUARD_PORT%"=="" set M_GUARD_PORT=9101
 curl -s -m 8 -X POST http://127.0.0.1:%M_GUARD_PORT%/set_password -H "Content-Type: application/json" -H "X-Guard-Key: %GK%" -d "{\"password\":\"%NEW%\",\"current\":\"%HC%\"}"
 echo.

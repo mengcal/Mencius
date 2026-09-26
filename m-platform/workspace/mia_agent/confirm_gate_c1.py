@@ -511,7 +511,8 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
             # 爸爸原话"也没看 zcode 给你放批准卡限额啊"）。爸爸在线逐卡批=人就是预算；
             # 计数照记（卡面软提醒+账本）。牛马不受影响：子层 SubGate 不走本路径（不弹卡），
             # 它们的配额是任务侧返工轮次（tasks.py），两套账本本就该分开。
-            # _over_budget 集合与 wrap 层精准拒保留：管理端重置入口/外部登记/在途清理不受影响。
+            # r33 连根拔补记：原"外部登记不受影响"的宣称经全仓 grep 证伪（无写入点），
+            # 相应集合与消费分支已拆；reset_thread 快照的防御性 getattr 保留作兼容垫。
             return True
         return when
 
@@ -521,7 +522,6 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         ConfirmGateC1._GATE_INSTANCES.append(self)
         # 反选架构下名单在 after_model 动态补全；初始空表。
         self.sub_mode = sub_mode
-        self._over_budget: dict = {}  # {tid: set(tool_call_id)} 预算扣卡的调用（wrap 精准拒）
         self._clarify: dict = {}      # {tid: bool} r44b：task_brief 待澄清态（卡面提示用）
         self._abs_blocked: dict = {}  # {tid: set(tc_id)} r46 路径形态门扣卡的调用
         # r61h P-1（hy4 八轮 E19-1）：when 判冻结排除出卡的 tc_id 登记处——
@@ -701,9 +701,9 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                 "本调用不可重试。若任务确需完成该类操作，请改用 write_file/edit_file 等"
                 "白名单工具达成目标，或把目标与替代方案向爸爸汇报，由爸爸定夺。"),
                 tool_call_id=tc.get("id", ""))
-        if dec == "ask" and tck in (self._over_budget.get(tid) or set()):
-            self._over_budget[tid].discard(tck)  # 消费一次，防集合膨胀
-            return ToolMessage(content=self._budget_refusal(name), tool_call_id=tc.get("id", ""))
+        # r33（N1 裁定连根拔，NOVA/Veda 附议）：批准卡硬预算退役后 _over_budget 全仓
+        # 写入点为零（grep 实锤，含包外），原 wrap 消费分支=永不触发的死口，整段拆除。
+        # _abs_blocked 保留（路径形态门仍在用）。
         if dec == "ask" and tck in (self._abs_blocked.get(tid) or set()):
             self._abs_blocked[tid].discard(tck)
             # r46（Veda 炮落地）：绝对形式硬拒——拒信即教学（不烧预算不弹卡）

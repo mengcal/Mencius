@@ -422,7 +422,7 @@ with patch.object(ConfirmGateMiddleware, "_level", staticmethod(lambda: "auto_ed
         gm._guard_lock["d2m"] = (time.time(), 60)
         gm._guard_streak["d2m"] = [time.time()]
         gm._frozen_hold["d2m"] = {"t9"}
-        gm._over_budget["d2m"] = {"t8"}
+        gm._over_budget = {"d2m": {"t8"}}
         ConfirmGateC1._PRESSURE_PIN["d2m"] = (time.time(), "p-d2m")
         gm._fail_streak["d2m"] = {"n": 3, "recent": ["x"], "fired": True}
         r_m = ConfirmGateC1.reset_thread("d2m")
@@ -448,7 +448,7 @@ with patch.object(ConfirmGateMiddleware, "_level", staticmethod(lambda: "auto_ed
 # ── M2/M3：十四轮 §⑤ 两表同中（budget=命中数之和）+ 落账失败=三锁原样未清 ──
 # 顺序决策（本单主项）：先算 → 先落账 → 落账成功才清锁。落账抛时锁根本没清，
 # 出口语义="本次重置未完成、请重试/人工"，绝不允许"清了锁没账"的无痕态。
-gm._over_budget["d2m2"] = {"t8"}
+gm._over_budget = {"d2m2": {"t8"}}
 gm._abs_blocked["d2m2"] = {"t7"}
 ConfirmGateC1._PRESSURE_PIN["d2m2"] = (time.time(), "p-d2m2")
 r_m2 = ConfirmGateC1.reset_thread("d2m2")
@@ -465,7 +465,7 @@ T("M2 落账带 budget_detail 明细（账与返回值同口径）",
 gm._guard_lock["d2m3"] = (time.time(), 60)
 gm._guard_streak["d2m3"] = [time.time()]
 gm._frozen_hold["d2m3"] = {"t5"}
-gm._over_budget["d2m3"] = {"t6"}
+gm._over_budget = {"d2m3": {"t6"}}
 ConfirmGateC1._PRESSURE_PIN["d2m3"] = (time.time(), "p-d2m3")
 with patch.object(ap, "_audit", side_effect=RuntimeError("audit down")):
     r_m3 = ConfirmGateC1.reset_thread("d2m3")
@@ -493,7 +493,7 @@ ConfirmGateC1._DEADLETTER_PATH = _dl
 gm._guard_lock["d2m4"] = (time.time(), 60)
 gm._guard_streak["d2m4"] = [time.time()]
 gm._frozen_hold["d2m4"] = {"t4"}
-gm._over_budget["d2m4"] = {"t9"}
+gm._over_budget = {"d2m4": {"t9"}}
 ConfirmGateC1._PRESSURE_PIN["d2m4"] = (time.time(), "p-d2m4")
 gm._fail_streak["d2m4"] = {"n": 3, "recent": ["x"], "fired": True}
 with patch.object(ap, "_audit", side_effect=RuntimeError("audit down")):
