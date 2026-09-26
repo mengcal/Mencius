@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import {
   Square,
   ArrowUp,
-  Globe,
   Paperclip,
 } from "lucide-react";
 import { saveFile } from "@/lib/providerApi";
@@ -67,8 +66,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
   const [input, setInput] = useState("");
   // ── OWUI 式输入框：左下角联网开关+思维档位，右下角模型选择（2026-08-29 知夏；r25 空壳🔧按钮已随爸爸令拔除）──
   const {
-    webSearchOn,
-    setWebSearchOn,
+    // r32b：webSearchOn/setWebSearchOn 随联网按钮退役（恒传 true，见 handleSubmit）
     thinking,
     setThinking,
     models,
@@ -152,12 +150,14 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       sendMessage(messageText, {
         model: selectedModel || undefined,
         provider: selectedProvider || undefined,
-        webSearch: webSearchOn,  // R73（NOVA🔴2）：恒传布尔，关→开也能翻回来；不再"关一次焊死"
+        // r32b（爸爸裁决"默认米娅可以联网搜索"）：恒传 true——按钮已退役，
+        // 老的 localStorage 关闭态（webSearchOn=false）不再生效；后端缺省本就 True
+        webSearch: true,
         thinking: thinking || undefined,
       });
       setInput("");
     },
-    [input, isLoading, sendMessage, setInput, submitDisabled, selectedModel, selectedProvider, webSearchOn, thinking]
+    [input, isLoading, sendMessage, setInput, submitDisabled, selectedModel, selectedProvider, thinking]
   );
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -322,15 +322,16 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                 </button>
                 <button
                   type="button"
-                  title="联网搜索"
-                  onClick={() => setWebSearchOn(!webSearchOn)}
-                  className={cn(
-                    "rounded-lg p-2 transition-colors hover:bg-accent",
-                    webSearchOn ? "text-primary bg-accent" : "text-tertiary"
-                  )}
+                  title="上传文件（文本类直接可读，米娅收到后可用 execute 处理）"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  className="rounded-lg p-2 text-tertiary transition-colors hover:bg-accent hover:text-primary disabled:opacity-50"
                 >
-                  <Globe size={16} />
+                  <Paperclip size={16} />
                 </button>
+                {/* r32b（爸爸 09-26 裁决）：联网搜索按钮退役——对齐主流（豆包/清言/ZCode 无此按钮=默认能联网）。
+                    后端 web_search 本就缺省 True（run_config.py），模型内置搜索（qwen3.8-flash 系）
+                    或搜索工具（tavily/秘塔/博查/searxng）都默认可用，无需爸爸选。 */}
                 <select
                   title="思维档位（随消息生效）"
                   value={thinking}

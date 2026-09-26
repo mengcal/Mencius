@@ -241,77 +241,80 @@ export const ChatMessage = React.memo<ChatMessageProps>(
               🕐 {fmtBJ(createdAt)}
             </div>
           )}
-          {hasToolCalls && showTools && (
+          {hasToolCalls && (
             <div className="mt-4 flex w-full flex-col">
-              {(() => {
-                // R54 牛马进程折叠：工具调用默认收成一行摘要，点击展开详情（想看才看，不混淆对话流）
-                const visible = toolCalls.filter(
-                  (toolCall: ToolCall) => toolCall.name !== "task"
-                );
-                if (visible.length === 0) return null;
-                const done = visible.filter(
-                  (t: ToolCall) => (t.status || "completed") === "completed"
-                ).length;
-                const names = Array.from(
-                  new Set(visible.map((t: ToolCall) => t.name))
-                ).slice(0, 3);
-                return (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setToolsOpen(!toolsOpen)}
-                      className="flex w-full items-center gap-2 rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-left text-[0.6875rem] text-gray-500 transition-colors hover:bg-accent dark:border-gray-900 dark:bg-gray-900 dark:hover:bg-accent"
-                    >
-                      <span>{toolsOpen ? "▾" : "▸"}</span>
-                      <span>
-                        🔧 米娅执行了 {visible.length} 个工具调用
-                        {blockedCount > 0
-                          ? "（⛔ 待批准）"
-                          : done === visible.length
-                            ? "（已完成）"
-                            : "（进行中）"}
-                        {!toolsOpen && names.length > 0 && (
-                          <span className="ml-1 opacity-70">
-                            {names.join(" / ")}
-                            {names.length >= 3 ? " …" : ""}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                    {toolsOpen && (
-                      <div className="flex w-full flex-col">
-                        {toolCalls.map((toolCall: ToolCall) => {
-                          if (toolCall.name === "task") return null;
-                          const toolCallGenUiComponent = ui?.find(
-                            (u) => u.metadata?.tool_call_id === toolCall.id
-                          );
-                          // r41（C1）批量模式：单卡停用（批量卡统一接管），只渲染工具盒子
-                          const actionRequest = batchMode
-                            ? undefined
-                            : actionRequestsMap?.get(toolCall.name);
-                          const reviewConfig = batchMode
-                            ? undefined
-                            : reviewConfigsMap?.get(toolCall.name);
-                          return (
-                            <ToolCallBox
-                              key={toolCall.id}
-                              toolCall={toolCall}
-                              uiComponent={toolCallGenUiComponent}
-                              stream={stream}
-                              graphId={graphId}
-                              actionRequest={actionRequest}
-                              reviewConfig={reviewConfig}
-                              onResume={onResumeInterrupt}
-                              isLoading={isLoading}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-              {/* r41（C1）批量批准卡：官方 HITLRequest 多工具一卡一次 resume（爸爸裁决=按钮扣章） */}
+              {showTools &&
+                (() => {
+                  // R54 牛马进程折叠：工具调用默认收成一行摘要，点击展开详情（想看才看，不混淆对话流）
+                  const visible = toolCalls.filter(
+                    (toolCall: ToolCall) => toolCall.name !== "task"
+                  );
+                  if (visible.length === 0) return null;
+                  const done = visible.filter(
+                    (t: ToolCall) => (t.status || "completed") === "completed"
+                  ).length;
+                  const names = Array.from(
+                    new Set(visible.map((t: ToolCall) => t.name))
+                  ).slice(0, 3);
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setToolsOpen(!toolsOpen)}
+                        className="flex w-full items-center gap-2 rounded-md border border-gray-100 bg-gray-50 px-2 py-1 text-left text-[0.6875rem] text-gray-500 transition-colors hover:bg-accent dark:border-gray-900 dark:bg-gray-900 dark:hover:bg-accent"
+                      >
+                        <span>{toolsOpen ? "▾" : "▸"}</span>
+                        <span>
+                          🔧 米娅执行了 {visible.length} 个工具调用
+                          {blockedCount > 0
+                            ? "（⛔ 待批准）"
+                            : done === visible.length
+                              ? "（已完成）"
+                              : "（进行中）"}
+                          {!toolsOpen && names.length > 0 && (
+                            <span className="ml-1 opacity-70">
+                              {names.join(" / ")}
+                              {names.length >= 3 ? " …" : ""}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                      {toolsOpen && (
+                        <div className="flex w-full flex-col">
+                          {toolCalls.map((toolCall: ToolCall) => {
+                            if (toolCall.name === "task") return null;
+                            const toolCallGenUiComponent = ui?.find(
+                              (u) => u.metadata?.tool_call_id === toolCall.id
+                            );
+                            // r41（C1）批量模式：单卡停用（批量卡统一接管），只渲染工具盒子
+                            const actionRequest = batchMode
+                              ? undefined
+                              : actionRequestsMap?.get(toolCall.name);
+                            const reviewConfig = batchMode
+                              ? undefined
+                              : reviewConfigsMap?.get(toolCall.name);
+                            return (
+                              <ToolCallBox
+                                key={toolCall.id}
+                                toolCall={toolCall}
+                                uiComponent={toolCallGenUiComponent}
+                                stream={stream}
+                                graphId={graphId}
+                                actionRequest={actionRequest}
+                                reviewConfig={reviewConfig}
+                                onResume={onResumeInterrupt}
+                                isLoading={isLoading}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              {/* r41（C1）批量批准卡：官方 HITLRequest 多工具一卡一次 resume（爸爸裁决=按钮扣章）。
+                  r32b 修（爸爸点名"点隐藏把四档确认窗口也藏了"）：批准卡是请示窗口不是
+                  工具调用卡——移出 showTools 连坐，隐藏工具卡时照常弹出。 */}
               {batchMode && onResumeInterrupt && (
                 <div className="mt-2 w-full">
                   <BatchApprovalInterrupt

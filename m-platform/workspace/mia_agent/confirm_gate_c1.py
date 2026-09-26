@@ -503,14 +503,15 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                 print(f"[gate] remember_rules 查询失败（放行走正常门）：{_re}", flush=True)
             import hashlib as _hl
             _fpv = _hl.sha256(str(tc.get("args") or "").encode("utf-8", "replace")).hexdigest()[:12]
-            n = _ap.bump_blocked(tid, tc_id, fp=_fpv)  # (tid,tc_id) 幂等：resume 不双计；r43 空 id 退参数指纹（hy4 P1-1）
+            _ap.bump_blocked(tid, tc_id, fp=_fpv)  # (tid,tc_id) 幂等：resume 不双计；r43 空 id 退参数指纹（hy4 P1-1）
             # r2-2：软轨告警计数已随 bump_blocked 同点递增（幂等保护在其内部），
             # 卡面告警文案另受 note_new_turn 按轮清零（见 after_model）。
-            if n >= _ap.CARD_BUDGET:
-                # 超预算：不弹卡，登记该 tc_id——wrap 层只拒"被预算扣掉卡"的调用（P1-3：
-                # 爸爸刚批准的调用不在此集合，绝不会被误吞）
-                self._over_budget.setdefault(tid, set()).add(tc_id)
-                return False
+            # r32b 退役（爸爸 09-26 裁决）：批准卡硬预算整体退役——"满 8 张拒弹"曾把
+            # 长任务拦腰截断（miafirm 接入第 9 张卡被拒=干到一半被迫停工汇报；
+            # 爸爸原话"也没看 zcode 给你放批准卡限额啊"）。爸爸在线逐卡批=人就是预算；
+            # 计数照记（卡面软提醒+账本）。牛马不受影响：子层 SubGate 不走本路径（不弹卡），
+            # 它们的配额是任务侧返工轮次（tasks.py），两套账本本就该分开。
+            # _over_budget 集合与 wrap 层精准拒保留：管理端重置入口/外部登记/在途清理不受影响。
             return True
         return when
 
