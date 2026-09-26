@@ -2,7 +2,7 @@ import { Inter } from "next/font/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Toaster } from "sonner";
 import "./globals.css";
-import { AuthGate } from "@/app/components/SetupWizard"; // R10.8e：全局登录闸门（client 组件）
+import { AuthGate } from "@/app/components/AuthPage"; // r31（09-26 爸爸令）：登录/注册合一页面
 
 const inter = Inter({ subsets: ["latin"] });
 

@@ -17,9 +17,9 @@ import {
 import { ThreadList } from "@/app/components/ThreadList";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ChatInterface } from "@/app/components/ChatInterface";
-import { getSettings, postSettings, tokenStatus } from "@/lib/providerApi";
+import { getSettings, postSettings, tokenStatus, clearAdminToken } from "@/lib/providerApi";
 import { API, apiFetch } from "@/lib/apiBase";
-import { SetupWizard, LoginGate } from "@/app/components/SetupWizard";
+import { authLogout, AuthPage } from "@/app/components/AuthPage";
 
 /** 顶栏快捷开关：确认分档 / 米娅管牛马 / 工具显隐——不进设置页直接切（2026-08-30 知夏）
  *  r35（爸爸点名"循环四档要点半天不科学"+逮到 off/full 枚举错位 bug）：
@@ -258,6 +258,19 @@ function HomePageInner({
               <SquarePen className="mr-2 h-4 w-4" />
               New Thread
             </Button>
+            {/* r31：退出登录（爸爸令"看看 OWUI"）——顶栏右侧，点了清 cookie 回登录页 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try { await fetch(`${API}/auth/logout`, { method: "POST" }); } catch {}
+                clearAdminToken();
+                window.location.reload();
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              退出登录
+            </Button>
           </div>
         </header>
         <div className="flex-1 overflow-hidden">
@@ -373,9 +386,9 @@ function HomePageContent() {
   // R10.7：管理员注册向导（未配置密钥=首部署 → 全屏引导；检测中短暂空白）
   // R10.8e（bug 修复）：loginNeeded=true 时 setupNeeded 仍是 null（configured=true 从不设置它）——
   // 空值检查必须放 loginNeeded 之后，否则登录层永远被 return null 挡住（爸爸"页面看不到"真凶）。
-  if (loginNeeded) return <LoginGate onDone={() => window.location.reload()} />;
+  if (loginNeeded) return <AuthPage onDone={() => window.location.reload()} defaultMode="login" />;
   if (setupNeeded === null) return null;
-  if (setupNeeded) return <SetupWizard onDone={() => window.location.reload()} />;
+  if (setupNeeded) return <AuthPage onDone={() => window.location.reload()} defaultMode="register" />;
   if (!config) {
     return (
       <>

@@ -23,7 +23,7 @@ del /f /q "%~dp0token.bin" 2>nul
 del /f /q "%~dp0password.bin" 2>nul
 del /f /q "%~dp0hostcopy.token" 2>nul
 del /f /q "%~dp0.token_bootstrap" 2>nul
-schtasks /Run /tn m-guard-watch-sys >nul 2>&1
+rem r31 09-26: m-guard-watch-sys task retired - guard auto-restarts via Startup folder
 timeout /t 4 /nobreak >nul
 curl -s -m 5 http://127.0.0.1:9101/status
 echo.

@@ -33,11 +33,12 @@ function TierPicker() {
     try {
       const r = await apiFetch(`${API}/settings/confirm-level`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level: lv, ...(password ? { password } : {}) }),
+        body: JSON.stringify({ level: lv, _rev: Number(val('_rev') || 0), ...(password ? { password } : {}) }),
       });
       const j = await r.json().catch(() => ({}));
       if (j?.ok) { setTier(j.confirmLevel); setPending(''); setPwd(''); setMsg('✓ 已切换'); }
       else if (j?.need_password) { setPending(lv); setMsg(''); }
+      else if (j?.conflict) { setMsg(j?.error || '设置已被后台修改，请刷新页面'); }
       else { if (j?.previous) setTier(j.previous); setMsg(j?.error || '切换失败'); }
     } catch { setMsg('无法连接后端'); }
   };
