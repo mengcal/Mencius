@@ -79,13 +79,17 @@ async def api_set_settings(section: str, data: dict = Body(...), request: Reques
         # 持 Cookie 的 XSS 脚本此前一条 POST /settings/general {confirmLevel:"full"} 即可
         # 替米娅松档（与 r28 改密旁路同族病），此路自此关闭。
         if section == "general" and "confirmLevel" in data:
+            # r32b：文案随密码门退役更新（爸爸裁决四档自由切）
             return {"ok": False,
-                    "error": "确认分档须走专用通道（设置页档位行；顶栏只许收紧）——放宽需管理员密码验证"}
+                    "error": "确认分档须走专用通道 /settings/confirm-level（设置页档位行或顶栏直选，变更全程落审计）"}
         result = save_section(section, data)
         # agents 已由 save_section 深度合并进 settings.agents（配置页=唯一真源）；不再回写 agents_config.json
-        return {"ok": True, "saved": section, "data": result}
+        # r32c F1（CB/Qoder 双 P0）：成功帧回吐新 rev——前端多节保存逐节续版，破"第 2 节起必 409"
+        return {"ok": True, "saved": section, "data": result, "rev": settings_rev()}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        # r32c F6（Qoder P2）：str(e) 英文异常原文（含路径）直穿 UI——分译人话+日志留底
+        print(f"[settings] 保存异常 section={section}: {type(e).__name__}: {e}", flush=True)
+        return {"ok": False, "error": "保存失败：配置读写异常，请刷新页面重试（详情见服务日志）"}
 
 # ── R68 P0（五路评审同锤）：/providers/fetch_models 已删除 ──
 # 它拿"请求里的任意 base_url"发送"已存明文 key"=密钥外带正门；且前端从不调用（只用 refresh/add），纯死攻击面。

@@ -320,15 +320,6 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                 >
                   <Paperclip size={16} />
                 </button>
-                <button
-                  type="button"
-                  title="上传文件（文本类直接可读，米娅收到后可用 execute 处理）"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading}
-                  className="rounded-lg p-2 text-tertiary transition-colors hover:bg-accent hover:text-primary disabled:opacity-50"
-                >
-                  <Paperclip size={16} />
-                </button>
                 {/* r32b（爸爸 09-26 裁决）：联网搜索按钮退役——对齐主流（豆包/清言/ZCode 无此按钮=默认能联网）。
                     后端 web_search 本就缺省 True（run_config.py），模型内置搜索（qwen3.8-flash 系）
                     或搜索工具（tavily/秘塔/博查/searxng）都默认可用，无需爸爸选。 */}

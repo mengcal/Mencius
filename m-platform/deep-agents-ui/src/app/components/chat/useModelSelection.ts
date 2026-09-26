@@ -3,7 +3,7 @@
 /**
  * components/chat/useModelSelection.ts —— 输入框模型/思维档/联网开关 hook（原 ChatInterface.tsx 迁出）
  * ------------------------------------------------------------------
- * - 🌐 联网开关：默认开（R28 教训：默认关=米娅搜索全被挡），localStorage 'mia.webSearch' 记住上次选择
+ * - 🌐 联网：r32b 起按钮退役恒开（爸爸裁决），无开关无 localStorage 键
  * - 🧠 思维四档：''=默认(随模型出厂)，off/low/medium/high；按对话独立存储（localStorage 'mia.thinking.<tid>'）
  * - 模型选择：R46 按对话记忆 + 全局默认（新对话继承上次选择；切回旧对话自动恢复）
  *   localStorage 键 'mia.model.<tid>' / 'mia.modelProvider.<tid>' / 'mia.model' / 'mia.modelProvider' 原样保留
@@ -15,14 +15,8 @@ import { useQueryState } from "nuqs";
 import { getAllModels } from "@/lib/providerApi";
 
 export function useModelSelection() {
-  // 🌐 默认开（R28 教训：默认关=米娅搜索全被挡，看起来像"没搜索"）；记住上次选择
-  const [webSearchOn, setWebSearchOnState] = useState(
-    typeof window !== "undefined" ? localStorage.getItem("mia.webSearch") !== "false" : true
-  );
-  const setWebSearchOn = (v: boolean) => {
-    setWebSearchOnState(v);
-    localStorage.setItem("mia.webSearch", String(v));
-  };
+  // r32c #13（CB F10）：webSearchOn/setWebSearchOn 随联网按钮退役（ChatInterface 恒传 true），
+  // 死状态与 localStorage 'mia.webSearch' 僵尸键一并清除——联网=默认开，无开关。
   // r25（爸爸：输入框"工具"按钮=只有开关没有下游消费，空壳连根拔；ZCode 式工具本就该由模型自主调用）
   // 思维四档：'' =默认(随模型出厂)，off=关闭，low/medium/high。按对话独立存储，随消息传给引擎
   const [thinking, setThinkingState] = useState("");
@@ -65,8 +59,6 @@ export function useModelSelection() {
     localStorage.setItem("mia.modelProvider", provider || "");
   };
   return {
-    webSearchOn,
-    setWebSearchOn,
     thinking,
     setThinking,
     models,

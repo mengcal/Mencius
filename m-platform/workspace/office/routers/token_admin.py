@@ -149,16 +149,20 @@ async def api_token_rotate(req: dict = Body(...), request: Request = None):
         try:
             result = _guard_post("/set", payload, timeout=8.0)
         except urllib.error.HTTPError as e:
+            # r32c F5（CB）：守卫原始 body 不再直透——解析后 error 过翻译层
             try:
                 result = _rj.loads(e.read())
             except Exception:
                 result = {"ok": False, "error": "被守卫拒绝"}
+            if isinstance(result, dict) and result.get("error"):
+                result = {"ok": False, "error": _human_error(result.get("error"))}
         except Exception as e:
             _token_audit("guard_error", False, err=type(e).__name__, ip=ip)  # r32 F17 补 IP
-            return _JSONResp({"ok": False, "error": "守卫服务不可达（fail-closed）"}, status_code=503)
+            return _JSONResp({"ok": False, "error": "服务暂时不可用，请稍后再试"}, status_code=503)
         if not result.get("ok"):
             _token_audit("rotate_denied" if configured else "first_set_denied", False, ip=ip)
-            return _JSONResp({"ok": False, "error": result.get("error", "被守卫拒绝")}, status_code=403)
+            # r32c F5（CB）：守卫英文/黑话过翻译层
+            return _JSONResp({"ok": False, "error": _human_error(result.get("error") or "被守卫拒绝")}, status_code=403)
         val = payload["token"]
         clear_verify_cache()  # R10.11（Eve P3）：rotate/首设成功即清验证缓存，30s 撤销窗口压到 0
         _token_audit("first_set" if not configured else "rotate", True, ip=ip)
@@ -232,6 +236,7 @@ async def auth_set_password(req: dict = Body(...), request: Request = None):
     guard = M_GUARD_URL
     # R10.11（千问）：/auth/set_password 此前 office 侧无限频（guard 侧有 10/min 但每次拒绝仍落守卫审计行）——补同款分桶
     if not _boot_rate_ok("setpwd"):
+        _token_audit("setpwd_rate_limited", False, ip=(request.client.host if request and request.client else "?"))  # r32c #17a
         return _JSONResp({"ok": False, "error": "尝试过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
     if not guard:
         return _JSONResp({"ok": False, "error": "本地裸跑模式不支持（未配置守卫）"}, status_code=503)
@@ -268,6 +273,7 @@ async def auth_login(req: dict = Body(...), request: Request = None):
     if not guard:
         return _JSONResp({"ok": False, "error": "服务暂时不可用，请稍后再试"}, status_code=503)  # r32 F9：黑话原文"本地裸跑模式不支持（未配置守卫）"不进浏览器
     if not _boot_rate_ok("login"):
+        _token_audit("login_rate_limited", False, ip=(request.client.host if request and request.client else "?"))  # r32c #17a
         return _JSONResp({"error": "尝试过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
     # 09-17 OWUI 颗粒度对齐（爸爸令"登录名+登录密码"双要素）：登录名=注册时爸爸亲手
     # 所设（R10.408 起注册页必填），存 general.admin_name、设置页可改。
@@ -328,6 +334,7 @@ async def api_token_clear(request: Request = None):
     R10.408：清除后不再重建激活码——注册流程已反转为"谁先注册谁是主人"。
     R10.2（hy4 ②-7）：未配置态的 DELETE 限频（防洪水 IO）。"""
     if not _boot_rate_ok("clear"):
+        _token_audit("clear_rate_limited", False, ip=(request.client.host if request and request.client else "?"))  # r32c #17a
         return _JSONResp({"error": "密钥管理操作过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
     guard = M_GUARD_URL
     if guard:
@@ -337,17 +344,18 @@ async def api_token_clear(request: Request = None):
         try:
             result = _guard_post("/clear", payload, timeout=8.0)
         except urllib.error.HTTPError as e:
-            # R10.8c：HTTP 层拒绝（403/429）透传守卫的真实原因；连接层失败才报"不可达"
+            # R10.8c：HTTP 层拒绝透传守卫真实原因；r32c F5：error 过翻译层不再直透
             try:
-                _body = e.read()
+                _d = _rj.loads(e.read())
+                _d = {"ok": False, "error": _human_error(_d.get("error"))}
             except Exception:
-                _body = b'{"ok": false}'
-            return _RawResp(_body, status_code=e.code, media_type="application/json")
+                _d = {"ok": False, "error": "操作失败，请稍后再试"}
+            return _JSONResp(_d, status_code=200 if e.code < 500 else e.code)
         except Exception as _e:
             print(f"[auth] clear 异常: {type(_e).__name__}: {_e}", flush=True)
-            return _JSONResp({"ok": False, "error": "守卫服务不可达（fail-closed）"}, status_code=503)
+            return _JSONResp({"ok": False, "error": "服务暂时不可用，请稍后再试"}, status_code=503)
         if not result.get("ok"):
-            return _JSONResp(result, status_code=403)
+            return _JSONResp({"ok": False, "error": _human_error(result.get("error"))}, status_code=403)
         _token_audit("token_clear", True, ip=(request.client.host if request and request.client else "?"))
         clear_verify_cache()  # R10.11（Eve P3）：清除密钥=撤销即时生效，不等 30s TTL
         resp = _JSONResp({"ok": True, "cleared": True})
@@ -437,13 +445,22 @@ async def api_set_confirm_level(req: dict = Body(...), request: Request = None):
     try:
         _token_audit("confirm_level_change", ok=True, cur=cur, new=new, relaxed=relaxed, ip=ip, strict=True)
     except Exception as e:
+        # r32c P1#3（Qoder）：旧版回滚分支里 strict 审计自己再抛=诚实文案永远到不了浏览器（裸 500）。
+        # 拆清楚：回滚成败与审计成败是两回事——回滚尽力而为，审计尽力落账（不 strict），
+        # 文案按"回滚真值"如实说。
+        rolled_back = False
         try:
             save_section("general", {"confirmLevel": cur})
-            _token_audit("confirm_level_change_rollback", ok=True, cur=new, new=cur, ip=ip, strict=True)
+            rolled_back = True
+        except Exception as _re:
+            print(f"[confirm-level] 回滚也失败: {type(_re).__name__}: {_re}", flush=True)
+        try:
+            _token_audit("confirm_level_change_rollback", ok=rolled_back, reason=type(e).__name__, cur=new, new=cur, ip=ip)
         except Exception:
-            _token_audit("confirm_level_change_rollback", ok=False, reason=type(e).__name__, cur=new, new=cur, ip=ip, strict=True)
-            return _JSONResp({"ok": False,
-                              "error": f"审计日志写入失败且自动回滚也失败——档位仍为 {new}，请立即人工到设置页收紧并排查 secrets 卷"},
-                             status_code=503)
-        return _JSONResp({"ok": False, "error": "审计日志写入失败，档位已自动回滚，请排查 secrets 卷后重试"}, status_code=503)
+            pass  # 审计通道已坏，别再叠 500；真相已在服务日志
+        if rolled_back:
+            return _JSONResp({"ok": False, "error": "审计日志写入失败，档位已自动回滚，请排查 secrets 卷后重试"}, status_code=503)
+        return _JSONResp({"ok": False,
+                          "error": f"审计日志写入失败且自动回滚也失败——档位仍为 {new}，请立即人工到设置页收紧并排查 secrets 卷"},
+                         status_code=503)
     return {"ok": True, "confirmLevel": new, "previous": cur}

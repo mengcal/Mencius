@@ -48,7 +48,11 @@ export function postSettings(section: string, body: Record<string, unknown>) {
 
 // R75 token 管理端点
 export function tokenStatus(): Promise<{ configured: boolean }> {
-  return apiFetch(`${API}/settings/token/status`).then((r) => r.json()).catch(() => ({ configured: false }));
+  // r32c F2（CB/Qoder 双 P0）：旧版吞网络/HTTP 错 → unreachable 三态永不触发。
+  // 不可达时如实回 unreachable:true，AuthGate 的"服务暂时不可用"页才真正生效
+  return apiFetch(`${API}/settings/token/status`)
+    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .catch(() => ({ configured: false, unreachable: true }));
 }
 export function tokenRotate(newToken?: string): Promise<{ ok?: boolean; token?: string; error?: string }> {
   return apiFetch(`${API}/settings/token`, {

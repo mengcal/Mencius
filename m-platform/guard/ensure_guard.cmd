@@ -15,6 +15,9 @@ rem     - stale kill   : cscript kill_guard.vbs (WMI CommandLine match;
 rem                      wmic itself is GONE from this OS build 26200)
 rem   cscript/cmd/curl inherit the hidden console created by ensure_guard.vbs
 rem   (Run style 0) -> zero visible windows.
+rem r32c (Qoder #5): the ONLY powershell use in this script = reading M_GUARD_PORT
+rem digits from .env (ASCII key, digits-only output) - outside the GBK parsing pitfall
+rem that the powershell-free rule targets (guard OUTPUT parsing). Constraint scope noted.
 rem NOTE (r32 unified): RETIRED on 09-26. The one true keepalive = Startup
 rem folder guard_boot.vbs -> run_guard.cmd (host already installed). The
 rem m-guard-task.xml service plan stays an unused backup; do not mix stories.

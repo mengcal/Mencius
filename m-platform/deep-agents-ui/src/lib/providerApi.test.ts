@@ -116,9 +116,14 @@ describe('响应处理与失败兜底（空值/异常边界）', () => {
     await expect(tokenStatus()).resolves.toEqual({ configured: true, guard: true, unreachable: false });
   });
 
-  it('tokenStatus 网络失败静默回退 configured: false', async () => {
+  it('tokenStatus 网络失败如实回 unreachable:true（r32c F2：三态必须能触发）', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
-    await expect(tokenStatus()).resolves.toEqual({ configured: false });
+    await expect(tokenStatus()).resolves.toEqual({ configured: false, unreachable: true });
+  });
+
+  it('tokenStatus HTTP 500 同样回 unreachable（旧版被 r.json() 吞成 configured:false）', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as unknown as Response));
+    await expect(tokenStatus()).resolves.toEqual({ configured: false, unreachable: true });
   });
 
   it('postProviderAction 网络失败回退友好错误对象（r32 F15：内部端口/容器名出用户文案）', async () => {

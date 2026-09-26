@@ -7,18 +7,21 @@
  */
 import { useEffect, useState } from "react";
 import { API, apiFetch } from "@/lib/apiBase";
-import { authHeaders, clearAdminToken, tokenStatus } from "@/lib/providerApi";
+import { authHeaders, clearAdminToken, tokenStatus, getSettings } from "@/lib/providerApi";
 import { Button } from "@/components/ui/button";
 
 /** 登录/注册成功后的放行：轮询等 Cookie 落定再放行（r32 F13，Qoder P2——
  *  固定 setTimeout 1200/2500 在慢机器上 reload 早于 Cookie 生效→探测 401→
  *  登录成功却被弹回登录页）。最多等 5 秒，拿到 configured=true 即放行。 */
 async function probeUntilAuthed(): Promise<void> {
+  // r32c P1#4b（Qoder）：旧探针探 tokenStatus 的 configured——注册成功后它本来就 true，
+  // 第一轮即返回=零等待，Cookie 没落定就 reload 仍会弹回登录页。改探 getSettings()：
+  // 401=Cookie 未生效继续等，200=登录态真成立才放行。
   for (let i = 0; i < 16; i++) {
     try {
-      const s = await tokenStatus();
-      if (s?.configured) return;
-    } catch { /* 后端还没就绪，继续等 */ }
+      await getSettings();
+      return;
+    } catch { /* 401=Cookie 未落定，继续等 */ }
     await new Promise((r) => setTimeout(r, 300));
   }
 }

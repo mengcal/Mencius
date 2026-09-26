@@ -134,7 +134,7 @@ function RememberRulesCard() {
   const load = React.useCallback(async () => {
     setLoadState('loading');
     try {
-      const r = await apiFetch(`${API}/settings/remember-rules`);
+      const r = await apiFetch(`${API}/remember-rules`);
       const d = await r.json();
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setRules(d.rules || []);
@@ -152,7 +152,7 @@ function RememberRulesCard() {
     // r30 Cora#7：删除必须读响应——401/500 谎报"已删"刷新后规则复活（schtasks
     // 谎报案前端变体）。失败不动本地列表，如实弹回。
     try {
-      const res = await apiFetch(`${API}/settings/remember-rules`, {
+      const res = await apiFetch(`${API}/remember-rules`, {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key }),
       });

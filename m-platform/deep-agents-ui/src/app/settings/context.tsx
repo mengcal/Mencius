@@ -71,7 +71,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } catch {
       // 后端未启动或不可达：空配置展示，不让页面崩
       setS({});
-      flash('无法连接后端 (2024 端口)，请确认 workplatform 容器在跑');
+      flash('无法连接后端，请确认平台服务正在运行');
     }
   }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -92,20 +92,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       rest.forEach((kk, i) => { if (i === rest.length - 1) o[kk] = v; else { o[kk] = o[kk] || {}; o = o[kk]; } });
     });
     if (bySection.external && Object.keys(bySection.external).length === 0) bySection.external.providers = S.external?.providers || [];
-    // r32 F1（七路复审主发现）：全部 tab 的主保存链注入 _rev——此前唯一没带版本号的
-    // 咽喉，后端"缺 _rev 即不校验"让防撞车对设置页 100% 失效。conflict 单独分译+
-    // 无论成败都 reload（拿新版本号，破"409 后 _rev 永久陈旧、再存必再败"死循环）。
-    const rev = Number((S as any)?._rev || 0);
+    // r32 F1：全部 tab 的主保存链注入 _rev（防撞车全覆盖）。
+    // r32c F1 修正（CB/Qoder 双 P0）：rev 不许循环外取一次——第 1 节落盘 mtime 即变，
+    // 第 2 节起必 409 且 reload 抹草稿=静默丢数据。改：后端成功帧回吐新 rev，逐节续版；
+    // 失败/冲突节如实报节名且**不 reload**（保住未保存草稿），全成才清草稿刷新。
+    let rev = Number((S as any)?._rev || 0);
+    const failed: string[] = [];
     let conflict = false;
-    let ok = true;
     for (const [section, body] of Object.entries(bySection)) {
       const j = await postSettings(section, { ...body, _rev: rev });
-      if ((j as any)?.conflict) conflict = true;
-      ok = ok && j.ok;
+      if ((j as any)?.conflict) { conflict = true; failed.push(section); continue; }
+      if (!(j as any)?.ok) { failed.push(section); continue; }
+      rev = Number((j as any).rev ?? rev);
     }
-    if (conflict) flash('设置已被后台修改，已为您刷新最新版本，请重新保存');
-    else flash(ok ? '已保存 ✓' : '保存失败');
-    await reload();
+    if (conflict) flash('设置已被后台修改，请刷新页面后重新进入再保存（未保存：' + failed.join('、') + '）');
+    else if (failed.length) flash('以下改动未保存：' + failed.join('、') + '——请重试或刷新页面');
+    else { flash('已保存 ✓'); await reload(); }
   };
 
   const providers: any[] = Array.isArray(S.external?.providers) ? S.external.providers : [];

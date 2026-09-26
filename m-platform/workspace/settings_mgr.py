@@ -287,8 +287,9 @@ def save_section(section: str, data: dict):
     try:
         if SETTINGS_PATH.exists():
             shutil.copyfile(SETTINGS_PATH, _bak)
-    except Exception:
-        pass  # 备份失败不阻断保存；缺 .bak 时 load_settings 走 fail-loud 而非静默
+    except Exception as _be:
+        # r32c #18（Qoder P3）：备份失败不再全静默——自愈将无备份可退，至少出声
+        print(f"[settings] 写前 .bak 备份失败（{type(_be).__name__}）——本次保存无备份可退", flush=True)
     SETTINGS_PATH.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
     return s[section]
 
