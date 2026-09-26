@@ -18,7 +18,7 @@ SCHEMA = {
     "model.maxRetries":            {"default": 3, "type": "int", "ui": "模型", "note": "ChatOpenAI 自动重试（429/慢响应）"},
     "model.requestTimeout":        {"default": 90, "type": "int", "ui": "模型", "note": "单次请求超时秒"},
     "models.contextLimitDefault":  {"default": 131072, "type": "int", "ui": "模型", "note": "未知模型上下文窗口兜底"},
-    "models.contextLimits":        {"default": {"glm-4.7": 200000, "glm-4.5-air": 131072, "glm-4.6v": 65536}, "type": "dict", "ui": "模型", "note": "模型名→窗口（覆盖默认表）"},
+    "models.contextLimits":        {"default": {"glm-4.5-air": 131072, "glm-4.6v": 65536}, "type": "dict", "ui": "模型", "note": "模型名→窗口（覆盖默认表）。glm-4.7 条目已删（09-04 出局模型的历史残留，爸爸 09-27 发现）"},
     # —— 后台任务模型（W5：界面→任务模型可选） ——
     "task.model":                  {"default": "", "type": "str", "ui": "界面", "note": "后台任务（标题生成等）用哪个具体模型；留空=沿用原有回退链（scribe→boss），与旧行为兼容"},
     # —— RAG/嵌入 ——
