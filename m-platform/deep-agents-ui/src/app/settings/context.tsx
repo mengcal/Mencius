@@ -92,13 +92,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       rest.forEach((kk, i) => { if (i === rest.length - 1) o[kk] = v; else { o[kk] = o[kk] || {}; o = o[kk]; } });
     });
     if (bySection.external && Object.keys(bySection.external).length === 0) bySection.external.providers = S.external?.providers || [];
+    // r32 F1（七路复审主发现）：全部 tab 的主保存链注入 _rev——此前唯一没带版本号的
+    // 咽喉，后端"缺 _rev 即不校验"让防撞车对设置页 100% 失效。conflict 单独分译+
+    // 无论成败都 reload（拿新版本号，破"409 后 _rev 永久陈旧、再存必再败"死循环）。
+    const rev = Number((S as any)?._rev || 0);
+    let conflict = false;
     let ok = true;
     for (const [section, body] of Object.entries(bySection)) {
-      const j = await postSettings(section, body);
+      const j = await postSettings(section, { ...body, _rev: rev });
+      if ((j as any)?.conflict) conflict = true;
       ok = ok && j.ok;
     }
-    flash(ok ? '已保存 ✓' : '保存失败');
-    if (ok) await reload();
+    if (conflict) flash('设置已被后台修改，已为您刷新最新版本，请重新保存');
+    else flash(ok ? '已保存 ✓' : '保存失败');
+    await reload();
   };
 
   const providers: any[] = Array.isArray(S.external?.providers) ? S.external.providers : [];

@@ -532,7 +532,7 @@ async def remember_rules_list():
 async def remember_rules_add(req: dict = Body(...)):
     """批量卡"批准并记住"钮回调：存精确规则 (tool, key)。key 由 args 规范化提取，
     提取不到（空 key）=拒绝——永不支持通配/全工具放行。"""
-    from settings_mgr import load_settings, SETTINGS_PATH
+    from settings_mgr import load_settings, save_section, SETTINGS_PATH
     import json as _json
     from mia_agent.remember_rules import rule_key
     tool = str(req.get("tool") or "")
@@ -548,21 +548,24 @@ async def remember_rules_add(req: dict = Body(...)):
     rules.append({"key": key, "tool": tool,
                   "note": str(req.get("note") or "")[:80],
                   "created": str(req.get("created") or "")})
-    SETTINGS_PATH.write_text(_json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    # r32（Qoder P3#19）：改走 save_section 统一写路——此前 SETTINGS_PATH 整文件直写
+    # 绕过 _rev/锁/写前 .bak，是 settings.json 的"第三写者"，与设置页保存互相覆盖。
+    save_section("remember_rules", rules)
     _token_audit("remember_rule_add", True, tool=tool, key=key[:60])
     return {"ok": True, "key": key}
 
 
 @router.delete("/remember-rules")
 async def remember_rules_del(req: dict = Body(...)):
-    from settings_mgr import load_settings, SETTINGS_PATH
+    from settings_mgr import load_settings, save_section, SETTINGS_PATH
     import json as _json
     key = str(req.get("key") or "").lower()
     s = load_settings()
     rules = s.get("remember_rules") or []
     kept = [r for r in rules if str(r.get("key", "")).lower() != key]
     s["remember_rules"] = kept
-    SETTINGS_PATH.write_text(_json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    # r32（Qoder P3#19）：同上——消灭 settings.json 第三写者，统一走 save_section
+    save_section("remember_rules", kept)
     _token_audit("remember_rule_del", True, key=key[:60], removed=len(rules) - len(kept))
     return {"ok": True, "remaining": len(kept)}
 

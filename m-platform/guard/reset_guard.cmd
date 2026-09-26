@@ -25,7 +25,9 @@ del /f /q "%~dp0hostcopy.token" 2>nul
 del /f /q "%~dp0.token_bootstrap" 2>nul
 rem r31 09-26: m-guard-watch-sys task retired - guard auto-restarts via Startup folder
 timeout /t 4 /nobreak >nul
-curl -s -m 5 http://127.0.0.1:9101/status
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try{(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_PORT=(.+)$').Matches[0].Groups[1].Value}catch{''}"`) do set M_GUARD_PORT=%%a
+if "%M_GUARD_PORT%"=="" set M_GUARD_PORT=9101
+curl -s -m 5 http://127.0.0.1:%M_GUARD_PORT%/status
 echo.
 echo DONE. Refresh the platform page - the setup wizard will appear.
 pause

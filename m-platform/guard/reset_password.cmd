@@ -22,7 +22,9 @@ echo 将修改 M 平台管理员密码（设置与对话不动）。
 set NEW=
 set /p NEW=输入新管理员密码（至少 8 位；会显示在屏幕上，本机无旁观即可）:
 if "%NEW%"=="" ( echo 已取消。 & exit /b 0 )
-curl -s -m 8 -X POST http://127.0.0.1:9101/set_password -H "Content-Type: application/json" -H "X-Guard-Key: %GK%" -d "{\"password\":\"%NEW%\",\"current\":\"%HC%\"}"
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try{(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_PORT=(.+)$').Matches[0].Groups[1].Value}catch{''}"`) do set M_GUARD_PORT=%%a
+if "%M_GUARD_PORT%"=="" set M_GUARD_PORT=9101
+curl -s -m 8 -X POST http://127.0.0.1:%M_GUARD_PORT%/set_password -H "Content-Type: application/json" -H "X-Guard-Key: %GK%" -d "{\"password\":\"%NEW%\",\"current\":\"%HC%\"}"
 echo.
 echo 上面返回 {"ok": true} 即改密成功，用新密码登录即可。
 pause

@@ -10,6 +10,19 @@ import { API, apiFetch } from "@/lib/apiBase";
 import { authHeaders, clearAdminToken, tokenStatus } from "@/lib/providerApi";
 import { Button } from "@/components/ui/button";
 
+/** 登录/注册成功后的放行：轮询等 Cookie 落定再放行（r32 F13，Qoder P2——
+ *  固定 setTimeout 1200/2500 在慢机器上 reload 早于 Cookie 生效→探测 401→
+ *  登录成功却被弹回登录页）。最多等 5 秒，拿到 configured=true 即放行。 */
+async function probeUntilAuthed(): Promise<void> {
+  for (let i = 0; i < 16; i++) {
+    try {
+      const s = await tokenStatus();
+      if (s?.configured) return;
+    } catch { /* 后端还没就绪，继续等 */ }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
 export function AuthPage({ onDone, defaultMode }: { onDone: () => void; defaultMode: "login" | "register" }) {
   const [mode, setMode] = useState<"login" | "register">(defaultMode);
   const [uname, setUname] = useState("");
@@ -33,9 +46,11 @@ export function AuthPage({ onDone, defaultMode }: { onDone: () => void; defaultM
       if (j?.ok) {
         clearAdminToken();
         setMsg("登录成功，正在进入平台…");
-        setTimeout(onDone, 1200);
+        await probeUntilAuthed();
+        onDone();
       } else {
-        setMsg(j?.error || "密码不正确");
+        // r32 CB F14：兜底文案与后端同款泛化——"密码不正确"会向探测者确认"用户名存在"
+        setMsg(j?.error || "登录名或密码不正确");
       }
     } catch { setMsg("无法连接后端"); }
     finally { setBusy(false); }
@@ -54,13 +69,15 @@ export function AuthPage({ onDone, defaultMode }: { onDone: () => void; defaultM
         body: JSON.stringify({ token: "", username: u, password: pwd }),
       });
       const j1 = await r1.json();
-      if (!j1?.ok || !j1?.token) {
+      // r32 F8（Qoder）：后端注册路径已不回吐明文 token，成功判据只看 ok
+      if (!j1?.ok) {
         setMsg(j1?.error || "注册失败");
         return;
       }
       clearAdminToken();
       setDone(true);
-      setTimeout(onDone, 2500);
+      await probeUntilAuthed();
+      onDone();
     } catch { setMsg("无法连接后端"); }
     finally { setBusy(false); }
   };
@@ -132,21 +149,26 @@ export function AuthPage({ onDone, defaultMode }: { onDone: () => void; defaultM
 
         {msg && <div className="text-xs leading-relaxed text-red-500">{msg}</div>}
         <div className="mt-4 text-[0.68rem] leading-relaxed text-muted-foreground">
-          凭证以 HttpOnly Cookie 保存在本机，不上传。忘记密码？运行 <code className="rounded bg-muted px-1">guard\reset_password.cmd</code>
+          {/* r32 F7（五家合流）：去内部路径/去黑话——爸爸在登录页不该看到宿主目录结构，
+              "HttpOnly Cookie" 是术语；找回动作=找管理员跑部署目录里的重置脚本 */}
+          登录状态保存在本机浏览器里，不上传。忘记密码？请联系本机管理员运行部署目录中的密码重置脚本。
         </div>
       </div>
     </div>
   );
 }
 
-/** 全局闸门：根据后端状态自动选 login/register/ok */
+/** 全局闸门：根据后端状态自动选 login/register/ok/unreachable */
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<"checking" | "ok" | "login" | "register">("checking");
+  const [state, setState] = useState<"checking" | "ok" | "login" | "register" | "unreachable">("checking");
 
   useEffect(() => {
     let alive = true;
-    tokenStatus().then((s) => {
+    tokenStatus().then((s: any) => {
       if (!alive) return;
+      // r32 F10（Qoder P2#9）：守卫/后端不可达 ≠ 未配置——显示"服务暂时不可用"，
+      // 绝不把已注册管理员送进注册页（再注册必失败=往坑里引）
+      if (s.unreachable) { setState("unreachable"); return; }
       if (!s.configured) { setState("register"); return; }
       import("@/lib/providerApi").then(({ getSettings }) => {
         getSettings().then(() => {
@@ -158,21 +180,40 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           }
         });
       });
-    }).catch(() => { if (alive) setState("ok"); });
+    }).catch(() => { if (alive) setState("unreachable"); });
     return () => { alive = false; };
   }, []);
 
   if (state === "checking") return null;
+  if (state === "unreachable")
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-lg">
+          <div className="mb-3 text-4xl">🛠</div>
+          <h1 className="mb-2 text-xl font-semibold">服务暂时不可用</h1>
+          <p className="text-sm text-muted-foreground">后台服务没有应答，请稍后刷新重试。</p>
+          <Button className="mt-4" onClick={() => window.location.reload()}>刷新重试</Button>
+        </div>
+      </div>
+    );
   if (state === "login" || state === "register")
     return <AuthPage onDone={() => window.location.reload()} defaultMode={state === "register" ? "register" : "login"} />;
   return <>{children}</>;
 }
 
-/** 登出（清 cookie + 刷新） */
+/** 登出（清 cookie + 刷新）——r32 F7（Qoder P2"谎报登出"）：必须读响应，
+ * 登出失败（网络断/后端炸）时 Cookie 其实还在，静默 reload 会让人以为登出了
+ * 实际仍是登录态（共用机器上是真问题）；失败如实出声、不刷新。 */
 export async function authLogout(): Promise<void> {
   try {
-    await apiFetch(`${API}/auth/logout`, { method: "POST" });
-  } catch { /* cookie 清除失败不影响前端 */ }
-  clearAdminToken();
-  window.location.reload();
+    const r = await apiFetch(`${API}/auth/logout`, { method: "POST" });
+    if (!r.ok) {
+      window.alert(`登出失败（HTTP ${r.status}），请稍后再试——当前可能仍处于登录状态`);
+      return;
+    }
+    clearAdminToken();
+    window.location.reload();
+  } catch {
+    window.alert("登出失败：无法连接后端——当前可能仍处于登录状态");
+  }
 }

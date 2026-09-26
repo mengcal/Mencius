@@ -17,58 +17,69 @@ import {
 import { ThreadList } from "@/app/components/ThreadList";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ChatInterface } from "@/app/components/ChatInterface";
-import { getSettings, postSettings, tokenStatus, clearAdminToken } from "@/lib/providerApi";
+import { getSettings, postSettings, tokenStatus } from "@/lib/providerApi";
 import { API, apiFetch } from "@/lib/apiBase";
-import { authLogout, AuthPage } from "@/app/components/AuthPage";
+import { authLogout } from "@/app/components/AuthPage";
+import { CONFIRM_TIERS } from "@/lib/confirmTiers"; // r32 F18：四档单一真源（原本地 CONFIRM_LEVELS 与设置页各抄一份）
 
 /** 顶栏快捷开关：确认分档 / 米娅管牛马 / 工具显隐——不进设置页直接切（2026-08-30 知夏）
  *  r35（爸爸点名"循环四档要点半天不科学"+逮到 off/full 枚举错位 bug）：
  *  循环按钮改下拉直选；档位值对齐后端合法四档 plan/strict/auto_edit/full
- *  （旧前端写 "off" 后端不认→fail-closed 回落 strict，按钮显示一直在撒谎）。 */
-const CONFIRM_LEVELS = [
-  { v: "plan", label: "🛡 计划模式（只出计划）" },
-  { v: "strict", label: "🛡 变更前确认（都先问）" },
-  { v: "auto_edit", label: "🛡 自动编辑（跑代码先问）" },
-  { v: "full", label: "🛡 完全访问（全自动）" },
-];
+ *  （旧前端写 "off" 后端不认→fail-closed 回落 strict，按钮显示一直在撒谎）。
+ *  r32（爸爸 09-26 裁决"个人平台管理员验证多此一举，等多用户版再考虑"）：
+ *  顶栏四档自由切（原"放宽须到设置页验密、顶栏只收紧"限制整段撤除）。 */
 function QuickToggles() {
   const [confirmLevel, setConfirmLevel] = useState<string>("strict");
   const [miaManage, setMiaManage] = useState<boolean>(true);
   const [tools, setTools] = useState<boolean>(true);
+  const [rev, setRev] = useState<number>(0); // _rev：GET /settings 回传的版本号，保存时回传（r32 F1 顶栏补带）
+
+  const refreshRev = () => {
+    getSettings().then((s: any) => {
+      setConfirmLevel(s?.general?.confirmLevel || "strict");
+      setRev(Number(s?._rev || 0));
+    }).catch(() => {});
+  };
 
   useEffect(() => {
-    getSettings().then((s) => {
+    getSettings().then((s: any) => {
       // 后端 _level() 对未配置/非法值 fail-closed 回落 strict——前端默认同步，不再谎报 auto_edit
       setConfirmLevel(s?.general?.confirmLevel || "strict");
       setMiaManage(s?.permissions?.miaManageAgents !== false);
+      setRev(Number(s?._rev || 0));
     }).catch(() => {});
     setTools(localStorage.getItem("mia.showToolCalls") !== "false");
   }, []);
 
   const pickConfirm = async (v: string) => {
-    // r29 焊档（全家判词收敛）：顶栏只做紧急刹车——放宽方向一律挡回设置页走旧密码人质门，
-    // 收紧方向即时生效（非对称设计：降权限不设槛）。
-    const RANK: Record<string, number> = { plan: 0, strict: 1, auto_edit: 2, full: 3 };
-    if ((RANK[v] ?? 1) > (RANK[confirmLevel] ?? 1)) {
-      window.alert("放宽档位须到设置页经管理员密码验证；顶栏只做收紧（紧急刹车）。");
-      return;
-    }
+    // r32：四档直选无方向限制（爸爸裁决撤密码门）；_rev 防撞车；成功后刷新 rev
+    // 防"保存后 mtime 已变、下次保存必 409"的陈旧版本死循环（Qoder P3#20）。
     const prev = confirmLevel;
     setConfirmLevel(v);
     try {
       const r = await apiFetch(`${API}/settings/confirm-level`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ level: v }),
+        body: JSON.stringify({ level: v, _rev: rev }),
       });
       const j = await r.json().catch(() => ({}));
-      if (!j?.ok) { setConfirmLevel(j?.previous || prev); window.alert(j?.error || "档位切换失败"); }
+      if (j?.ok) { refreshRev(); }
+      else {
+        setConfirmLevel(j?.previous || prev);
+        window.alert(j?.error || "档位切换失败");
+        if (j?.conflict) refreshRev(); // 409：拿到最新版本号，改完即可再存
+      }
     } catch { setConfirmLevel(prev); window.alert("无法连接后端"); }
   };
   const toggleMia = () => {
     const next = !miaManage;
     setMiaManage(next);
-    postSettings("permissions", { miaManageAgents: next });
+    // r32 F1：顶栏保存补 _rev（此前唯一裸奔的 permissions 写面）
+    postSettings("permissions", { miaManageAgents: next, _rev: rev }).then((j: any) => {
+      if (j?.ok) refreshRev();
+      else if (j?.conflict) { window.alert(j?.error || "设置已被后台修改，请刷新页面后重试"); refreshRev(); }
+      else if (j?.error) window.alert(j.error);
+    });
   };
   const toggleTools = () => {
     const next = !tools;
@@ -79,11 +90,11 @@ function QuickToggles() {
   return (
     <>
       <Select value={confirmLevel} onValueChange={pickConfirm}>
-        <SelectTrigger className="h-8 w-52 gap-1 border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900" title="确认分档（下拉直选四档；改完即时生效，无需重启）">
+        <SelectTrigger className="h-8 w-52 gap-1 border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900" title="确认分档（四档直选；改完即时生效，无需重启）">
           <SelectValue placeholder="🛡 确认分档" />
         </SelectTrigger>
         <SelectContent>
-          {CONFIRM_LEVELS.map((l) => (
+          {CONFIRM_TIERS.map((l) => (
             <SelectItem key={l.v} value={l.v} className="text-xs">{l.label}</SelectItem>
           ))}
         </SelectContent>
@@ -258,19 +269,10 @@ function HomePageInner({
               <SquarePen className="mr-2 h-4 w-4" />
               New Thread
             </Button>
-            {/* r31：退出登录（爸爸令"看看 OWUI"）——顶栏右侧，点了清 cookie 回登录页 */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                try { await fetch(`${API}/auth/logout`, { method: "POST" }); } catch {}
-                clearAdminToken();
-                window.location.reload();
-              }}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              退出登录
-            </Button>
+            {/* r31：退出登录（爸爸令"看看 OWUI"）——顶栏右侧，点了清 cookie 回登录页。
+                r32 F5/F7（CB/Qoder）：本地裸跑模式（无守卫）登录通道不存在=登出即自锁，
+                故 !guard 时整个按钮不渲染；authLogout 读响应，失败出声不再谎报登出。 */}
+            <LogoutButton />
           </div>
         </header>
         <div className="flex-1 overflow-hidden">
@@ -323,26 +325,31 @@ function HomePageInner({
     </>
   );
 }
+/** r32 F5/F7：退出按钮自持组件——查 /settings/token/status 的 guard 标志，
+ * 本地裸跑模式（guard:false）不渲染（登录通道不存在，登出=自锁死路）；
+ * 登出动作统一走 AuthPage 的 authLogout()（读响应、失败出声），消灭第二份内联实现。 */
+function LogoutButton() {
+  const [guard, setGuard] = useState<boolean | null>(null);
+  useEffect(() => {
+    tokenStatus().then((s: any) => setGuard(s?.guard !== false)).catch(() => setGuard(null));
+  }, []);
+  if (guard === false) return null;
+  return (
+    <Button variant="outline" size="sm" onClick={() => void authLogout()}
+      className="text-muted-foreground hover:text-foreground">
+      退出登录
+    </Button>
+  );
+}
+
 function HomePageContent() {
   const [config, setConfig] = useState<StandaloneConfig | null>(null);
-  // R10.7（爸爸："发布后要有管理员注册页面，这个一定要有"）：未配置密钥时全屏展示注册向导
-  const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null);
-  // R10.8e（爸爸："401 死锁，找回入口在进不去的设置页里"）：已配置但本浏览器无有效凭证 → 登录层
-  // r24 lint 清账：AuthGate 全局闸门（layout 层）接管后，本地登录层只读不再置位——setter 是死变量
-  const [loginNeeded] = useState(false);
-  useEffect(() => {
-    console.log("[gate] probe start");
-    tokenStatus().then((s) => {
-      console.log("[gate] tokenStatus:", JSON.stringify(s));
-      // R10.8g（爸爸登录后黑屏真凶）：configured=true 分支此前不落定 setupNeeded——
-      // 它永远卡 null，被下方 `if (setupNeeded === null) return null` 永久挡住，登录成功也黑屏。
-      if (s.configured) { setSetupNeeded(false); return; }
-      setSetupNeeded(true);
-    }).catch(() => setSetupNeeded(false));
-  }, []);
-  useEffect(() => {
-    console.log("[gate] render state:", JSON.stringify({ setupNeeded, loginNeeded, hasConfig: !!config }));
-  }, [setupNeeded, loginNeeded, config]);
+  // r32 F11（CB/Qoder/Veda 三路同锤）：本地闸门整套拆除——layout 层 AuthGate 已全局接管
+  // （未配置→注册页、无凭证→登录页、已配置→放行），本组件挂载时必已过闸；
+  // 此前的 setupNeeded 探针 / loginNeeded 死变量 / 两处 AuthPage 分支 = 与全局闸门
+  // 职责重复的死代码（console.log 调试残留一并清，Cora P4-1）。
+  // fail-open 语义注记（NOVA/Cora 观察项）：AuthGate 对非 401 错误放行渲染是"后端挂
+  // 优先出界面"的取舍，数据请求会失败但页面不锁死——有意为之，勿改回 fail-closed 黑屏。
   // 界面字号（爸爸老花眼友好）：读 interface.uiZoom（百分比），应用到 body zoom
   useEffect(() => {
     // R10（千问 P1-1）：GET /settings 在 token 门内——裸 fetch 换统一封装 getSettings（自带 Bearer），
@@ -383,12 +390,7 @@ function HomePageContent() {
   }, []);
   const langsmithApiKey =
     config?.langsmithApiKey || process.env.NEXT_PUBLIC_LANGSMITH_API_KEY || "";
-  // R10.7：管理员注册向导（未配置密钥=首部署 → 全屏引导；检测中短暂空白）
-  // R10.8e（bug 修复）：loginNeeded=true 时 setupNeeded 仍是 null（configured=true 从不设置它）——
-  // 空值检查必须放 loginNeeded 之后，否则登录层永远被 return null 挡住（爸爸"页面看不到"真凶）。
-  if (loginNeeded) return <AuthPage onDone={() => window.location.reload()} defaultMode="login" />;
-  if (setupNeeded === null) return null;
-  if (setupNeeded) return <AuthPage onDone={() => window.location.reload()} defaultMode="register" />;
+  // r32 F11：原 setupNeeded/loginNeeded 三行闸门分支整段删除（见 HomePageContent 头注释）
   if (!config) {
     return (
       <>

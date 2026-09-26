@@ -11,6 +11,7 @@
 
 import json
 import os
+import shutil
 
 # R68（评审共识 E2）：嵌入模型默认值全平台单一源——后端各处 import 此常量，前端经配置页注入
 # 09-17 深夜 schema 收口：默认值单一来源=settings_schema.py（hy4 挑刺②：模块常量=第二真源，堵掉）
@@ -20,6 +21,13 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
 SETTINGS_PATH = BASE / "settings.json"
+
+
+def settings_rev() -> int:
+    """_rev 单一源（r32 CB F13）：settings.json 修改时间的微秒整数。
+    秒级粒度下同秒内两次保存互不可见=防撞车失明；微秒值 ~1.77e15 < 2^53，JS Number 精度安全。
+    providers.py（GET/POST）与 token_admin.py（confirm-level）一律 import 本函数，禁止再各自 stat。"""
+    return int(SETTINGS_PATH.stat().st_mtime * 1_000_000)
 # R79②（Eve P1 实锤：部门图旧本地 shell `head ../.settings_secrets` 直读出明文=钥匙挂在容器可写墙上）：
 # 密钥文件挪出 src 挂载面 → 宿主 D:\m\secrets/（compose 挂 /data/secrets，沙箱不挂、源码 :ro 面不再含它）。
 # env 未设时回落 BASE/.settings_secrets（本地裸跑兼容）。
@@ -107,10 +115,40 @@ def load_agents_config() -> dict:
 
 
 # ── 设置读写 ─────────────────────────────────────────────────
+# r32（Cora P1/NOVA 中危/CB F1 五路合流）：直写时代（r31 回退）读侧必须有兜底——
+# 半写毒化此前 = 登录/设置面/保存修复通道全 500 且 UI 无法自救（死锁态）。
+# 三防：短睡重试吃半写窗口 → 回落 .bak 自愈 → 无 .bak 才炸（fail-loud）。
+# 铁律：绝不静默 {} 兜底——admin_name 回落 "admin"=爸爸被自己的名字挡在门外（Cora：比炸更阴险）。
 def load_settings() -> dict:
-    if SETTINGS_PATH.exists():
+    if not SETTINGS_PATH.exists():
+        return {}
+    try:
         return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-    return {}
+    except (json.JSONDecodeError, OSError) as e:
+        import time as _t
+        _t.sleep(0.2)  # 半写窗口：并发写者可能正在落盘，短睡后重读一次
+        try:
+            return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        bak = SECRETS_PATH.with_name("settings.json.bak")  # 与写侧同处：secrets rw 卷（workspace 目录容器内只读）
+        if bak.exists():
+            try:
+                data = json.loads(bak.read_text(encoding="utf-8"))
+                try:  # 毒化原件留证；容器 ro 目录里写不进 .poisoned 也不影响自愈
+                    SETTINGS_PATH.with_name(SETTINGS_PATH.name + ".poisoned").write_text(
+                        SETTINGS_PATH.read_text(encoding="utf-8", errors="replace"), encoding="utf-8")
+                except Exception:
+                    pass
+                SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                print("[settings] 警告：settings.json 解析失败（%s），已从 .bak 自动恢复，原件留证 .poisoned"
+                      % type(e).__name__, flush=True)
+                return data
+            except Exception as e2:
+                print("[settings] .bak 恢复也失败（%s）——请手工检查 settings.json" % type(e2).__name__, flush=True)
+        print("[settings] settings.json 解析失败且无可用备份（%s）——fail-loud，请手工修复该文件"
+              % type(e).__name__, flush=True)
+        raise
 
 
 def _find_in_list(lst: list, name: str):
@@ -238,12 +276,20 @@ def save_section(section: str, data: dict):
         # provider 全部静默改写成新名——加号≠改名！
         # 改名联动现在只认显式 /providers/rename 端点（office.api_provider_rename，那里
         # 精确按 old→new 处理，且是用户主动改名）。按名字查、宁报错不猜，符合零硬编码铁律。
-    # r30 CB#8（glm-5.3 复测）：裸 write_text 半写崩溃可毒化整个 settings.json
-    # （读方虽 fail-closed 回落 strict，但设置面全 500）——对齐 :51-56 secrets 同款
-    # tmp+replace 原子落盘（R10.5 事故加固同族补漏）。
-    tmp = SETTINGS_PATH.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(str(tmp), str(SETTINGS_PATH))
+    # r30 CB#8 原子写→r31 09-26 回退：tmp 文件落在 ro 挂载目录内写不进去（容器内
+    # workspace 根 :ro，settings.json 单文件 rw 不覆盖同目录其他文件），注册/保存全炸
+    # （"用户名保存失败"实证）。settings.json 本身是单文件 rw 挂载=直写安全，回退直写。
+    # r32 更正（Qoder Max EXDEV 指谬）：旧注释建议"tmp 写 rw 卷后 os.replace 跨卷"——
+    # os.replace 跨设备必 EXDEV 失败（Windows MoveFileEx 同样），该路线根本不成立。
+    # 直写时代的兜底=写前 .bak（落 secrets rw 卷——workspace 同目录在容器里只读，
+    # 新建 .bak 必失败）+ load_settings 三防自愈（毒化→短睡重试→回落 .bak→fail-loud）。
+    _bak = SECRETS_PATH.with_name("settings.json.bak")
+    try:
+        if SETTINGS_PATH.exists():
+            shutil.copyfile(SETTINGS_PATH, _bak)
+    except Exception:
+        pass  # 备份失败不阻断保存；缺 .bak 时 load_settings 走 fail-loud 而非静默
+    SETTINGS_PATH.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
     return s[section]
 
 

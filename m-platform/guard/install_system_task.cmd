@@ -1,9 +1,14 @@
 @echo off
 rem ============================================================
-rem m-guard SYSTEM install (R10.8) - run as administrator.
-rem 1) Kill any stale guard processes (old code keeps port 9101).
-rem 2) Lock the guard directory ACL (SYSTEM+Administrators+wolfm).
-rem 3) (Re)install SYSTEM tasks and start the guard with current code.
+rem m-guard keepalive installer (r32 rewrite, run as administrator).
+rem History: R10.8 installed two SYSTEM scheduled tasks (m-guard-boot,
+rem m-guard-watch-sys). Those were RETIRED on 09-26 (watchdog zombie case:
+rem SYSTEM tasks + IgnoreNew ate every trigger; startup folder is the
+rem one true keepalive now). This script used to resurrect them - that
+rem is exactly what r32 reviews (Lyra P1 / CB F4 / Qoder P1#1) caught.
+rem Now it only: 1) cleans up retired tasks, 2) locks dir ACL,
+rem 3) starts the guard once for immediate use. Auto-start on boot =
+rem the Startup-folder guard_boot.vbs (already installed per user).
 rem ASCII-only: cmd.exe mis-parses UTF-8 Chinese.
 rem ============================================================
 net session >nul 2>&1
@@ -12,17 +17,21 @@ if %errorlevel% neq 0 (
   pause
   exit /b 1
 )
-echo [1/3] Killing stale guard processes...
-taskkill /f /im pythonw.exe 2>nul
-taskkill /f /im python.exe /fi "WINDOWTITLE eq m_guard*" 2>nul
-echo [2/3] Locking D:\m\guard ACL (deny Mia standard account)...
-icacls "D:\m\guard" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "wolfm:(OI)(CI)F"
-echo [3/3] Installing SYSTEM tasks...
-schtasks /Create /tn m-guard-boot /sc onstart /ru SYSTEM /tr "cmd /c D:\m\guard\ensure_guard.cmd" /f
-schtasks /Create /tn m-guard-watch-sys /sc minute /mo 1 /ru SYSTEM /tr "cmd /c D:\m\guard\ensure_guard.cmd" /f
-schtasks /Run /tn m-guard-watch-sys
+set "GUARDDIR=%~dp0"
+echo [1/4] Removing retired watchdog tasks (idempotent)...
+schtasks /Delete /tn m-guard-boot /f >nul 2>&1
+schtasks /Delete /tn m-guard-watch-sys /f >nul 2>&1
+echo [2/4] Killing stale guard processes (match by image only for our own venv pythonw)...
+taskkill /f /im pythonw.exe /fi "WINDOWTITLE eq m_guard*" 2>nul
+echo [3/4] Locking guard dir ACL (deny Mia standard account)...
+icacls "%GUARDDIR%" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "wolfm:(OI)(CI)F"
+echo [4/4] Starting guard once (auto-restart on boot = Startup\guard_boot.vbs)...
+cscript //nologo "%GUARDDIR%guard_boot.vbs"
 timeout /t 4 /nobreak >nul
-curl -s -m 5 http://127.0.0.1:9101/status
+for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "try{(Select-String -Path 'D:\m\.env' -Pattern '^M_GUARD_PORT=(.+)$').Matches[0].Groups[1].Value}catch{''}"`) do set M_GUARD_PORT=%%a
+if "%M_GUARD_PORT%"=="" set M_GUARD_PORT=9101
+curl -s -m 5 http://127.0.0.1:%M_GUARD_PORT%/status
 echo.
-echo DONE. Refresh the platform page - the setup wizard will appear.
+echo DONE. If nothing printed above, the guard did not come up - check D:\m\guard\ logs.
+echo NOTE: keepalive on reboot = Startup folder VBS, NOT scheduled tasks.
 pause

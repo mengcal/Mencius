@@ -86,14 +86,18 @@ describe('chunkText() 分片（默认 size=800 overlap=100）', () => {
 });
 
 describe('embed()（mock fetch，不发真请求）', () => {
-  it('模型未注入时显式报错且不发请求', async () => {
-    // 换行重置模块状态做不到（单例），用临时置空模拟：直接依赖本文件开头未注入前的断言
-    // 这里确保错误信息对“注入空串”场景成立——getEmbedModel 为空则必须抛
-    const model = getEmbedModel();
-    expect(model).not.toBe(''); // 前面用例已注入；若为空则走下方分支
-    if (!model) {
-      await expect(embed('x')).rejects.toThrow('嵌入模型未注入');
-    }
+  it('模型未注入时显式报错且不发请求（r32 修空转：resetModules 拿干净单例真实断言）', async () => {
+    // r32（NOVA/Cora 两路同锤：旧版 if(!model) 恒假=空转绿，什么都没验——
+    // 单例早已被前面用例注入，守门分支从未被执行）。vi.resetModules 清注册表，
+    // 动态 import 拿到未注入的干净模块，真实走进报错分支；静态导入的原实例
+    // 不受影响（vitest 的静态绑定指向收集期实例），后续用例照常。
+    vi.resetModules();
+    const fresh = await import('./ragClient');
+    expect(fresh.getEmbedModel()).toBe('');
+    const spy = vi.fn();
+    vi.stubGlobal('fetch', spy);
+    await expect(fresh.embed('x')).rejects.toThrow('嵌入模型未注入');
+    expect(spy).not.toHaveBeenCalled(); // "不发请求"也验上了
   });
 
   it('成功时返回 embeddings[0]，请求体含模型名与截断到 4000 的输入', async () => {

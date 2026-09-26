@@ -95,7 +95,7 @@ export function useThreads(props: {
       const normal = threads.filter(
         (t: any) => !((t.metadata as any)?.cow_task === true)
       );
-      return normal.map((thread): ThreadItem => {
+      const items = normal.map((thread): ThreadItem => {
         let title = "Untitled Thread";
         let description = "";
 
@@ -145,6 +145,11 @@ export function useThreads(props: {
           pinned: (thread.metadata as any)?.pinned === true,
         };
       });
+      // r32（爸爸 09-26"后台任务怎么还在左侧对话框里"）：AsyncSubAgent 派活线程由官方件
+      // 裸 threads.create()（deepagents/middleware/async_subagents.py:263，无元数据可标），
+      // 其首条消息=派活文本、固定带"后台任务"前缀（米娅派活口径）——按标题前缀滤出，
+      // 任务状态在任务面板看，不占对话历史侧栏。
+      return items.filter((t) => !t.title.startsWith("后台任务"));
     },
     {
       revalidateFirstPage: true,

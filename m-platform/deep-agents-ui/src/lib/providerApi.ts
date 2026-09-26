@@ -31,7 +31,8 @@ export function postProviderAction(action: string, payload: Record<string, unkno
     body: JSON.stringify(payload),
   })
     .then((r) => r.json())
-    .catch(() => ({ error: '无法连接后端 (2024 端口)，请确认 workplatform 容器在跑' }));
+    // r32 F15（Veda/Cora/Eve 三路同锤，常驻清单第 3 条）：内部端口+容器名不再进用户文案
+    .catch(() => ({ error: '无法连接后端，请确认服务正在运行' }));
 }
 
 /** 保存设置节（section 来自本页固定白名单，非用户可控）。r25：X-By 常数头作废，真钥匙=管理员 token（Bearer/Cookie） */
@@ -42,7 +43,7 @@ export function postSettings(section: string, body: Record<string, unknown>) {
     body: JSON.stringify(body),
   })
     .then((r) => r.json())
-    .catch(() => ({ ok: false, error: '无法连接后端 (2024 端口)' }));
+    .catch(() => ({ ok: false, error: '无法连接后端，请确认服务正在运行' }));
 }
 
 // R75 token 管理端点
@@ -101,5 +102,5 @@ export function saveFile(name: string, b64: string): Promise<{ ok?: boolean; pat
     body: JSON.stringify({ name, b64 }),
   })
     .then((r) => r.json())
-    .catch(() => ({ error: '无法连接后端 (2024 端口)' }));
+    .catch(() => ({ error: '无法连接后端，请确认服务正在运行' }));
 }

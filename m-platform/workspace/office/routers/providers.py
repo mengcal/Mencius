@@ -18,8 +18,9 @@ import os  # 09-17 深夜：_runtime.visionEndpoint 读 env
 import httpx as _httpx  # 原 :1619
 
 from fastapi import APIRouter, Body, Request
+from fastapi.responses import JSONResponse
 
-from settings_mgr import load_settings, save_section, get_plain_provider_key, mask_key  # 原 :1618
+from settings_mgr import load_settings, save_section, get_plain_provider_key, mask_key, settings_rev  # 原 :1618；r32 加 settings_rev 单一源
 
 from ..core import BASE
 
@@ -33,7 +34,7 @@ async def api_get_settings():
     s = load_settings()
     # agents 直接来自 settings.agents（配置页=唯一真源）；不再用 agents_config.json 覆盖显示
     try:
-        s["_rev"] = int((BASE / "settings.json").stat().st_mtime)
+        s["_rev"] = settings_rev()  # r32 CB F13：单源微秒化（原秒级 int(st_mtime) 同秒并发不可见）
     except Exception:
         pass
     # 09-17 深夜（hy4 挑刺·ChatInterface 内嵌地址收口）：容器侧运行时端点由后端下发，
@@ -57,12 +58,15 @@ async def api_set_settings(section: str, data: dict = Body(...), request: Reques
         expected_rev = data.pop("_rev", None)
         if expected_rev is not None:
             try:
-                current_rev = int((BASE / "settings.json").stat().st_mtime)
+                current_rev = settings_rev()
                 if int(expected_rev) != current_rev:
-                    return {"ok": False, "conflict": True,
-                            "error": "设置已被后台修改（知夏/米娅/其他对话刚动过），请刷新页面后重改"}
-            except Exception:
-                pass
+                    # r32 Qoder P3#20：409 语义统一——此前 HTTP 200+conflict 与 token_admin.py
+                    # 的真 409 两张皮，前端无法用状态码统一分流
+                    return JSONResponse({"ok": False, "conflict": True,
+                                         "error": "设置已被后台修改（知夏/米娅/其他对话刚动过），请刷新页面后重改"},
+                                        status_code=409)
+            except (ValueError, TypeError):
+                pass  # _rev 非数字 → 不拦截（宽松路径，与 token_admin confirm-level 同款）
         # 权限检查（NOVA#3/Cora#4）：r25（爸爸裁决）X-By 常数头作废——
         # /settings/* 写面从 R10 起由 api_token_guard token fail-closed 真守（米娅无钥匙=中间件 401），
         # 旧 by!=admin 双锁是 R75 无统一 token 时代的遗产，零额外熵，拆掉不再演双保险。

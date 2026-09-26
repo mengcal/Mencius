@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { format } from "date-fns";
-import { Loader2, MessageSquare, X, MoreVertical, Pin, PinOff, Pencil, Trash2, LogOut } from "lucide-react";
+// r32 F10（四家同锤）：LogOut/API/apiFetch/clearAdminToken 四个死 import 删除——
+// 侧栏退出按钮撤除（r31 移顶栏）后的残留（Loader2 等在用图标保留）
+import { Loader2, MessageSquare, X, MoreVertical, Pin, PinOff, Pencil, Trash2 } from "lucide-react";
 import { useQueryState } from "nuqs";
-import { API, apiFetch } from "@/lib/apiBase";
-import { clearAdminToken } from "@/lib/providerApi";
 import { useClient } from "@/providers/ClientProvider";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";

@@ -87,6 +87,14 @@ describe('请求构造：URL / method / body（mock fetch，不发真请求）',
     expect(JSON.parse(init.body)).toEqual({ embeddingModel: 'm' });
   });
 
+  it('r32 F1：postSettings 原样透传调用方给的 _rev（防撞车覆盖全入口的前提）', async () => {
+    await postSettings('permissions', { miaManageAgents: true, _rev: 1777000000123456 });
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body._rev).toBe(1777000000123456); // 微秒级 _rev 原样到后端，JS 精度安全
+    expect(body.miaManageAgents).toBe(true);
+  });
+
   it('tokenRotate 无参时 body.token 为空串', async () => {
     await tokenRotate();
     const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
@@ -104,8 +112,8 @@ describe('请求构造：URL / method / body（mock fetch，不发真请求）',
 
 describe('响应处理与失败兜底（空值/异常边界）', () => {
   it('tokenStatus 正常解析 configured', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ configured: true })));
-    await expect(tokenStatus()).resolves.toEqual({ configured: true });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ configured: true, guard: true, unreachable: false })));
+    await expect(tokenStatus()).resolves.toEqual({ configured: true, guard: true, unreachable: false });
   });
 
   it('tokenStatus 网络失败静默回退 configured: false', async () => {
@@ -113,10 +121,10 @@ describe('响应处理与失败兜底（空值/异常边界）', () => {
     await expect(tokenStatus()).resolves.toEqual({ configured: false });
   });
 
-  it('postProviderAction 网络失败回退友好错误对象', async () => {
+  it('postProviderAction 网络失败回退友好错误对象（r32 F15：内部端口/容器名出用户文案）', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
     await expect(postProviderAction('test', {})).resolves.toEqual({
-      error: '无法连接后端 (2024 端口)，请确认 workplatform 容器在跑',
+      error: '无法连接后端，请确认服务正在运行',
     });
   });
 
