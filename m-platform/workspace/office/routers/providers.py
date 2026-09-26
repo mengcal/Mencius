@@ -116,6 +116,12 @@ def _assert_public_fetch_target(url: str) -> str:
     u = urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
         raise ValueError("只允许 http/https 地址")
+    # r33d（爸爸 09-27 凌晨"网关不能给米娅用？"）：自家 litellm 网关豁免——
+    # 网关在 compose 网络（容器名 litellm-gw），base_url 由管理员在设置页配置
+    # （米娅无 token 改不了），SSRF 防的是米娅可控输入打内网，不含管理员配置面。
+    # 网络前提：litellm-gw 已 docker network connect 进 m_mia 网络。
+    if u.hostname == "litellm-gw":
+        return url
     try:
         infos = socket.getaddrinfo(u.hostname, u.port or (443 if u.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
     except OSError:
