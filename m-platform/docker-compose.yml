@@ -27,12 +27,15 @@ services:
       - SEARXNG_URL=http://searxng:8080
       # R76 execute 沙箱：SandboxedShellBackend 用它连沙箱执行服务（.env 里同值，两端配对）
       - SANDBOX_TOKEN=${SANDBOX_TOKEN}
-      # R80（Eve P1）：沙箱已出 mia 网，runner 改经宿主回环（127.0.0.1:9090 发布）调用
-      - SANDBOX_EXEC_URL=http://host.docker.internal:9090/exec
+      # R80（Eve P1）：沙箱已出 mia 网，runner 改经宿主回环调用；09-17 晚 9090→9099（9090 是爸爸 OWUI 的端口，R80 选端口时撞车未察觉=本次事故主犯）
+      - SANDBOX_EXEC_URL=http://host.docker.internal:9099/exec
       # R82 CodeBuddy 代理层：真 key 只进本进程（沙箱牛马走 /codebuddy + 代理钥匙，见 office.py）
       - CODEBUDDY_BASE_URL=${CODEBUDDY_BASE_URL}
       - CODEBUDDY_API_KEY=${CODEBUDDY_API_KEY}
       - CODEBUDDY_PROXY_TOKEN=${CODEBUDDY_PROXY_TOKEN}
+      # 09-17 深夜 米娅=知夏同等权限：full 档 execute 走宿主 runner
+      - MIA_HOST_RUNNER_URL=${MIA_HOST_RUNNER_URL}
+      - MIA_HOST_RUNNER_KEY=${MIA_HOST_RUNNER_KEY}
       # R10：/vision 二级钥匙——office 是校验方必须有它（沙箱带钥匙来，office 拿钥匙验）
       - VISION_PROXY_TOKEN=${VISION_PROXY_TOKEN}
       # R10.2（Eve P2）：/rag/query 二级钥匙——三扇门之一从"说开实际锁"改成真开（牛马带它检索）
@@ -56,7 +59,7 @@ services:
       - D:\m\workspace\providers.json:/deps/outer-workspace/src/providers.json
       - D:\m\workspace\departments_config.json:/deps/outer-workspace/src/departments_config.json
       - D:\m\workspace\mia_home:/deps/outer-workspace/src/mia_home                     # 数据区（记忆/任务/用量/文件）整目录读写=米娅该写的都在这
-      - D:\m\skills:/deps/outer-workspace/src/mia_home/skills:ro                       # R80 skills 洞：技能真源挪 D:\m\skills，只读视图挂回原位（SkillsMiddleware 零改动照常读；写=EROFS）
+      - D:\m\skills:/deps/outer-workspace/src/mia_home/skills                          # r27 评审 P1（Eve 实测一锤 EROFS）：workplatform 视图改 rw——设置页技能增删改（/skills/create|update|delete）需写面，防护=管理员 token 门（米娅没有钥匙）+全程审计+skills_lock 哈希篡改检测（启动校验+清单状态位）。R80 物理墙在沙箱容器（下方 :92 行）保持 :ro 不动——米娅 shell 面依旧写不了；host 面写=档位确认门管辖，与 execute 同政策
       # R79④：control/:ro 挂载与 MIA_TIER_FILE 已随"带外档位地板"退役（_level 单源=settings.general.confirmLevel）；
       # 宿主 D:\m\control\mia_tier 文件保留作历史档案，不再被任何代码读取
       # R75 已撤 /var/run/docker.sock 裸挂载（Eve/NOVA 实测=docker run -v 挂 control 改档位的"第三条路"+宿主逃逸）；容器管理待范围轴用只读代理再给
@@ -64,8 +67,8 @@ services:
       - postgres
       - redis
       - sandbox
-    networks: [mia]
-    restart: unless-stopped
+    networks: [mia, family]
+    restart: "no"
 
   # ──  沙箱：干活执行环境（重权限层）──
   # R76：沙箱兼作 execute 的隔离执行场——只挂数据区 /data/mia_home，**没有** settings/源码/control，
@@ -79,7 +82,7 @@ services:
     image: mia-sandbox:pw   # r35：eve2 基础上叠 playwright+chromium（沙箱内渲染自验，不新增网络面）
     command: python3 /runner.py
     ports:
-      - "127.0.0.1:9090:9000"   # R80：runner 执行服务仅宿主回环发布（X-Token 鉴权照旧）
+      - "127.0.0.1:9099:9000"   # R80：runner 执行服务仅宿主回环发布（X-Token 鉴权照旧）；09-17 让位 OWUI 9090
     volumes:
       - D:\m\workspace\sandbox_runner.py:/runner.py:ro
       - D:\m\workspace\mia_home:/data/mia_home
@@ -107,7 +110,7 @@ services:
       # R10.2（Eve P2）：检索二级钥匙——牛马经宿主回环带它调 /rag/query（X-Proxy-Key 头）
       - RAG_PROXY_TOKEN=${RAG_PROXY_TOKEN}
     networks: [sandbox-isolated]
-    restart: unless-stopped
+    restart: "no"
 
   # ── ③ SearXNG：搜索（六引擎优化版）──
   searxng:
@@ -118,8 +121,8 @@ services:
       - D:\m\searxng:/etc/searxng
     environment:
       - SEARXNG_BASE_URL=http://localhost:18080/
-    networks: [mia]
-    restart: unless-stopped
+    networks: [mia, family]
+    restart: "no"
 
   # ── ④ n8n：工作流自动化 ──
   n8n:
@@ -134,8 +137,8 @@ services:
       - GENERIC_TIMEZONE=Asia/Shanghai
     volumes:
       - n8n_data:/home/node/.n8n
-    networks: [mia]
-    restart: unless-stopped
+    networks: [mia, family]
+    restart: "no"
 
   # ── ⑤ PostgreSQL：对话历史/线程持久化 + pgvector（RAG 向量检索，R43 升级）──
   postgres:
@@ -145,14 +148,14 @@ services:
       - POSTGRES_DB=m
     volumes:
       - pg_data:/var/lib/postgresql/data
-    networks: [mia]
-    restart: unless-stopped
+    networks: [mia, family]
+    restart: "no"
 
   # ── ⑥ Redis：队列/缓存 ──
   redis:
     image: redis:7-alpine
-    networks: [mia]
-    restart: unless-stopped
+    networks: [mia, family]
+    restart: "no"
 
   # ── Ollama 说明（2026-08-30）：爸爸 Windows 本机已装 Ollama（11434），容器不再重复起。
   # 平台容器内访问本机 Ollama 用 http://host.docker.internal:11434（mxbai/bge/qwen2.5 都在本机）。
@@ -164,6 +167,11 @@ volumes:
 networks:
   mia:
     driver: bridge
-  # R80：沙箱独立网（与 mia 零互通）——出站 NAT 照常（CodeBuddy/pip 可用），入站仅宿主回环 9090
+  # r33d（09-27 爸爸令"全家互通"）：家族骨干网（外部网，litellm-gw/celia 已手工接入）——
+  # 容器互访一律用容器名（http://litellm-gw:4000 式），沙箱除外（隔离是它的功能）
+  family:
+    external: true
+    name: family
+  # R80：沙箱独立网（与 mia 零互通）——出站 NAT 照常（CodeBuddy/pip 可用），入站仅宿主回环 9099
   sandbox-isolated:
     driver: bridge
