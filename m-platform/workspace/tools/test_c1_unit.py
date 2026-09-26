@@ -118,7 +118,7 @@ _ap.bump_blocked(tid_probe, "tc-dup")
 T("resume 重放幂等", _ap.task_cards(tid_probe) == 1)
 for i in range(8):
     _ap.bump_blocked(tid_probe, f"tc-{i}")
-T("8 张达预算线", _ap.card_pressure(tid_probe) == "BUDGET")
+T("8 张中文强提醒（r33 English 哨兵退役）", "配额上限" in _ap.card_pressure(tid_probe))
 # r2-2 双轨后：告警文案看软轨，构造场景须两轨同改（语义演进，合法更新）
 _ap._task_cards[tid_probe] = [4, 0]; _ap._card_pressure_soft[tid_probe] = 4
 T("4 张告警不报数", "⚠" in _ap.card_pressure(tid_probe) and "8" not in _ap.card_pressure(tid_probe))

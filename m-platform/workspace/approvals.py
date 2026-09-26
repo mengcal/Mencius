@@ -389,13 +389,14 @@ _turn_marks = {}          # {thread_id: 上次见过的 human 消息数}
 
 
 def card_pressure(thread_id: str) -> str:
-    """卡面告警文案（<3 无；>=3 提醒但不报确切数；>=CARD_BUDGET 报 BUDGET 标记）。
+    """卡面告警文案（<3 无；>=3 提醒但不报确切数；>=CARD_BUDGET 中文强提醒——r33 起 English 哨兵退役）。
     r2-2（09-12 基线 W2 案）：告警走软轨——爸爸每发一条新消息（=换题/给新指令）
     告警清零重计，不拿旧任务的账挂新任务的卡；硬预算 _task_cards 不受影响
     （防"随便发句话就无限刷卡"）。"""
     n = task_cards(thread_id)
-    if n >= CARD_BUDGET:
-        return "BUDGET"
+    # r33（CB 补审 1.2）：英文哨兵 "BUDGET" 退役——硬预算已退役（r32b），n>=8 只是
+    # "这个任务弹了很多卡"，按中文告警口径出声；且全仓无 == "BUDGET" 读者，
+    # 唯一出口是拼进爸爸卡面（:983→:1002），英文 token 直穿用户可见文案。
     with _lock:
         w = _card_pressure_soft.get(thread_id, 0)
     # r43（hy4 P1-4：软轨清零不得掐断硬轨唯一预警——n=7 且 w=0 静默逼近第 8 张硬拒）：

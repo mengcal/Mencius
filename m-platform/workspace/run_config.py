@@ -44,12 +44,8 @@ def _model_for(request, model_name: str, thinking=None, provider: str | None = N
     except Exception:
         pass
     return None
-
-
-def _tool_blocked(cfg: dict, name: str, request, result_of) -> bool:
-    if not cfg.get("web_search", True) and name in SEARCH_TOOLS:
-        return True
-    return False
+  # r33（CB 补审 A1）：_tool_blocked 死函数删除——全仓零调用且语义与本体分叉
+  # （真值判定 vs 本体 is False 严格判定），留着=引雷。关闭语义唯一真源在 :230/:240。
 
 
 def _record_usage(model_name: str, result):

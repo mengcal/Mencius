@@ -64,7 +64,7 @@ check("同轮 note 幂等不清零", "⚠️" in ap.card_pressure(TID))
 # 硬预算满 → BUDGET（与软轨无关）
 for i in range(ap.CARD_BUDGET):
     ap.bump_blocked(TID, f"x-{i}")
-check("硬满走 BUDGET", ap.card_pressure(TID) == "BUDGET")
+check("硬满走中文强提醒（r33 哨兵退役）", "配额上限" in ap.card_pressure(TID))
 ap.reset_task_cards(TID)
 check("reset 双轨全清", ap.task_cards(TID) == 0 and ap.card_pressure(TID) == "")
 

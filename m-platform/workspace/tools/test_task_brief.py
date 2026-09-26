@@ -44,11 +44,11 @@ TID = "tR"
 ap.reset_task_cards(TID)
 for i in range(8):
     ap.bump_blocked(TID, f"c{i}")
-T("烧满 8=BUDGET", ap.card_pressure(TID) == "BUDGET")
+T("烧满 8=BUDGET", "配额上限" in ap.card_pressure(TID))
 T("第1次回血到4", ap.soft_reset_task(TID) and ap.task_cards(TID) == 4)
 for i in range(4):
     ap.bump_blocked(TID, f"d{i}")
-T("回血后再烧满 8", ap.card_pressure(TID) == "BUDGET")
+T("回血后再烧满 8", "配额上限" in ap.card_pressure(TID))
 ap.soft_reset_task(TID)
 T("第2次回血到3（衰减）", ap.task_cards(TID) == 3)
 ap.soft_reset_task(TID)
@@ -59,7 +59,7 @@ ap.soft_reset_task(TID)
 T("第5次回血=0（不再给）", ap.task_cards(TID) == 1)
 for i in range(8):
     ap.bump_blocked(TID, f"e{i}")
-T("烧回 8 后回血不再生效", ap.card_pressure(TID) == "BUDGET" and not ap.soft_reset_task(TID))
+T("烧回 8 后回血不再生效", "配额上限" in ap.card_pressure(TID) and not ap.soft_reset_task(TID))
 ap.reset_task_cards(TID)
 
 # ── 3) 验收契约（P0-1）：acceptance_for→literal_diff 直通 ──
