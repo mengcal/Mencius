@@ -162,8 +162,8 @@ export default function SubagentsTab() {
               onBlur={(e) => set('approvals.claimTimeout', Number(e.target.value) || 1800)} />
           </label>
           <label className="flex flex-col gap-1">CodeBuddy 默认模型
-            <input className={inputC + ' w-56'} defaultValue={val('codebuddy.defaultModel', 'Qwen/Qwen3.8-Flash-Next')}
-              onBlur={(e) => set('codebuddy.defaultModel', e.target.value.trim() || 'Qwen/Qwen3.8-Flash-Next')} />
+            <input className={inputC + ' w-56'} defaultValue={val('codebuddy.defaultModel')}
+              onBlur={(e) => set('codebuddy.defaultModel', e.target.value.trim())} />
           </label>
           <label className="flex flex-col gap-1">可换模型白名单（逗号分隔）
             <input className={inputC + ' w-72'} defaultValue={val('codebuddy.allowedModels', '')} placeholder="留空=只许默认模型"

@@ -16,10 +16,13 @@ import httpx
 from fastapi import APIRouter, Body
 
 from ..core import BASE, _token_audit
+from settings_mgr import SECRETS_PATH  # r34（CB 2.5）：凭据文件挪 secrets 卷
 
 router = APIRouter()
 
-_CRED_FILE = BASE / "secrets" / "lark_app.txt"
+# r34（CB 2.5）：凭据回源码树挂载面是 R79② 漏网——挪 secrets 卷（宿主 D:\m\secrets，
+# 容器内 /data/secrets，与 .settings_secrets 同卷同纪律）
+_CRED_FILE = SECRETS_PATH.parent / "lark_app.txt"
 _API = "https://open.feishu.cn/open-apis"
 _tok_cache: dict = {"token": "", "exp": 0.0}
 
@@ -29,7 +32,7 @@ def _cred() -> tuple[str, str]:
     app = re.search(r"(cli_[0-9a-f]+)", t)
     sec = re.search(r"(?i)secret\s*[=:：]\s*(\S+)", t)
     if not app or not sec:
-        raise RuntimeError("lark_app.txt 格式不含 App ID(cli_…)/Secret——请爸爸检查")
+        raise RuntimeError("飞书应用凭据文件格式不完整——请爸爸检查 secrets 卷内 lark_app.txt")
     return app.group(1), sec.group(1)
 
 

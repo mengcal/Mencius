@@ -80,7 +80,7 @@ export default function ModelsTab() {
           <textarea
             className={inputMonoClass + ' min-h-24 resize-y'}
             rows={4}
-            defaultValue={JSON.stringify(val('models.contextLimits', { 'glm-4.7': 200000, 'glm-4.5-air': 131072, 'glm-4.6v': 65536 }))}
+            defaultValue={JSON.stringify(val('models.contextLimits'))}
             onBlur={(e) => { try { set('models.contextLimits', JSON.parse(e.target.value)); } catch { /* 非法 JSON 不写入 */ } }}
           />
         </div>
