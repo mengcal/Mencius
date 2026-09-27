@@ -34,16 +34,11 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
         return await self._acall(cmd, timeout or 120)
 
     def _route(self):
-        """09-17 深夜爸爸定纲"米娅=知夏同等权限"：confirmLevel=full 时 execute 落宿主
-        runner（同款 Git Bash、同款机器权限）；其余档位走沙箱不变。每次现读配置——
-        爸爸设置页拨回非 full，秒级关门（runner 侧还有第二道同款检查，双保险 fail-closed）。"""
-        try:
-            from settings_mgr import load_settings
-            if str((load_settings().get("general", {}) or {}).get("confirmLevel", "")) == "full":
-                return (os.environ.get("MIA_HOST_RUNNER_URL", "http://host.docker.internal:2026/exec"),
-                        os.environ.get("MIA_HOST_RUNNER_KEY", ""))
-        except Exception:
-            pass
+        """09-17 深夜爸定纲"米娅=知夏同等权限"曾落地为 full 档→宿主 runner 后门；
+        09-27 晚爸改定（架构两轴）：档位只管"要不要问"，**域由工作区管**——
+        除非工作区/容器挂载调整，容器里就是容器里，不设档位触发的专门门。
+        host_runner 进程与自启已停；本文件与 runner 代码保留，
+        待"宿主工作区"作为一等公民实现时复用（届时入口=选工作区，不是切档位）。"""
         return (self._URL, self._tok)
 
     # hy4 backlog①（09-19）：宿主 runner 走短时票据——静态钥匙只在 /ticket 换票时过线，

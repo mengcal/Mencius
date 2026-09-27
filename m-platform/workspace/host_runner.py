@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-r"""host_runner.py —— 米娅"完全访问档"的宿主执行后端（09-17 深夜爸爸定纲：米娅=知夏同等权限）
+r# r36（09-27 爸定）：本 runner 已停用（档位不再开后门）——代码保留待"宿主工作区"一等公民化时复用；
+# 进程与 Startup 自启件同日撤除。见 mia_agent/sandbox.py _route 注释。
+"""host_runner.py —— 米娅"完全访问档"的宿主执行后端（09-17 深夜爸爸定纲：米娅=知夏同等权限）
 
 语义：general.confirmLevel == "full" 时，米娅的 execute 经此服务落在宿主 Git Bash
 （与知夏同款 shell、同款权限）；其他档位本服务直接 403（沙箱路线不变）。
