@@ -8,6 +8,7 @@
   一个网关守护管一摊，这里无守护、无状态，加账号=注册表加一行。
 """
 import imaplib
+import json
 import smtplib
 from email.mime.text import MIMEText
 from email.header import decode_header, make_header
@@ -28,10 +29,12 @@ def _acct(name: str):
         raise ValueError(f"邮箱账号「{name}」不在注册表（设置页 email 节 / 找知夏加）")
     if acc.get("enabled") is False:
         raise ValueError(f"邮箱「{name}」已被停用")
-    from settings_mgr import secret_get
-    pw = secret_get(f"email.account.{name}.password") or ""
-    if not pw:
-        raise ValueError(f"邮箱「{name}」缺授权码（email.account.{name}.password）")
+    pw = ""
+    if acc.get("transport") != "cli":  # r35：cli 通道账号钥匙在沙箱，平台侧不需要授权码
+        from settings_mgr import secret_get
+        pw = secret_get(f"email.account.{name}.password") or ""
+        if not pw:
+            raise ValueError(f"邮箱「{name}」缺授权码（email.account.{name}.password）")
     return acc, pw
 
 
@@ -41,7 +44,80 @@ def _imap():
     return imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, ssl_context=ssl.create_default_context(), timeout=30)
 
 
+# ── r35（09-27 爸爸诊断）：transport=cli 通道 ──────────────────────────────
+# 米娅的新箱 miafirm@claw.163.com 是 ClawEmail 智能体信箱：正门=官方 mail-cli（WS/ajax），
+# 钥匙住在米娅沙箱的 mail-cli 配置里——平台代码与注册表【零凭据】。
+# 牛马（总管等）收发 = 经此桥借道主人的活通道（米娅下令查收=授权本身）。
+# 旧 IMAP 路（email.account.<名>.password 16 位码）保留给仍走协议门的账号。
+import re as _re
+
+_UID_RE = _re.compile(r"^[0-9]{1,4}:[A-Za-z0-9+/=_-]{1,64}$")   # 57:1tbi... 形态，拒一切 shell 拼接面
+_ADDR_RE = _re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
+
+def _cli_exec(name: str, args: str, timeout: int = 40, raw: str = "") -> str:
+    """在米娅沙箱里跑 mail-cli --json <args>（复用 SandboxedShellBackend 现成执行器：
+    票据/401 重试/超时击杀全走官方路，这里不造第二套）。raw=完整命令（send 用）。"""
+    from mia_agent.sandbox import SandboxedShellBackend
+    be = SandboxedShellBackend(root_dir="/tmp")
+    cmd = raw if raw else ("mail-cli --profile default --json " + args)
+    r = be._call(cmd, timeout)
+    if r.exit_code != 0:
+        raise RuntimeError(f"信箱通道返回异常（exit={r.exit_code}）：{r.output[:300]}")
+    return r.output
+
+
+def _cli_json(name: str, args: str, timeout: int = 40, raw: str = ""):
+    raw_out = _cli_exec(name, args, timeout, raw=raw)
+    i = raw_out.find("{")
+    j = raw_out.find("[")
+    if 0 <= j < i:
+        i = j
+    if i < 0:
+        raise RuntimeError(f"信箱通道无结构化输出：{raw_out[:200]}")
+    return json.loads(raw_out[i:])
+
+
+def check_cli(name: str, limit: int = 8) -> str:
+    d = _cli_json(name, f"mail list --fid 1 --order date --desc --limit {int(limit)}")
+    rows = d.get("data") or []
+    if not rows:
+        return f"邮箱「{name}」收件箱没有信。"
+    out = [f"邮箱「{name}」最近 {len(rows)} 封（编号 已读性 | 日期 | 发件人 | 主题）："]
+    for m in rows:
+        out.append(f"  {m.get('id','?')} | {'未读' if not m.get('read') else '已读'} | {m.get('date','')} | {m.get('from','')} | {m.get('subject','')}")
+    return "\n".join(out)
+
+
+def read_cli(name: str, uid: str) -> str:
+    if not _UID_RE.match(uid or ""):
+        return "uid 格式不对——请用 check 列表里的编号原样复制。"
+    d = _cli_json(name, f"read body --fid 1 --id '{uid}'")
+    r = d.get("data") or d
+    body = str(r.get("body") or r.get("text") or "")[:6000]
+    return f"【{r.get('subject','')}】来自 {r.get('from','')} {r.get('date','')}\n{body}"
+
+
+def send_cli(name: str, to: str, subject: str, body: str) -> str:
+    for t in (to or "").split(","):
+        if t.strip() and not _ADDR_RE.match(t.strip()):
+            return f"收件地址格式不合法：{t.strip()[:60]}"
+    import base64 as _b64
+    b64 = _b64.b64encode((body or "").encode("utf-8")).decode()
+    # 正文走 base64 落盘（防注入/防引号炸）；收件人与主题做 shell 安全转义后用双引号包
+    to_q = (to or "").replace('"', "").replace("$", "").replace("`", "")
+    subj_q = (subject or "").replace('"', "").replace("$", "").replace("`", "")[:120]
+    full = (f"printf %s {b64} | base64 -d > /tmp/mia_mail_body.txt && "
+            f'mail-cli --profile default --json compose send --to "{to_q}" --subject "{subj_q}" '
+            f"--body-file /tmp/mia_mail_body.txt; rm -f /tmp/mia_mail_body.txt")
+    d = _cli_json(name, "", timeout=60, raw=full)
+    ok = d.get("success") or (d.get("data") or {}).get("status") == "sent"
+    return f"已发往 {to}：{subject}" if ok else f"发送失败：{str(d)[:200]}"
+
+
 def check(name: str, limit: int = 8) -> str:
+    if _acct(name)[0].get("transport") == "cli":
+        return check_cli(name, limit)
     """列最近 N 封（只读不动邮件、不回复）。
     R73（Cora P3a）：用 UID 命令取真实 UID——check 与 read 是两次独立连接，
     若用序号（sequence number），中间外部删信会导致序号漂移读错信；UID 稳定。"""

@@ -527,7 +527,11 @@ def email(action: str, account: str = "", uid: str = "", to: str = "", subject: 
         if action == "check":
             return mail_service.check(account)
         if action == "read":
+            if mail_service._acct(account)[0].get("transport") == "cli":
+                return mail_service.read_cli(account, uid)
             return mail_service.read(account, uid)
+        if action == "send" and (mail_service._acct(account or '')[0].get("transport") if account else False) == "cli":
+            return mail_service.send_cli(account, to, subject, body)
         if action == "send":
             if not (to and subject):
                 return "send 需要 to 和 subject"
