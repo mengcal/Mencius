@@ -70,7 +70,7 @@ def _seat_model(seat: str):
     prov = cfg.get("provider") or ""
     model = cfg.get("model")
     if not prov or not model:
-        raise ValueError(f"围炉 {seat} 位未配置服务商/模型：请到 设置→围炉 两项都选好（当前 provider={prov or '空'} model={model or '空'}）")
+        raise ValueError(f"围炉 {seat} 位未配置服务商/模型：请到 设置页→牛马矩阵→「围炉与圆桌（朋友席）」两项都选好（当前 provider={prov or '空'} model={model or '空'}）")
     return make_model(prov, model)
 
 
@@ -140,7 +140,7 @@ def summarize(state: HearthState) -> dict:
         # 09-17 批①：boss 模型不再静默回退 intern-latest（未配置走 r39 如实降级通道）
         _boss_model = boss.get("model") or ""
         if not _boss_model:
-            raise ValueError("boss 未配置模型：请到 设置→牛马编制 给米娅(boss)选模型")
+            raise ValueError("boss 未配置模型：请到 设置页→牛马矩阵 给米娅(boss)选模型")
         m = make_model(boss.get("provider", ""), _boss_model, max_tokens=4000)
         cloth, _complete = ask(m, [SystemMessage(PROMPT_SUMMARY), HumanMessage(chat_txt)])
         if cloth and not _complete:
@@ -148,7 +148,7 @@ def summarize(state: HearthState) -> dict:
     except Exception as e:
         print(f"[hearth] 归纳异常: {type(e).__name__}: {e}", flush=True)
         cloth = ("（归纳暂时出错，聊天原文完整保留在下方，请重发喊停口令再归纳。）"
-                 f"请重发喊停口令再归纳。）\n\n{chat_txt}")
+                 f"\n\n{chat_txt}")
     if not cloth:
         cloth = ("（归纳位沉默：疑上游审核拦截。聊天原文降级保留于下方。"
                  "请重发喊停口令再归纳。）\n\n" + chat_txt)

@@ -184,7 +184,9 @@ async def api_provider_add(req: dict = Body(...)):
         _save_external_provider(name, base_url, enabled=req.get("enabled", True), models_cache=models)
         return {"ok": True, "name": name, "count": len(models), "models": models}
     except Exception as e:
-        return {"error": f"保存或拉取失败: {e}"}
+        # r34 CB 2.4：异常原文（httpx 带 URL、settings_mgr 带路径）不再直穿上屏——留底+人话
+        print(f"[providers] add/refresh 失败 name={name}: {type(e).__name__}: {e}", flush=True)
+        return {"error": "保存或拉取失败：请检查地址与密钥后重试（详情见服务日志）"}
 
 
 @router.post("/providers/rename")
@@ -304,6 +306,7 @@ async def api_provider_update(req: dict = Body(...)):
         try:
             _assert_public_fetch_target(bu)
         except ValueError as e:
+            # r34 CB 2.4 复核：闸门抛的是受控中文拒信（只含被拒主机名/IP，无路径），可上屏
             return {"error": str(e)}
         entry["base_url"] = bu
     if req.get("api_key"):
