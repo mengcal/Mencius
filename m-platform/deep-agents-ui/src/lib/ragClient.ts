@@ -82,11 +82,11 @@ export async function ragQuery(q: string, k = 5): Promise<{ results?: { name: st
 }
 
 export function ragStats(): Promise<{ chunks: number; docs: Record<string, number> }> {
+  // r34（CB 7.3）：旧实现注释说"不许静默吞"但 catch 仍回 {0,{}}——文档页库存恒 0。
+  // 改：非 2xx/网络失败一律 throw，消费方（TasksFilesSidebar）catch 后显示"统计不可用"。
   return apiFetch(`${API}/rag/stats`, { headers: authHeaders() })
     .then((r) => {
-      // R80 续（Eve P3）：401/失败不许静默吞成假数据（旧 catch 会让统计永远显示 0 片段）
-      if (!r.ok) console.warn(`[rag] stats HTTP ${r.status}`);
+      if (!r.ok) throw new Error(`rag stats HTTP ${r.status}`);
       return r.json();
-    })
-    .catch(() => ({ chunks: 0, docs: {} }));
+    });
 }

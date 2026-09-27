@@ -11,6 +11,9 @@
 """
 
 SCHEMA = {
+    # r34（CB 1.4）：uiZoom 登记入 schema 单源（此前 InterfaceTab 假默认 110、
+    # page.tsx ?? 100 双源漂移；实际值 100）
+    "interface.uiZoom":             {"default": 100, "type": "int", "ui": "界面", "note": "浏览器缩放百分比（90-160）"},
     # —— 通用/安全 ——
     "general.confirmLevel":        {"default": "strict", "type": "enum", "ui": "通用", "note": "四档确认门；非法/缺=fail-closed strict；r29 焊档：放宽须走 /settings/confirm-level 验旧密码，通用通道已关"},
     "general.admin_name":          {"default": "admin", "type": "str", "ui": "米娅与安全", "note": "登录名（09-17 双要素）"},

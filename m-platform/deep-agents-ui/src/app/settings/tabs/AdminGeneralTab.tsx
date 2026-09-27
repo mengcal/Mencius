@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { useSettings } from '../context';
 import { Section, Row, Switch, inputC, pageTitleClass, pageSubtitleClass } from '../ui';  // r32：inputCImportant 随密码框退役
 import { API, apiFetch } from '@/lib/apiBase';
+import { CONFIRM_TIERS } from '@/lib/confirmTiers'; // r34（CB 8.1）：四档单源消费
 import AdminTokenRow from '../rows/AdminTokenRow';
 import SkillsManager from '../rows/SkillsManager';
 
@@ -42,11 +43,9 @@ function TierPicker() {
   const onPick = (lv: string) => { setMsg(''); apply(lv); };
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
+      {/* r34（CB 8.1）：手写四档 option 改 CONFIRM_TIERS 单源循环——加档不再漏改 */}
       <select className={inputC + ' w-36'} value={tier} onChange={(e) => onPick(e.target.value)}>
-        <option value="full">完全访问（全自动；米娅 execute 同知夏落宿主 Git Bash，权限对等）</option>
-        <option value="auto_edit">自动编辑（跑代码先问）</option>
-        <option value="strict">变更前确认（都先问）</option>
-        <option value="plan">计划模式（只出计划）</option>
+        {CONFIRM_TIERS.slice().reverse().map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
       </select>
       {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
     </div>
@@ -66,12 +65,12 @@ export default function AdminGeneralTab() {
           <TierPicker />
         </Row>
         <Row label="管理员登录名" description="登录页第一个输入框校验的名字（与密码双要素；改完即生效，下次登录用新名字）。默认 admin">
-          <input className={inputC + ' w-36'} defaultValue={val('general.admin_name', 'admin')}
+          <input className={inputC + ' w-36'} defaultValue={val('general.admin_name')}
             onBlur={(e) => {
               // r32（NOVA 常驻1 违规）：清空不再静默回落 'admin'（改完名字的爸爸失手清空
               // 就被自己改掉的名字挡在门外）——恢复原值并出声。
               const v = e.target.value.trim();
-              if (!v) { e.target.value = String(val('general.admin_name', 'admin') || 'admin'); alert('登录名不能为空，已恢复原值'); return; }
+              if (!v) { e.target.value = String(val('general.admin_name')); alert('登录名不能为空，已恢复原值'); return; }
               set('general.admin_name', v);
             }} />
         </Row>

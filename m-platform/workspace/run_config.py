@@ -225,7 +225,7 @@ class RunConfigMiddleware(AgentMiddleware):
         name = (request.tool_call or {}).get("name", "")
         if cfg.get("web_search", True) is False and name in SEARCH_TOOLS:
             return ToolMessage(
-                content="（联网搜索当前已在输入框关闭。如需搜索请打开 🌐 开关后重试。）",
+                content="（联网搜索当前被本条消息关闭。如需搜索请正常发消息重试——联网默认开启，按钮已退役。）",
                 tool_call_id=(request.tool_call or {}).get("id", ""),
             )
         return handler(request)

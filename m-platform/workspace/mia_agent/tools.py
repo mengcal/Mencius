@@ -140,7 +140,7 @@ def dispatch_to_xiaoquan(task: str) -> str:  # 原 L179-209
     # R80 续：dispatch 双钥匙门——进程内工具带 X-Internal-Key（WEBHOOK_TOKEN env，与 office 同源），
     # 沙箱/外部没这把 env=401（浏览器走 Bearer 管理员密钥）
     # 09-17 硬编码收口批②：地址走 env（对齐 dept_watch MIA_SELF_SDK_URL 先例），默认=容器内服务名
-    req = _ureq.Request(_os.environ.get("MIA_SELF_SDK_URL", "http://workplatform:8000").rstrip("/") + "/tasks/dispatch",
+    req = _ureq.Request(_os.environ.get("MIA_SELF_SDK_URL", "http://127.0.0.1:8000").rstrip("/") + "/tasks/dispatch",  # r34（CB 4.1）：workplatform:8000 是 R80 断网名，统一回环默认
                         data=body,
                         headers={"Content-Type": "application/json",
                                  "X-Internal-Key": _os.environ.get("WEBHOOK_TOKEN", "")})

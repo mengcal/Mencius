@@ -31,6 +31,12 @@ _OFFICE_ALLOW = (
     # R10 修四③（Lyra 小项）：/codebuddy 提前入册——代理层自带代理钥匙门（X-Proxy-Key），
     # 若将来 office 路由真进了 auth 罩，缺这一条会让沙箱 CodeBuddy CLI 直接断链（自检都跑不动）。
     "/codebuddy", "/codebuddy/",
+    # r34（CB 2.3）：app.py 已装 8 个 router，名单补齐——现靠 office 路由实测在
+    # langgraph auth 罩外侥幸不炸；一旦框架变化，/auth/login（注册即登录）与全部
+    # 新页面立刻 401。豁免=双保险的每一行不多罩一寸（精确前缀）。
+    "/auth", "/auth/", "/skills", "/skills/", "/remember-rules", "/memory",
+    "/external", "/external/", "/models", "/models/", "/usage", "/usage/",
+    "/context", "/context/",
     # R10.2（Cora 观察②）："/threads/title" 不再放前缀——startswith 会撞原生 GET /threads/{id}
     # 当 id=="title…"（thread_id 虽需管理员钥匙才建得出、无实际碰撞面，但豁免清单=双保险，
     # 双保险的每一行也不该多罩一寸）。office 真路由是 POST /threads/title，按精确路径放行。

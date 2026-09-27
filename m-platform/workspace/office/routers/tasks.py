@@ -95,7 +95,7 @@ def _sdk_client():
     from settings_mgr import get_api_token
     from internal_key import INTERNAL_KEY
     _tok = get_api_token()
-    return get_client(url=os.environ.get("MIA_SELF_SDK_URL", "http://localhost:8000"),
+    return get_client(url=os.environ.get("MIA_SELF_SDK_URL", "http://127.0.0.1:8000"),  # r34（CB 4.1）：三套默认统一 127.0.0.1:8000
                       headers={"X-Internal-Key": INTERNAL_KEY,
                                **({"Authorization": f"Bearer {_tok}"} if _tok else {})})
 

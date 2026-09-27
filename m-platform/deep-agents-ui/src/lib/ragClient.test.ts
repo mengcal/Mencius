@@ -123,9 +123,9 @@ describe('embed()（mock fetch，不发真请求）', () => {
 });
 
 describe('ragStats() 失败兜底', () => {
-  it('网络失败静默回退零值结构', async () => {
+  it('网络失败如实抛错（r34 CB 7.3：不再静默吞成假 0）', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
-    await expect(ragStats()).resolves.toEqual({ chunks: 0, docs: {} });
+    await expect(ragStats()).rejects.toThrow();
   });
 
   it('正常时透传后端统计', async () => {

@@ -42,7 +42,8 @@ export default function AdminTokenRow() {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         // R10.408 修暗病：/auth/login 是双要素（登录名+密码），此前只送密码=永远"登录名或密码不正确"
-        body: JSON.stringify({ username: String(val('general.admin_name', 'admin') || 'admin'), password: recPwd }),
+        body: JSON.stringify({ username: String(val('general.admin_name')), // r34（CB 1.5）：'admin' 二源退役走 schema
+        password: recPwd }),
       });
       const j = await r.json();
       if (j?.ok) { setRecovering(false); setRecPwd(''); setMsg('找回成功：已重新登录（Cookie 已种入）。'); refresh(); setTimeout(() => window.location.reload(), 1500); }

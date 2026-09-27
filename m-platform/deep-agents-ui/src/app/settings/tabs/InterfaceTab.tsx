@@ -41,7 +41,7 @@ export default function InterfaceTab() {
       </Section>
       <Section title="显示">
         <Row label="界面字号" description="整体缩放（html zoom）。100%=标准，110%≈浏览器缩放一档，改完保存即生效。爸爸老花眼友好。">
-          <select className={inputC + ' w-32'} value={String(val('interface.uiZoom', 110))}
+          <select className={inputC + ' w-32'} value={String(val('interface.uiZoom'))}
             onChange={(e) => { const v = +e.target.value; set('interface.uiZoom', v); document.documentElement.style.zoom = String(v / 100); }}>
             <option value="100">100%（标准）</option>
             <option value="110">110%（大一号）</option>

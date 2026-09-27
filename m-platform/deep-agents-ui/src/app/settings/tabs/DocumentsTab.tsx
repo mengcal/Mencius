@@ -23,8 +23,9 @@ export default function DocumentsTab() {
   const [ragBusy, setRagBusy] = useState(false);
   const [ragQ, setRagQ] = useState('');
   const [ragResults, setRagResults] = useState<{ name: string; score: number; text: string }[]>([]);
-  const [ragStatsData, setRagStatsData] = useState<{ chunks: number; docs: Record<string, number> }>({ chunks: 0, docs: {} });
-  const loadRagStats = useCallback(() => { ragStats().then(setRagStatsData); }, []);
+  const [ragStatsData, setRagStatsData] = useState<{ chunks: number; docs: Record<string, number> } | null>({ chunks: 0, docs: {} });
+  // r34（CB 7.3）：ragStats 失败不再静默吞成 0——null=不可用态，渲染处如实显示
+  const loadRagStats = useCallback(() => { ragStats().then(setRagStatsData).catch(() => setRagStatsData(null)); }, []);
   useEffect(() => { loadRagStats(); }, [loadRagStats]);
   const ragIngestNow = async () => {
     if (!ragName.trim() || !ragText.trim()) { flash('文档名和内容都要填'); return; }
@@ -99,7 +100,7 @@ export default function DocumentsTab() {
         )}
       </Section>
       <Section title="库存">
-        <div className="text-sm text-muted-foreground">{ragStatsData.chunks} 个片段 · {Object.keys(ragStatsData.docs || {}).length} 份文档：{Object.entries(ragStatsData.docs || {}).map(([n, c]) => `${n}(${c})`).join('、') || '空'}</div>
+        <div className="text-sm text-muted-foreground">{ragStatsData === null ? "库存统计暂时读不到（稍后刷新）" : <>{ragStatsData.chunks} 个片段 · {Object.keys(ragStatsData.docs || {}).length} 份文档：{Object.entries(ragStatsData.docs || {}).map(([n, c]) => `${n}(${c})`).join('、') || '空'}</>}</div>
       </Section>
     </>
   );

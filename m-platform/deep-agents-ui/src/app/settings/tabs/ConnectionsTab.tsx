@@ -70,14 +70,16 @@ export default function ConnectionsTab() {
     } else { flash(j.error || '改名失败'); await reload(); }
   };
   const toggleProvider = async (name: string, enabled: boolean) => {
-    await postProviderAction('toggle', { name, enabled });
+    // r34（CB 8.3）：写操作读响应——失败如实报，不假装成功（schtasks 谎报同族）
+    const j = await postProviderAction('toggle', { name, enabled });
+    if (!(j as any)?.ok) { flash(`启停失败：${(j as any)?.error || '未知原因'}`); await reload(); return; }
     await reload();
   };
   const deleteProvider = async (name: string) => {
     if (!window.confirm(`确定删除服务商「${name}」？米娅和牛马将立刻无法使用它。`)) return;
-    await postProviderAction('delete', { name });
-    flash('已删除');
-    await reload();
+    const j = await postProviderAction('delete', { name });
+    if ((j as any)?.ok) { flash('已删除'); await reload(); }
+    else { flash(`删除失败：${(j as any)?.error || '未知原因'}`); await reload(); }
   };
 
   return (
