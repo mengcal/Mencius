@@ -371,7 +371,17 @@ function HomePageContent() {
         setAssistantId(savedConfig.assistantId);
       }
     } else {
-      setConfigDialogOpen(true);
+      // r34（CB 7.1 P1）：首用/换浏览器/无痕不再弹全英文 LangGraph Cloud 配置框——
+      // 自建同源场景这框是误导（填的 Deployment URL 根本不被使用，下方已自动 origin/lg）。
+      // 自动写入默认配置直达主界面；围炉/圆桌链接仍走 URL assistantId 参数不受影响。
+      const def: StandaloneConfig = {
+        deploymentUrl: `${window.location.origin}/lg`,
+        assistantId: "agent",
+        langsmithApiKey: "",
+      };
+      saveConfig(def);
+      setConfig(def);
+      if (!assistantId) setAssistantId("agent");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
