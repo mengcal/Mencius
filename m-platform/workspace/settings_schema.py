@@ -15,8 +15,8 @@ SCHEMA = {
     # page.tsx ?? 100 双源漂移；实际值 100）
     "interface.uiZoom":             {"default": 100, "type": "int", "ui": "界面", "note": "浏览器缩放百分比（90-160）"},
     # —— 通用/安全 ——
-    "general.confirmLevel":        {"default": "strict", "type": "enum", "ui": "通用", "note": "四档确认门；非法/缺=fail-closed strict；r29 焊档：放宽须走 /settings/confirm-level 验旧密码，通用通道已关"},
-    "general.admin_name":          {"default": "admin", "type": "str", "ui": "米娅与安全", "note": "登录名（09-17 双要素）"},
+    "general.confirmLevel":        {"default": "strict", "type": "enum", "ui": "通用", "note": "四档确认门 plan<strict<auto_edit<full；非法/缺=fail-closed strict；r32（09-26 爸爸裁决）：四档自由直切，个人平台不设密码门，等多用户版再议"},
+    "general.admin_name":          {"default": "admin", "type": "str", "ui": "管理", "note": "登录名（09-17 双要素）"},
     # —— 模型运行参数（批⑤新收口） ——
     "model.maxRetries":            {"default": 3, "type": "int", "ui": "模型", "note": "ChatOpenAI 自动重试（429/慢响应）"},
     "model.requestTimeout":        {"default": 90, "type": "int", "ui": "模型", "note": "单次请求超时秒"},
@@ -28,30 +28,42 @@ SCHEMA = {
     "rag.embeddingModel":          {"default": "qwen3-embedding:0.6b", "type": "str", "ui": "文档", "note": "嵌入模型唯一真源"},
     "rag.embeddingDim":            {"default": 1024, "type": "int", "ui": "文档", "note": "向量维度；换模型改此值+重建全库"},
     # —— 搜索端点（批②收口，公网引擎只许 https） ——
-    "search.engine":               {"default": "auto", "type": "str", "ui": "搜索", "note": "auto=按可用钥匙选"},
-    "search.resultCount":          {"default": 5, "type": "int", "ui": "搜索", "note": "结果条数"},
-    "search.searxngUrl":           {"default": "http://searxng:8080/search", "type": "str", "ui": "搜索", "note": "容器内网地址（scheme 轻闸门）"},
-    "search.bochaUrl":             {"default": "https://api.bochaai.com/v1/web-search", "type": "str", "ui": "搜索", "note": "公网引擎 https-only"},
-    "search.tavilyUrl":            {"default": "https://api.tavily.com/search", "type": "str", "ui": "搜索", "note": "同上"},
-    "search.metasoUrl":            {"default": "https://metaso.cn/api/mcp", "type": "str", "ui": "搜索", "note": "同上"},
-    "search.bingUrl":              {"default": "https://www.bing.com/search", "type": "str", "ui": "搜索", "note": "同上"},
+    "search.engine":               {"default": "auto", "type": "str", "ui": "联网搜索", "note": "auto=按可用钥匙选"},
+    "search.searxngLang":            {"default": "all", "type": "str", "ui": "联网搜索", "note": "SearXNG 语言档（r35 Qoder P2-19 登记，此前后端/WebTab 双源字面量）"},
+    "search.resultCount":          {"default": 5, "type": "int", "ui": "联网搜索", "note": "结果条数"},
+    "search.searxngUrl":           {"default": "http://searxng:8080/search", "type": "str", "ui": "联网搜索", "note": "容器内网地址（scheme 轻闸门）"},
+    "search.bochaUrl":             {"default": "https://api.bochaai.com/v1/web-search", "type": "str", "ui": "联网搜索", "note": "公网引擎 https-only"},
+    "search.tavilyUrl":            {"default": "https://api.tavily.com/search", "type": "str", "ui": "联网搜索", "note": "同上"},
+    "search.metasoUrl":            {"default": "https://metaso.cn/api/mcp", "type": "str", "ui": "联网搜索", "note": "同上"},
     # —— 图像 ——
-    "images.engine":               {"default": "sd-webui", "type": "enum", "ui": "图像", "note": "sd-webui|default"},
-    "images.sdUrl":                {"default": "http://host.docker.internal:7860", "type": "str", "ui": "图像", "note": "容器视角（09-17 修正语义）"},
+    "images.sdUrl":                {"default": "http://host.docker.internal:7860", "type": "str", "ui": "图片", "note": "容器视角（09-17 修正语义）"},
+    # —— 对话压缩（r35 Qoder P1-7/P1-8：graph.py _compaction_middleware 真消费，此前整节未登记=验收官全盲） ——
+    "interface.compaction.enabled":   {"default": True, "type": "bool", "ui": "界面", "note": "关掉=不挂压缩中间件"},
+    "interface.compaction.threshold": {"default": "", "type": "str", "ui": "界面", "note": "触发阈值 token；留空=deepagents 官方默认（前端不许再假显 80000）"},
+    "interface.compaction.cap":       {"default": "", "type": "str", "ui": "界面", "note": "阈值上限；留空=官方默认"},
+    "interface.compaction.retained":  {"default": "", "type": "str", "ui": "界面", "note": "保留条数；留空=官方默认"},
+    "interface.compaction.prompt":    {"default": "", "type": "str", "ui": "界面", "note": "自定义压缩提示词；留空=官方默认"},
+    "interface.compaction.provider":  {"default": "", "type": "str", "ui": "界面", "note": "压缩模型服务商（与 model 成对）；留空=boss"},
+    "interface.compaction.model":     {"default": "", "type": "str", "ui": "界面", "note": "压缩模型；配便宜档不烧大模型（R69）"},
+    # —— 权限开关（r35 Qoder P2-14/P1-7：tools.py 真消费，miaManageEmail 此前前端零入口=死路文案） ——
+    "permissions.miaManageAgents":    {"default": True, "type": "bool", "ui": "管理", "note": "关=米娅不能增删改牛马"},
+    "permissions.miaManageEmail":     {"default": True, "type": "bool", "ui": "管理", "note": "关=米娅不能管理邮箱（r35 补 GeneralTab 开关入口）"},
+    # —— 人设（前端 GeneralTab 真渲染，此前未登记） ——
+    "general.system_prompt":          {"default": "", "type": "str", "ui": "通用", "note": "米娅人设/系统提示词追加段"},
     # —— 书记员/记忆（批⑤新收口） ——
-    "scribe.extractThreshold":     {"default": 600, "type": "int", "ui": "米娅与安全", "note": "累积字数触发事实抽取"},
-    "scribe.agingDays":            {"default": 30, "type": "int", "ui": "米娅与安全", "note": "笔记 aging 巡检阈值（天）"},
+    "scribe.extractThreshold":     {"default": 600, "type": "int", "ui": "管理", "note": "累积字数触发事实抽取"},
+    "scribe.agingDays":            {"default": 30, "type": "int", "ui": "管理", "note": "笔记 aging 巡检阈值（天）"},
     # —— 外部岗/审批（批⑤新收口） ——
     "approvals.claimTimeout":      {"default": 1800, "type": "int", "ui": "牛马矩阵", "note": "外部岗领取超时秒（09-17 深夜知夏拍板归类）"},
     # —— CodeBuddy 网关（批⑤新收口） ——
     "codebuddy.defaultModel":      {"default": "Qwen/Qwen3.8-Flash-Next", "type": "str", "ui": "牛马矩阵", "note": "配置>env CODEBUDDY_MODEL>默认（09-17 深夜知夏拍板归类）"},
     "codebuddy.allowedModels":     {"default": "", "type": "str", "ui": "牛马矩阵", "note": "米娅按需换模型的白名单（逗号分隔）；defaultModel 恒在名单内；env 可整体压过"},
     # —— 围炉/圆桌座位（既有键登记入表） ——
-    "hearth.A":                    {"default": {}, "type": "dict", "ui": "围炉", "note": "{provider,model} 双必填（09-17 fail-closed）"},
-    "hearth.B":                    {"default": {}, "type": "dict", "ui": "围炉", "note": "同上"},
-    "roundtable.A":                {"default": {}, "type": "dict", "ui": "圆桌", "note": "同上"},
-    "roundtable.B":                {"default": {}, "type": "dict", "ui": "圆桌", "note": "同上"},
-    "roundtable.host":             {"default": {}, "type": "dict", "ui": "圆桌", "note": "未配回退 boss（有意设计）"},
+    "hearth.A":                    {"default": {}, "type": "dict", "ui": "牛马矩阵", "note": "{provider,model} 双必填（09-17 fail-closed）"},
+    "hearth.B":                    {"default": {}, "type": "dict", "ui": "牛马矩阵", "note": "同上"},
+    "roundtable.A":                {"default": {}, "type": "dict", "ui": "牛马矩阵", "note": "同上"},
+    "roundtable.B":                {"default": {}, "type": "dict", "ui": "牛马矩阵", "note": "同上"},
+    "roundtable.host":             {"default": {}, "type": "dict", "ui": "牛马矩阵", "note": "未配回退 boss（有意设计）"},
 }
 
 

@@ -239,7 +239,7 @@ async def auth_set_password(req: dict = Body(...), request: Request = None):
         _token_audit("setpwd_rate_limited", False, ip=(request.client.host if request and request.client else "?"))  # r32c #17a
         return _JSONResp({"ok": False, "error": "尝试过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
     if not guard:
-        return _JSONResp({"ok": False, "error": "本地裸跑模式不支持（未配置守卫）"}, status_code=503)
+        return _JSONResp({"ok": False, "error": "服务暂时不可用，请稍后再试（改密码通道当前不可用，详见服务日志）"}, status_code=503)
     # r27 评审 P1-1（CB 发现，知夏核实）：浏览器路径只认【旧密码】——不再把请求带来的
     # 当前密钥转手当证明。否则持 Cookie 的 XSS 脚本（读不到 HttpOnly 但发得出同源请求）
     # 可无旧密码改密、把真主人的找回通道换锁——正是 R10.8b 要堵的洞在此端点的复发。
@@ -345,10 +345,11 @@ async def api_token_clear(request: Request = None):
             result = _guard_post("/clear", payload, timeout=8.0)
         except urllib.error.HTTPError as e:
             # R10.8c：HTTP 层拒绝透传守卫真实原因；r32c F5：error 过翻译层不再直透
-            # r34（CB 2.1 P1）：原引用 _rj 在本作用域不存在（只有 api_token_rotate 里局部
-            # import 过）——爸爸点"重置密钥"即 NameError 裸 500。改用本文件已导入的 json。
+            # r34（CB 2.1 P1）修复的修复（r35 Qoder P1-4）：本文件没有模块级 import json，
+            # 上一版写的 json.loads 仍是 NameError——被宽 except 吞掉=守卫真实原因永不上屏。
+            # 正确用就在 9 行上方导入的 _cj。
             try:
-                _d = json.loads(e.read())
+                _d = _cj.loads(e.read())
                 _d = {"ok": False, "error": _human_error(_d.get("error"))}
             except Exception:
                 _d = {"ok": False, "error": "操作失败，请稍后再试"}
@@ -385,7 +386,7 @@ async def auth_logout(request: Request = None):
         _token_audit("logout_rate_limited", False, ip=(request.client.host if request and request.client else "?"))
         return _JSONResp({"ok": False, "error": "操作过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
     ip = (request.client.host if request and request.client else "?")
-    had_cookie = bool(_presented_token(request)) if _presented_token else False
+    had_cookie = bool(_presented_token(request))  # r35（Qoder P3-4）：去掉对函数对象的恒真 if 判断
     _token_audit("logout", True, ip=ip, had_cookie=had_cookie)
     resp = _JSONResp({"ok": True})
     resp.delete_cookie("m_admin_token", path="/")

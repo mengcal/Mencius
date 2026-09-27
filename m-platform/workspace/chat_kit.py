@@ -15,14 +15,20 @@ PLACEHOLDER = "rt_placeholder"  # additional_kwargs 标记：沉默占位不算�
 
 
 def load_settings() -> dict:
-    """读 settings.json；失败打警告不静默——fallback 生效要让管理员看得见（Eve 新炮4：
-    配置缺失要么响要么死，静默吞成 {} 会让 fallback 模型顶替配置悄悄干活）。"""
+    """读设置（r35 Qoder P2-20：换用 settings_mgr 真源——旧版第二份裸读绕过
+    短睡重试/.bak 自愈/fail-loud 三道防毒化防线，半写窗口会把已配好的座位报成
+    "未配置"；且 stderr 那句"退回硬编码默认"早已说谎，实际是 raise 路径）。
+    settings_mgr 不可导入的极端环境（如独立跑脚本）退回裸读并如实出声。"""
     try:
-        return json.loads((BASE / "settings.json").read_text(encoding="utf-8"))
-    except Exception as e:
-        print(f"[chat_kit] settings.json 读取失败（{type(e).__name__}），本节点退回硬编码默认",
-              file=sys.stderr, flush=True)
-        return {}
+        from settings_mgr import load_settings as _real
+        return _real()
+    except ImportError:
+        try:
+            return json.loads((BASE / "settings.json").read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[chat_kit] settings.json 读取失败（{type(e).__name__}），退回空配置（仅独立脚本场景）",
+                  file=sys.stderr, flush=True)
+            return {}
 
 
 def text_of(msg_obj) -> str:

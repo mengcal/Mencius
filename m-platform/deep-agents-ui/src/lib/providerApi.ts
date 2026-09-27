@@ -2,9 +2,11 @@
 
 /**
  * 服务商管理 API 客户端（2026-08-29 知夏）
- * 全部请求发往本平台自己的后端固定地址（NEXT_PUBLIC_LANGGRAPH_URL），
+ * 全部请求走同源 /lg 代理到本平台后端（R10.11 迁移，apiBase.ts 单源）；
  * 不存在用户可控的目标 URL；服务商地址只作为业务数据放进请求体，
  * 由后端（office.py）做协议校验后转发拉取模型列表。
+ * r35（Qoder P2-28 尾注）：NEXT_PUBLIC_LANGGRAPH_URL 自 R10.11 同源化后浏览器侧已失效，
+ * 注释与实码此处对齐（apiBase.ts 仅 SSR 期用 env 兜底）。
  */
 import { API, apiFetch } from './apiBase';
 
@@ -24,15 +26,23 @@ export function authHeaders(extra: Record<string, string> = {}): Record<string, 
   return h;
 }
 
+/** r35（Qoder P2-29/P1-5 同族纪律推广）：先验 r.ok 再 parse——
+ *  401/5xx 的错误体也是合法 JSON，旧版照 parse=把鉴权失败渲染成"空列表/0 计数"的假平静，
+ *  与 ragClient（CB 7.3）同型缺陷。统一走本 helper，不再各写各的。 */
+function jsonOrThrow(r: Response): Promise<any> {
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
 export function postProviderAction(action: string, payload: Record<string, unknown>) {
   return apiFetch(`${API}/providers/${action}`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
-    .then((r) => r.json())
+    .then(jsonOrThrow)
     // r32 F15（Veda/Cora/Eve 三路同锤，常驻清单第 3 条）：内部端口+容器名不再进用户文案
-    .catch(() => ({ error: '无法连接后端，请确认服务正在运行' }));
+    .catch(() => ({ error: '无法连接后端，请确认服务正在运行（或登录已过期，请重新登录）' }));
 }
 
 /** 保存设置节（section 来自本页固定白名单，非用户可控）。r25：X-By 常数头作废，真钥匙=管理员 token（Bearer/Cookie） */
@@ -42,16 +52,17 @@ export function postSettings(section: string, body: Record<string, unknown>) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
   })
-    .then((r) => r.json())
-    .catch(() => ({ ok: false, error: '无法连接后端，请确认服务正在运行' }));
+    .then(jsonOrThrow)
+    .catch(() => ({ ok: false, error: '无法连接后端，请确认服务正在运行（或登录已过期）' }));
 }
 
 // R75 token 管理端点
-export function tokenStatus(): Promise<{ configured: boolean }> {
+export function tokenStatus(): Promise<{ configured: boolean; guard?: boolean; unreachable?: boolean }> {
   // r32c F2（CB/Qoder 双 P0）：旧版吞网络/HTTP 错 → unreachable 三态永不触发。
   // 不可达时如实回 unreachable:true，AuthGate 的"服务暂时不可用"页才真正生效
+  // r35（Qoder P3-17）：返回类型补齐 guard/unreachable 实际字段
   return apiFetch(`${API}/settings/token/status`)
-    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then(jsonOrThrow)
     .catch(() => ({ configured: false, unreachable: true }));
 }
 export function tokenRotate(newToken?: string): Promise<{ ok?: boolean; token?: string; error?: string }> {
@@ -61,40 +72,38 @@ export function tokenRotate(newToken?: string): Promise<{ ok?: boolean; token?: 
     // 轮换（已配置态）证明=当前密钥（Cookie/Bearer 由 authHeaders 携带）。
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ token: newToken || '' }),
-  }).then((r) => r.json()).catch(() => ({ error: '无法连接后端' }));
+  }).then(jsonOrThrow).catch(() => ({ error: '无法连接后端（或登录已过期）' }));
 }
 export function tokenClear(): Promise<{ ok?: boolean; error?: string }> {
   return apiFetch(`${API}/settings/token`, {
     method: 'DELETE',
     headers: authHeaders(),
-  }).then((r) => r.json()).catch(() => ({ error: '无法连接后端' }));
+  }).then(jsonOrThrow).catch(() => ({ error: '无法连接后端（或登录已过期）' }));
 }
 
 /** 读取全量设置（打码版）。R80 续：读面收口后 GET /settings 也带 Bearer（浏览器=爸爸有钥匙） */
 export function getSettings() {
-  return apiFetch(`${API}/settings`, { headers: authHeaders() }).then((r) => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-  });
+  return apiFetch(`${API}/settings`, { headers: authHeaders() }).then(jsonOrThrow);
 }
 
 /** 所有启用服务商的模型合集（带服务商标识，同名模型各服务商各一条） */
 export function getAllModels(): Promise<{ model: string; provider: string }[]> {
   return apiFetch(`${API}/models/all`, { headers: authHeaders() })
-    .then((r) => r.json())
+    .then(jsonOrThrow)
     .then((j) =>
       (j.providers || []).flatMap((p: any) =>
         (p.models || []).map((m: string) => ({ model: m, provider: p.provider }))
       )
     )
-    .catch(() => []);
+    // r35（Qoder P2-29）：不再静默吞成空下拉——401 最常见成因=登录过期，出声留底
+    .catch((e) => { console.error('[providerApi] 模型列表读取失败：', e); return []; });
 }
 
 /** 后台任务列表（R3：独立线程长任务）。R80 续：读面收口带 Bearer */
 export function getBackgroundTasks(): Promise<{ tasks: any[] }> {
   return apiFetch(`${API}/tasks/list`, { headers: authHeaders() })
-    .then((r) => r.json())
-    .catch(() => ({ tasks: [] }));
+    .then(jsonOrThrow)
+    .catch((e) => { console.error('[providerApi] 任务列表读取失败：', e); return { tasks: [] }; });
 }
 
 /** 上传文件落盘到平台（识图等按路径读取）。R79 补（hy4 自检）：/files/save 写共享卷已入 token 门，
@@ -105,6 +114,6 @@ export function saveFile(name: string, b64: string): Promise<{ ok?: boolean; pat
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ name, b64 }),
   })
-    .then((r) => r.json())
-    .catch(() => ({ error: '无法连接后端，请确认服务正在运行' }));
+    .then(jsonOrThrow)
+    .catch(() => ({ error: '无法连接后端，请确认服务正在运行（或登录已过期）' }));
 }

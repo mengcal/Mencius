@@ -59,7 +59,7 @@ async def external_register(req: dict = Body(...)):
     try:
         ports = tuple(int(p) for p in (req.get("ports") or []))
     except (TypeError, ValueError):
-        return {"ok": False, "error": "ports 必须是端口号列表（r61b P2-2：非数字曾 500）"}
+        return {"ok": False, "error": "ports 必须是端口号列表（如 [9000]）"}
     if not name or not url or not ports:
         return {"ok": False, "error": "name/url/ports 都必填（端口白名单爸爸手填）"}
     try:

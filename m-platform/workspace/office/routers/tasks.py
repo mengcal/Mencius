@@ -325,7 +325,8 @@ async def tasks_list():
 @router.post("/threads/title")
 async def threads_title(req: dict = Body(...)):
     """R45 自动起名：新对话首轮结束后前端调用。已有 custom_title 或还没有用户消息则跳过。
-    标题用牛马同款 glm-4.5-air（免费包，thinking off，一次 ~100 token），≤12 字写回 metadata。"""
+    标题模型=settings.task.model（留空=沿用回退链 scribe→boss；r35 Qoder P3-22：
+    旧注释的"牛马同款 glm-4.5-air"硬编码模型名时代已结束）。thinking off，≤12 字写回 metadata。"""
     try:
         tid = (req.get("thread_id") or "").strip()
         if not tid:
@@ -377,4 +378,5 @@ async def threads_title(req: dict = Body(...)):
         await client.threads.update(tid, metadata={"custom_title": title})
         return {"ok": True, "title": title}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        print(f"[tasks] 后台任务创建失败: {type(e).__name__}: {e}", flush=True)
+        return {"ok": False, "error": "任务创建失败：请重试，持续失败请看服务日志（r35 Qoder P2-38：异常原文不再直穿上屏）"}

@@ -60,13 +60,24 @@ def _stage() -> str:
 def _audit(rec: dict) -> None:
     rec["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     try:
+        if AUDIT.exists() and AUDIT.stat().st_size > 10_000_000:
+            # r35（Qoder P2-26）：同仓 m_guard/office 账本都有轮转，宿主执行账本（命令全文）
+            # 反而是三者中唯一无上限 append——磁盘写满会连带打断原子性
+            p2 = Path(str(AUDIT) + ".2")
+            if p2.exists():
+                p2.unlink()
+            p1 = Path(str(AUDIT) + ".1")
+            if p1.exists():
+                p1.rename(p2)
+            AUDIT.rename(p1)
         with open(AUDIT, "a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
+    except OSError as e:
+        # r35（Qoder P2-24）：最高权限路径的账本不许无声缺页——出声（fail-loud 同 core._token_audit）
+        print(f"[host_runner] 审计写入失败（本条无痕！）: {type(e).__name__}: {e}", flush=True)
 
 
-_FAILS = {"n": 0, "until": 0.0}
+_FAILS = {}  # ip -> {"n","until"}（r35 Qoder P1-12：全局锁可被任意本机进程无限触发，改按来源分桶，同 m_guard._HITS 教训）
 _SEM = __import__("threading").Semaphore(2)  # 并发闸：宿主 shell 同时最多 2 条（hy4 复测：无资源闸=句柄耗尽面）
 _TICKET_TTL = int(os.environ.get("MIA_HOST_RUNNER_TICKET_TTL", "300"))
 _TICKETS = {}  # sha256(ticket) -> 过期时刻（09-19 backlog①：内存态单次票据，重启即清零）
@@ -91,8 +102,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         key = _env_key()
         now = time.time()
-        if _FAILS["until"] > now:
-            _audit({"decision": "denied_rate"})
+        _ip = self.client_address[0]
+        fl = _FAILS.setdefault(_ip, {"n": 0, "until": 0.0})
+        if fl["until"] > now:
+            _audit({"decision": "denied_rate", "ip": _ip})
             self._send(429, {"error": "鉴权失败过多，60 秒后再试"})
             return
         got_tok = str(self.headers.get("X-Token", "") or "")
@@ -108,14 +121,17 @@ class Handler(BaseHTTPRequestHandler):
             if exp and exp >= now:
                 auth = "ticket"
         if not auth:
-            _FAILS["n"] += 1
-            if _FAILS["n"] >= 5:
-                _FAILS["until"] = now + 60.0
-                _FAILS["n"] = 0
-            _audit({"decision": "denied_token"})
+            # r35（Qoder P1-12）：只计"带了凭据而错"的爆破行为；空手路过者不占桶
+            # （m_guard :310 同纪律"无/错=403 不占任何桶"）——堵任意本机进程 5 发瘫痪宿主执行
+            if got_tok or got_tkt:
+                fl["n"] += 1
+                if fl["n"] >= 5:
+                    fl["until"] = now + 60.0
+                    fl["n"] = 0
+            _audit({"decision": "denied_token", "ip": _ip})
             self._send(401, {"error": "bad token"})
             return
-        _FAILS["n"] = 0
+        fl["n"] = 0
         if self.path == "/ticket":
             # hy4 backlog①：发票口只认静态钥匙；票据=内存态、单次、默认 300s
             if auth != "static":
@@ -190,5 +206,9 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     if not _env_key():
         raise SystemExit("MIA_HOST_RUNNER_KEY 不在 D:\\m\\.env——拒绝裸奔启动")
+    if not os.path.exists(BASH):
+        # r35（Qoder P2-25）：钥匙 fail-fast 了，同一条启动路径的硬依赖 shell 没校——
+        # Git 不在位时服务"干净启动"然后每条 execute 都以"执行异常"失败，归因误导米娅
+        raise SystemExit(f"[拒绝] 宿主 shell 不存在：{BASH}——完全访问档将无实义（装好 Git Bash 再启动）")
     print(f"[host_runner] listening 127.0.0.1:{_PORT} stage-file={SETTINGS} (每次请求现读档位)", flush=True)
     ThreadingHTTPServer(("127.0.0.1", _PORT), Handler).serve_forever()

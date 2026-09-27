@@ -28,19 +28,9 @@ import { saveFile } from "@/lib/providerApi";
 import { authHeaders } from "@/lib/providerApi";
 import { API, apiFetch } from "@/lib/apiBase";
 
-// 09-17 深夜（hy4 挑刺收口）：vision 端点由后端 /settings._runtime 下发（后端 env 单一来源），
-// 前端提示词不再写死 host.docker.internal:2024；取不到才落回同一默认值。
-let _visionEp = "";
-async function visionEndpoint(): Promise<string> {
-  if (!_visionEp) {
-    try {
-      const r = await apiFetch(`${API}/settings`, { headers: authHeaders() });
-      _visionEp = String((await r.json())?._runtime?.visionEndpoint || "");
-    } catch { /* 后端未起=用默认兜一次 */ }
-    if (!_visionEp) _visionEp = "http://host.docker.internal:2024/vision";
-  }
-  return _visionEp;
-}
+// r35（Qoder P2-30）：visionEndpoint() 连根拔——注入消息洗净后 ep 值已零消费者，
+// 留着的正是"注释声称不写死、下一行写死 host.docker.internal"的双源本身；
+// 识图端点真源=后端 /settings._runtime（env 单源），浏览器不需要知道它。
 import { ChatMessage } from "@/app/components/ChatMessage";
 import type {
   ActionRequest,
@@ -128,7 +118,6 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       e.target.value = "";
       // 自动派活提示（走 enqueue 队列，不卡聊天）
       if (images.length) {
-        const ep = await visionEndpoint();
         sendMessage(
           `爸爸上传了图片：${images.join("、")}。图片已落盘（files 里有确切路径），请按流程派 visual 牛马识图，把结果汇总告诉爸爸。`,
           { webSearch: undefined }

@@ -56,16 +56,16 @@ export default function InterfaceTab() {
             与上方「对话压缩」区的服务商+模型两级联动（真源）打架，选了还容易把 provider 落空导致压缩回退 boss。
             压缩模型请到上方「对话压缩」区配置。 */}
         <Row label="对话压缩 (Context Compaction)" description="对话上下文变长时，把较早的历史消息压缩成摘要（官方 SummarizationMiddleware）。">
-          <Switch checked={!!val('interface.compaction.enabled', true)} onChange={(v) => set('interface.compaction.enabled', v)} />
+          <Switch checked={val('interface.compaction.enabled') !== false} onChange={(v) => set('interface.compaction.enabled', v)} />
         </Row>
         <div><label className="mb-1 block text-sm text-foreground">触发阈值 (Token Threshold)</label>
-          <input type="number" className={inputC} defaultValue={val('interface.compaction.threshold', 80000)} onChange={(e) => set('interface.compaction.threshold', +e.target.value)} />
+          <input type="number" className={inputC} placeholder="留空=官方默认" defaultValue={val('interface.compaction.threshold') ?? ''} onChange={(e) => set('interface.compaction.threshold', +e.target.value)} />
           <p className="mt-1 text-xxs text-muted-foreground">估算上下文超过这个 token 数时，较早的消息会被压缩成摘要。</p></div>
         <div><label className="mb-1 block text-sm text-foreground">上限 (Token Cap)</label>
-          <input type="number" className={inputC} defaultValue={val('interface.compaction.cap', 80000)} onChange={(e) => set('interface.compaction.cap', +e.target.value)} />
+          <input type="number" className={inputC} placeholder="留空=官方默认" defaultValue={val('interface.compaction.cap') ?? ''} onChange={(e) => set('interface.compaction.cap', +e.target.value)} />
           <p className="mt-1 text-xxs text-muted-foreground">单个模型自定义的压缩阈值不能超过这个上限。</p></div>
         <div><label className="mb-1 block text-sm text-foreground">保留条数 (Retained Messages)</label>
-          <input type="number" className={inputC} defaultValue={val('interface.compaction.retained', 40)} onChange={(e) => set('interface.compaction.retained', +e.target.value)} />
+          <input type="number" className={inputC} placeholder="留空=官方默认" defaultValue={val('interface.compaction.retained') ?? ''} onChange={(e) => set('interface.compaction.retained', +e.target.value)} />
           <p className="mt-1 text-xxs text-muted-foreground">压缩较早消息后，保留最近多少条消息不去动。</p></div>
         <div><label className="mb-1 block text-sm text-foreground">压缩提示词 (Context Compaction Prompt)</label>
           <input className={inputC} placeholder="留空以使用默认提示词，或输入自定义提示词" defaultValue={val('interface.compaction.prompt')} onChange={(e) => set('interface.compaction.prompt', e.target.value)} />

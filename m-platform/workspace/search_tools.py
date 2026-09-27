@@ -38,13 +38,13 @@ BOCHA_URL = _dof("search.bochaUrl")
 TAVILY_URL = _dof("search.tavilyUrl")
 METASO_URL = _dof("search.metasoUrl")
 SEARXNG_URL = _dof("search.searxngUrl")
-BING_URL = _dof("search.bingUrl")
+# r35（Qoder P2-17 族收口）：BING_URL/search.bingUrl 随 bing 死链整族退役（engine 选项无 bing、web_search 无分发、工具零注册）
 
 
 def _count() -> int:
     """搜索结果数量（设置页可改，默认 5）"""
     try:
-        return int(_search_setting("resultCount", 5))
+        return int(_search_setting("resultCount", _dof("search.resultCount")))
     except Exception:
         return 5
 
@@ -79,7 +79,7 @@ def _bocha(query, count=5):
     # 兼容两种返回格式
     pages = d.get("data", {}).get("webPages", {}).get("value", []) if isinstance(d.get("data"), dict) else []
     if not pages:
-        pages = d.get("results", []) or d.get("data", {}).get("results", []) if isinstance(d.get("data"), dict) else []
+        pages = d.get("results") or (d.get("data", {}).get("results", []) if isinstance(d.get("data"), dict) else [])
     return _fmt(pages)
 
 
@@ -122,7 +122,7 @@ def _searxng(query, count=5):
     if not base.lower().startswith(("http://", "https://")):
         base = SEARXNG_URL.rstrip("/")  # R10.11（千问 P2-4）：轻闸门——异 scheme（file:/data: 等）回落默认内网 searxng；
                                         # 不套 providers 的公网闸门是因为默认值本来就是容器内网地址（设计如此）
-    lang = str(_search_setting("searxngLang", "all"))
+    lang = str(_search_setting("searxngLang", _dof("search.searxngLang")))
     url = f"{base}?q={urllib.parse.quote(query)}&format=json&language={urllib.parse.quote(lang)}"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=15) as r:
@@ -139,30 +139,7 @@ def _searxng(query, count=5):
 import re, html as _html
 
 
-def _bing(query, count=5):
-    """必应(cn.bing.com)免代理搜索，解析HTML标题+链接。"""
-    q = urllib.parse.quote(query)
-    url = f"{_engine_url('bingUrl', BING_URL)}?q={q}&setlang=zh-hans&count={count}"
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "Accept-Language": "zh-CN,zh;q=0.9"})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        content = r.read().decode("utf-8", "ignore")
-    out = []
-    # 必应结果结构: <li class="b_algo">...<h2><a href="URL">标题</a></h2>...<p>摘要</p>
-    for block in re.split(r'<li class="b_algo"', content)[1:count + 1]:
-        m = re.search(r'<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', block, re.S)
-        if not m:
-            continue
-        link = m.group(1)
-        title = re.sub(r'<[^>]+>', '', m.group(2))
-        title = _html.unescape(title).strip()
-        snip_m = re.search(r'<p[^>]*>(.*?)</p>', block, re.S)
-        snip = re.sub(r'<[^>]+>', '', snip_m.group(1)) if snip_m else ""
-        snip = _html.unescape(snip).strip()[:150]
-        out.append(f"- {title}\n  链接: {link}\n  摘要: {snip}")
-    return "\n".join(out) if out else "（无结果或需重试）"
-
+# r35：_bing 已退役（同上，历史实现见 git 仓）
 
 def _tavily(query, count=5):
     if not _key("tavilyKey"):
@@ -198,21 +175,9 @@ def web_search_metaso(query: str) -> str:
         return f"秘塔搜索失败: {e}"
 
 
-def web_search_searxng(query: str) -> str:
-    """SearXNG搜索（本地免费无限，广撒网）。返回标题、链接、摘要。"""
-    try:
-        return _searxng(query)
-    except Exception as e:
-        return f"SearXNG搜索失败: {e}"
+# r35（Qoder CB 3.2 定案）：web_search_searxng 从未注册进任何图，死函数退役；searxng 引擎走 web_search(engine=searxng) 分支。
 
-
-def web_search_bing(query: str) -> str:
-    """必应搜索（免代理，cn.bing.com可用）。返回标题、链接、摘要。"""
-    try:
-        return _bing(query)
-    except Exception as e:
-        return f"必应搜索失败: {e}"
-
+# r35（Qoder CB 3.2 定案）：web_search_bing 从未注册进任何图，死函数退役；searxng 引擎走 web_search(engine=searxng) 分支。
 
 def web_search(query: str) -> str:
     """通用搜索。设置页 search.engine 可指定固定引擎；auto=智能路由：
@@ -232,10 +197,10 @@ def web_search(query: str) -> str:
     try:
         if has_cjk:
             try:
-                return "【秘塔中文】\n" + _metaso(query)
+                return "【秘塔中文】\n" + _metaso(query, count)
             except Exception:
-                return "【博查中文(秘塔失败回退)】\n" + _bocha(query)
-        return "【Tavily英文】\n" + _tavily(query)
+                return "【博查中文(秘塔失败回退)】\n" + _bocha(query, count)
+        return "【Tavily英文】\n" + _tavily(query, count)
     except Exception as e:
         try:
             res = _tavily(query) if has_cjk else _bocha(query)

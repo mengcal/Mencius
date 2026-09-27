@@ -139,7 +139,7 @@ def dispatch_to_xiaoquan(task: str) -> str:  # 原 L179-209
     body = _json.dumps({"task": task, "main_thread": main_thread}).encode()
     # R80 续：dispatch 双钥匙门——进程内工具带 X-Internal-Key（WEBHOOK_TOKEN env，与 office 同源），
     # 沙箱/外部没这把 env=401（浏览器走 Bearer 管理员密钥）
-    # 09-17 硬编码收口批②：地址走 env（对齐 dept_watch MIA_SELF_SDK_URL 先例），默认=容器内服务名
+    # 09-17 硬编码收口批②：地址走 env（对齐 dept_watch MIA_SELF_SDK_URL 先例），默认=宿主回环 127.0.0.1:8000（r35 Qoder P3-23：注释与实码对齐，旧注释误写"容器内服务名"）
     req = _ureq.Request(_os.environ.get("MIA_SELF_SDK_URL", "http://127.0.0.1:8000").rstrip("/") + "/tasks/dispatch",  # r34（CB 4.1）：workplatform:8000 是 R80 断网名，统一回环默认
                         data=body,
                         headers={"Content-Type": "application/json",
@@ -472,6 +472,12 @@ def search_knowledge_base(query: str, k: int = 5) -> str:  # 原 L731-763
     # 嵌入：本机 Ollama（09-17 批②：地址走 env MIA_OLLAMA_URL，SSRF 面不变=仍是固定常量级主机）
     import os as _os
     _ollama = _os.environ.get("MIA_OLLAMA_URL", "http://host.docker.internal:11434").rstrip("/")
+    # r35（Qoder P2-16）：兄弟模块 rag.py:285 对同一 env 键做本机白名单校验，这里没做——
+    # "固定常量级"论断在 env 可被 compose/.env 改写的前提下不成立，补平。
+    from urllib.parse import urlparse as _up
+    _u = _up(_ollama)
+    if _u.scheme != "http" or _u.hostname not in ("host.docker.internal", "localhost", "127.0.0.1"):
+        return "嵌入服务地址非法：MIA_OLLAMA_URL 只许本机 http 地址（host.docker.internal/localhost/127.0.0.1）"
     try:
         r = _httpx.post(_ollama + "/api/embed",
                         json={"model": model, "input": query[:4000]}, timeout=30)
@@ -508,7 +514,7 @@ def email(action: str, account: str = "", uid: str = "", to: str = "", subject: 
     try:
         from settings_mgr import load_settings
         if not load_settings().get("permissions", {}).get("miaManageEmail", True):
-            return "爸爸已关闭米娅管理邮箱的权限（permissions.miaManageEmail）——需要时转告爸爸或知夏开通。"
+            return "爸爸已关闭米娅管理邮箱的权限——需要恢复时到 设置页→通用→「允许米娅管理邮箱」重新打开（r35 Qoder P2-14：该开关现已有界面入口）。"
     except Exception:
         pass
     import mail_service
@@ -566,10 +572,14 @@ def sd_generate(prompt: str, negative_prompt: str = "", steps: int = 18,
     import os as _os
     try:
         from settings_mgr import load_settings
+        # r35（Qoder P2-15）：默认值三家里只留 schema（settings_schema.py images.sdUrl）——
+        # 配置页值 → env MIA_SD_URL → schema 默认，同一函数不再写两遍字面量
+        from settings_schema import default_of as _dof
         _sd_base = ((load_settings().get("images", {}) or {}).get("sdUrl", "")
-                    or _os.environ.get("MIA_SD_URL", "http://host.docker.internal:7860"))
+                    or _os.environ.get("MIA_SD_URL", "") or _dof("images.sdUrl"))
     except Exception:
-        _sd_base = _os.environ.get("MIA_SD_URL", "http://host.docker.internal:7860")
+        from settings_schema import default_of as _dof
+        _sd_base = _os.environ.get("MIA_SD_URL", "") or _dof("images.sdUrl")
     url = _sd_base.rstrip("/") + "/sdapi/v1/txt2img"
     payload = {"prompt": prompt[:2000],
                "negative_prompt": (negative_prompt or "lowres, bad anatomy, watermark")[:1000],

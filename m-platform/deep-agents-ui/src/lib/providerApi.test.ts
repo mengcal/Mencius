@@ -129,7 +129,7 @@ describe('响应处理与失败兜底（空值/异常边界）', () => {
   it('postProviderAction 网络失败回退友好错误对象（r32 F15：内部端口/容器名出用户文案）', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
     await expect(postProviderAction('test', {})).resolves.toEqual({
-      error: '无法连接后端，请确认服务正在运行',
+      error: '无法连接后端，请确认服务正在运行（或登录已过期，请重新登录）',
     });
   });
 

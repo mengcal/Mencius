@@ -7,7 +7,7 @@
 
 | 链 | 核心件 | 一句话 |
 |---|---|---|
-| **闸门链** | `mia_agent/confirm_gate_c1.py`(现役主门,1070行) → `confirm_gate.py`(档位/名单单源) → `guard_scan.py`(机器安全门,~149格最厚覆盖) → `approvals.py`(爸爸批准登记处,指纹绑定消费即焚) → 前端 `BatchApprovalInterrupt.tsx`+`ToolCallBox.tsx` | 一切工具调用过 C1 四档门（plan/strict/auto_edit/supreme）；high 机器拒、ask 弹卡给爸爸、D2 连败自动降档（TTL 24h） |
+| **闸门链** | `mia_agent/confirm_gate_c1.py`(现役主门,1070行) → `confirm_gate.py`(档位/名单单源) → `guard_scan.py`(机器安全门,~149格最厚覆盖) → `approvals.py`(爸爸批准登记处,指纹绑定消费即焚) → 前端 `BatchApprovalInterrupt.tsx`+`ToolCallBox.tsx` | 一切工具调用过 C1 四档门（plan/strict/auto_edit/full——r35 Qoder P2-37 纠正：supreme 是历史定调用语、非档位值，照旧文设档会被 fail-closed 回落 strict）；high 机器拒、ask 弹卡给爸爸、D2 连败自动降档（TTL 24h） |
 | **派单汇报链** | `tools.py`(dispatch_to_xiaoquan/dispatch_external) → `cow_graphs.py`(部门图工厂,SubGate 全拦) → `dept_watch.py`(完工/受阻轮询唤醒,15s扫描) → `office/routers/tasks.py`(TASKS账本+webhook) → `useTaskAnnouncer.ts`(前端播报) | 米娅只分派；部门 run 结束由 dept_watch 注入【部门自动汇报】唤醒主线程转呈；对外岗走 external.py pending/claim/callback 状态机 |
 | **模型档位链** | `model_tier.py`(派活定档,一期只标不切) → `models.py`/`providers.py`(make_model 工厂) → `run_config.py`(每轮换主脑/联网开关) → `vision.py`(识图三级优先) | 模型/服务商/密钥一律配置化（08-29 铁律），设置页唯一真源 |
 | **守卫审计链** | `guard/m_guard.py`(SYSTEM 进程,DPAPI,618行) → `internal_key.py`(进程身份钥匙) → `skills_lock.py`(技能哈希锁) → `auth.py`(原生 API 纵深) → `sandbox.py`↔`sandbox_runner.py`(执行面隔离对锁) | 密钥验证外置于米娅进程；三本账：token_audit / approvals_log / runner_audit |

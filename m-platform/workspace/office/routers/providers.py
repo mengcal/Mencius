@@ -178,10 +178,15 @@ async def api_provider_add(req: dict = Body(...)):
     _old = next((p for p in load_settings().get("external", {}).get("providers", []) if p.get("name") == name), None)
     if _old and not api_key and (_old.get("base_url") or "").rstrip("/") != base_url:
         return {"error": "地址已变更但没带新密钥——为防旧密钥被发往新地址，请重新粘贴该服务商的密钥再保存"}
+    # r35（Qoder P1-6）：校验先于落库（R71 纪律，对齐兄弟端点 /providers/update）——
+    # 旧序先 _save 再 fetch，坏地址已写进 settings.json 才被拒、还不清。
     try:
-        _save_external_provider(name, base_url, api_key)
+        _assert_public_fetch_target(base_url)
+    except ValueError as e:
+        return {"error": str(e)}
+    try:
         models = await _fetch_models_async(name, base_url)
-        _save_external_provider(name, base_url, enabled=req.get("enabled", True), models_cache=models)
+        _save_external_provider(name, base_url, api_key=api_key, enabled=req.get("enabled", True), models_cache=models)
         return {"ok": True, "name": name, "count": len(models), "models": models}
     except Exception as e:
         # r34 CB 2.4：异常原文（httpx 带 URL、settings_mgr 带路径）不再直穿上屏——留底+人话
@@ -192,7 +197,7 @@ async def api_provider_add(req: dict = Body(...)):
 @router.post("/providers/rename")
 async def api_provider_rename(req: dict = Body(...)):
     """服务商改名（猪八戒也行）：{old, new}。
-    联动同步：external.providers 条目、secrets 明文路径、agents_config.json 里引用它的牛马。
+    联动同步：external.providers 条目、secrets 明文路径、settings.agents 里引用它的牛马（r35 Qoder P3-9：agents_config.json 时代已结束，实现早已不碰它）。
     名字只是标签，引擎认的是名字背后的 base_url+key。"""
     old, new = (req.get("old") or "").strip(), (req.get("new") or "").strip()
     if not old or not new or old == new:
@@ -254,7 +259,9 @@ async def api_provider_refresh(req: dict = Body(...)):
         _save_external_provider(name, p.get("base_url", ""), models_cache=models)
         return {"ok": True, "name": name, "count": len(models), "models": models}
     except Exception as e:
-        return {"error": f"拉取失败: {e}"}
+        # r35（Qoder P2-9）：同 :92 已立的人话化纪律补到兄弟路径
+        print(f"[providers] refresh 失败 name={name}: {type(e).__name__}: {e}", flush=True)
+        return {"error": "拉取模型列表失败：请检查地址与密钥（详情见服务日志）"}
 
 
 @router.post("/providers/toggle")

@@ -569,13 +569,8 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                 if _d not in ("ask", "to_deny"):
                     raise RuntimeError(f"guard coverage broken: {_t} routed to pass")
 
-    def _budget_refusal(self, name: str) -> str:
-        return (f"⛔ 「{name}」被网关预算拦下：本任务批准卡配额已用完（拦一次计一次，换参数也计）。"
-                "停下——把目标、已完成步骤、卡在哪三件事向爸爸汇报；"
-                "爸爸可在新对话里重开额度，或在管理端重置本任务预算。不许再试探性调用。")
-
     def _freeze_refusal(self, tid: str = "") -> str:
-        # r61h P-1（hy4 八轮）：冻结拒信抽文案真源（同 _budget_refusal 惯例）——
+        # r61h P-1（hy4 八轮）：冻结拒信抽文案真源——（r34：_budget_refusal 已随预算制退役摘除）
         # _frozen 直判分支与 _frozen_hold 接力分支共用，防两处各写一份后漂移。
         # r61h 九轮 N-4（hy4 九轮）：解除时限不再硬编码"30 分钟"（与 r61e 指数退避
         # 不符）——读 _guard_lock 里的退避真值（when 侧 1800×2^(n-1)、n≥3=inf 唯一

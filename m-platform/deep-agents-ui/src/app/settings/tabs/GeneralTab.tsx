@@ -79,6 +79,9 @@ export default function GeneralTab() {
             }}
           />
         </Row>
+        <Row label="允许米娅管理邮箱" description="关闭后米娅无法再收发/管理全家邮箱——工具会明确拒绝并告知原因。">
+          <Switch checked={!!val('permissions.miaManageEmail', true)} onChange={(v) => set('permissions.miaManageEmail', v)} />
+        </Row>
         <Row label="允许米娅管理牛马" description="关闭后米娅无法修改牛马的模型/职业配置（只有爸爸在设置页能改）">
           <Switch checked={!!val('permissions.miaManageAgents', true)} onChange={(v) => set('permissions.miaManageAgents', v)} />
         </Row>

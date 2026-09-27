@@ -82,7 +82,6 @@ export const ALL_TABS = NAV.flatMap((s) => s.groups.flatMap((g) => g.tabs));
 export const FUTURE_ROWS: Record<string, [string, string][]> = {
   interface: [
     ['darkMode', '深色/浅色主题切换'],
-    ['fontSize', '界面字号缩放'],
   ],
   notifications: [['desktop', '桌面通知（任务完成时提醒）']],
   shortcuts: [['hotkeys', '自定义快捷键']],

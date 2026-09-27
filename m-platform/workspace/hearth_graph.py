@@ -97,15 +97,19 @@ def _route(state: HearthState) -> str:
 def _chat(state: HearthState, prompt: str, seat: str) -> dict:
     # r39（NOVA P1-1）：hearth 座位此前裸 invoke——上游静默空返回会产出空气泡还进哈希链。
     # 与圆桌共用 ask()（chat_kit），异常/空→占位打标。
+    why = ""
     try:
         t, _complete = ask(_seat_model(seat), [SystemMessage(prompt)] + list(state["messages"])[-20:])
-    except Exception:
-        t = ""
+    except Exception as e:
+        # r35（Qoder P1-11）：r39 圆桌同款 why 透传补齐——_seat_model 抛的可行动配置错
+        # 旧版整条吞掉=爸爸被误导去换模型重试。类名与详情只进日志，截断原因上屏。
+        t, why = "", f"（{type(e).__name__}: {str(e)[:160]}）"
+        print(f"[hearth] {seat} 位调用异常: {type(e).__name__}: {e}", flush=True)
     if t:
         return {"messages": [AIMessage(content=t, name=f"hearth_{seat}")]}
     return {"messages": [placeholder_msg(
         "hearth_system",
-        f"（{seat} 位本轮无输出：疑上游审核或模型故障，本占位不算发言。）")]}
+        f"（{seat} 位本轮无输出：疑上游审核或模型故障{why}，本占位不算发言。）")]}
 
 
 def seat_a(state: HearthState) -> dict:

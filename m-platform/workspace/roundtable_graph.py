@@ -23,7 +23,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 # r39（四家合批）：模型调用安全层/原子写/设置读取抽进 chat_kit，与围炉共享同一套兜底
-from chat_kit import ask as _ask, atomic_write_text, load_settings, placeholder_msg
+from chat_kit import PLACEHOLDER, ask as _ask, atomic_write_text, load_settings, placeholder_msg  # r35（Qoder P2-21）：标记常量单源导入
 
 BASE = Path(__file__).resolve().parent
 
@@ -70,7 +70,8 @@ PROMPT_HOST_PLAN = (
     "只输出这个结构，不加任何前后缀。"
 )
 
-PLACEHOLDER = "rt_placeholder"  # additional_kwargs 标记：沉默占位不算观点（与 chat_kit 同值）
+# r35（Qoder P2-21）：本地复述份已拔——PLACEHOLDER 由 chat_kit 单源导入（打标与过滤必须同源，
+# 否则 chat_kit 侧改值时圆桌占位过滤静默失效、占位消息混进挑刺轮污染审计链）
 
 
 def _settings() -> dict:
@@ -89,7 +90,7 @@ def _seat_model(seat: str, **kw):
     prov = cfg.get("provider") or (boss.get("provider") or "" if seat == "host" else "")
     model = cfg.get("model") or (boss.get("model") or "" if seat == "host" else "")
     if not prov or not model:
-        raise ValueError(f"圆桌 {seat} 位未配置服务商/模型：请到 设置→圆桌 两项都选好")
+        raise ValueError(f"圆桌 {seat} 位未配置服务商/模型：请到 设置页→牛马矩阵→「围炉与圆桌（朋友席）」两项都选好")
     try:
         return make_model(prov, model, **kw)
     except Exception as e:
@@ -356,7 +357,10 @@ def host(state) -> dict:
         verdict, truncated = _ask(m, ctx + [HumanMessage(
             PROMPT_HOST_REVIEW if cmd == "review" else PROMPT_HOST_PLAN)])
     except Exception as e:
-        verdict = f"（主持位故障：{type(e).__name__}——各轮发言见哈希链与圆桌线程，请重发口令。）"
+        # r35（Qoder P2-23）：配置类错误照旧"重发口令"=永远无效——原因截断透传+日志留底
+        print(f"[roundtable] 主持位故障: {type(e).__name__}: {e}", flush=True)
+        verdict = (f"（主持位故障：{type(e).__name__}: {str(e)[:160]}——"
+                   "各轮发言见哈希链与圆桌线程；若提示未配置，请到 设置页→牛马矩阵→「围炉与圆桌（朋友席）」补齐。）")
     silent = not verdict
     if silent:
         verdict = "（主持位沉默：上游空返回已重试仍无字，疑内容审核拦截。各轮发言见下方哈希链与圆桌线程，请重发口令重试或口头裁决。）"

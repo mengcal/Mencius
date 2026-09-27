@@ -3,12 +3,11 @@
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useQueryState } from "nuqs";
 import { getConfig, saveConfig, StandaloneConfig } from "@/lib/config";
-import { ConfigDialog } from "@/app/components/ConfigDialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Assistant } from "@langchain/langgraph-sdk";
 import { ClientProvider, useClient } from "@/providers/ClientProvider";
-import { Settings, MessagesSquare, SquarePen, Bot } from "lucide-react";
+import { MessagesSquare, SquarePen, Bot } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -114,16 +113,10 @@ interface HomePageInnerProps {
   // r39（NOVA R37-P0 统一修法）：URL 助手 id 独立传递，不回灌 config 本体——
   // config 永远保持 localStorage 态，围炉/圆桌链接永不进保存链/回写链。
   urlAssistantId?: string | null;
-  configDialogOpen: boolean;
-  setConfigDialogOpen: (open: boolean) => void;
-  handleSaveConfig: (config: StandaloneConfig) => void;
 }
 function HomePageInner({
   config,
   urlAssistantId,
-  configDialogOpen,
-  setConfigDialogOpen,
-  handleSaveConfig,
 }: HomePageInnerProps) {
   const client = useClient();
   const [threadId, setThreadId] = useQueryState("threadId");
@@ -205,12 +198,6 @@ function HomePageInner({
   }, [fetchAssistant]);
   return (
     <>
-      <ConfigDialog
-        open={configDialogOpen}
-        onOpenChange={setConfigDialogOpen}
-        onSave={handleSaveConfig}
-        initialConfig={config}
-      />
       <div className="flex h-screen flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border px-6">
           <div className="flex items-center gap-4">
@@ -251,14 +238,6 @@ function HomePageInner({
               办公室设置
             </Button>
             <QuickToggles />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setConfigDialogOpen(true)}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -354,13 +333,21 @@ function HomePageContent() {
   useEffect(() => {
     // R10（千问 P1-1）：GET /settings 在 token 门内——裸 fetch 换统一封装 getSettings（自带 Bearer），
     // 全前端不再留第二把门把手
-    getSettings().then((s: any) => {
-      const z = Number(s?.interface?.uiZoom ?? 100);
+    getSettings().then(async (s: any) => {
+      // r35（Qoder P1-10）：删 `?? 100` 字面量第三老家——settings 无此值时现读
+      // /settings/schema 的登记默认（单一真源）；schema 也拿不到才按浏览器原样不缩放
+      let z0 = s?.interface?.uiZoom;
+      if (z0 == null) {
+        try {
+          const sc = await fetch(`${window.location.origin}/lg/settings/schema`).then((r) => r.json());
+          z0 = sc?.["interface.uiZoom"]?.default;
+        } catch { /* 拿不到=不缩放（与 100% 等效），不再自造第二份默认 */ }
+      }
+      const z = Number(z0);
       // 缩放加在 html 根元素：vh 视口单位随之补偿，h-screen 布局不会被撑出滚动条
       if (z && z !== 100) document.documentElement.style.zoom = String(z / 100);
     }).catch(() => {});
   }, []);
-  const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [assistantId, setAssistantId] = useQueryState("assistantId");
   // On mount, check for saved config, otherwise show config dialog
   useEffect(() => {
@@ -394,37 +381,14 @@ function HomePageContent() {
   // r36→r39：URL 权威入口改由 urlAssistantId prop 直供 HomePageInner（NOVA P0-1/P0-2 根治），
   // 不再 setConfig 回灌——旧回灌与上方回写 effect 相咬（删 URL 逃不出围炉）、
   // 且 ConfigDialog 保存会把内存态 hearth 写进 localStorage（裸开默认被劫）。
-  const handleSaveConfig = useCallback((newConfig: StandaloneConfig) => {
-    saveConfig(newConfig);
-    setConfig(newConfig);
-  }, []);
   const langsmithApiKey =
     config?.langsmithApiKey || process.env.NEXT_PUBLIC_LANGSMITH_API_KEY || "";
   // r32 F11：原 setupNeeded/loginNeeded 三行闸门分支整段删除（见 HomePageContent 头注释）
   if (!config) {
-    return (
-      <>
-        <ConfigDialog
-          open={configDialogOpen}
-          onOpenChange={setConfigDialogOpen}
-          onSave={handleSaveConfig}
-        />
-        <div className="flex h-screen items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">Welcome to Standalone Chat</h1>
-            <p className="mt-2 text-muted-foreground">
-              Configure your deployment to get started
-            </p>
-            <Button
-              onClick={() => setConfigDialogOpen(true)}
-              className="mt-4"
-            >
-              Open Configuration
-            </Button>
-          </div>
-        </div>
-      </>
-    );
+    // r35（Qoder P2-35/P3-18）：全英文"Welcome to Standalone Chat"+手填 Deployment URL 的
+    // 兜底页连根拔——r34 自动 provision 后 config 挂载即就绪，这个窗口只闪一瞬；
+    // 保留手填入口反而能填一个不被使用的地址并污染 localStorage（见 :394 注释的围炉劫持史）。
+    return <div className="flex h-screen items-center justify-center"><p className="text-muted-foreground">正在连上平台…</p></div>;
   }
   return (
     <ClientProvider
@@ -434,9 +398,6 @@ function HomePageContent() {
       <HomePageInner
         config={config}
         urlAssistantId={assistantId}
-        configDialogOpen={configDialogOpen}
-        setConfigDialogOpen={setConfigDialogOpen}
-        handleSaveConfig={handleSaveConfig}
       />
     </ClientProvider>
   );
@@ -446,7 +407,7 @@ export default function HomePage() {
     <Suspense
       fallback={
         <div className="flex h-screen items-center justify-center">
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">正在加载…</p>
         </div>
       }
     >

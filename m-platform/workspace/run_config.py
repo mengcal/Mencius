@@ -13,7 +13,7 @@ from langchain_core.messages import ToolMessage
 
 SEARCH_TOOLS = {
     "web_search", "web_search_metaso", "web_search_bocha",
-    "web_search_tavily", "web_search_searxng", "web_search_bing",
+    "web_search_tavily",  # r35（Qoder P2-1 余党）：searxng/bing 工具名从未注册进任何图，死项随实现退役
 }
 
 
@@ -235,7 +235,7 @@ class RunConfigMiddleware(AgentMiddleware):
         name = (request.tool_call or {}).get("name", "")
         if cfg.get("web_search", True) is False and name in SEARCH_TOOLS:
             return ToolMessage(
-                content="（联网搜索当前已在输入框关闭。如需搜索请打开 🌐 开关后重试。）",
+                content="（联网搜索当前被本条消息关闭。如需搜索请正常发消息重试——联网默认开启，按钮已退役。）",
                 tool_call_id=(request.tool_call or {}).get("id", ""),
             )
         return await handler(request)

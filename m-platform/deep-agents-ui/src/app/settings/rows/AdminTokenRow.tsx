@@ -74,7 +74,7 @@ export default function AdminTokenRow() {
     } catch { setMsg('无法连接后端'); }
   };
   return (
-    <Row label="管理员密钥" description={'改设置/服务商/批准/知识库写入需带此密钥；米娅容器没有它=改不动。' + (configured ? '当前：已启用（写端点强制校验）' : '当前：未配置（fail-closed：所有写端点一律 401）')}>
+    <Row label="管理员密钥" description={'改设置/服务商/批准/知识库写入需带此密钥；米娅没有它=改不动。' + (configured ? '当前：已启用（所有修改操作都会校验它）' : '当前：未配置——所有修改操作都会被拒绝，直到设置好为止')}>
       <div className="flex flex-wrap items-center gap-2">
         {configured ? (
           <>

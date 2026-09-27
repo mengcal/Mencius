@@ -328,7 +328,7 @@ async def codebuddy_proxy(request: Request):
     model = str(body.get("model") or "")
     if model not in _cb_allowed_models():
         _cb_usage_log(model, 403, bool(body.get("stream")), nbytes)
-        return _JSONResp({"error": f"模型未授权：{model[:80] or '(空)'}（白名单见 CODEBUDDY_ALLOWED_MODELS）"},
+        return _JSONResp({"error": f"模型未授权：{model[:80] or '(空)'}（如需放行更多模型：设置页→牛马矩阵→「可换模型白名单」加名字即可，保存即生效）"},
                          status_code=403)
     # R82 补强②：max_tokens 夹取（缺失/非整数/非正数/超上限 → 8192）
     mt = body.get("max_tokens")

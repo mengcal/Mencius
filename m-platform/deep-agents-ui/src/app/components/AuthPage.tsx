@@ -178,8 +178,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           if (alive) setState("ok");
         }).catch((e: any) => {
           if (alive) {
+            // r35（Qoder P1-13）：旧版非 401 一律 setState("ok")=闸门对 500/502/断网 fail-**open**，
+            // 与"凭证有效才放行"的立项语义相反。非 401=服务状态不明 → 走"不可达"页（本件已有），
+            // 爸爸看到"稍后再试"而不是满是报错的空壳。401 判据与 providerApi.jsonOrThrow 同源。
             if (String(e?.message || e).includes("401")) setState("login");
-            else setState("ok");
+            else setState("unreachable");
           }
         });
       });

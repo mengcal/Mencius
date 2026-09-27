@@ -17,7 +17,7 @@ RUN set -ex && \
                 'name = "workspace"' \
                 'version = "0.1"' \
                 'dependencies = [' \
-                '  "deepagents==0.7.13",' \
+                '  "deepagents==0.7.19",' \
                 '  "langgraph-sdk==0.4.4",' \
                 '  "langchain-openai",' \
                 '  "langgraph-checkpoint-postgres",' \
@@ -50,11 +50,16 @@ RUN for dep in /deps/*; do \
         done
 
 # -- End of local dependencies install --
+# 权威注册表=langgraph.json；本文件为 langgraph build 产物，改图/改 auth 后须重新 build 同步此 ENV。
 
 ENV LANGGRAPH_STORE='{"path": "./store.py:make_store"}'
 ENV LANGGRAPH_HTTP='{"app": "/deps/outer-workspace/src/office.py:app"}'
 ENV LANGGRAPH_CHECKPOINTER='{"path": "/deps/outer-workspace/src/checkpointer.py:make_checkpointer"}'
-ENV LANGSERVE_GRAPHS='{"agent": "/deps/outer-workspace/src/agent.py:agent", "dept_0": "/deps/outer-workspace/src/cow_graphs.py:dept_0", "dept_1": "/deps/outer-workspace/src/cow_graphs.py:dept_1", "dept_2": "/deps/outer-workspace/src/cow_graphs.py:dept_2", "dept_3": "/deps/outer-workspace/src/cow_graphs.py:dept_3", "gm": "/deps/outer-workspace/src/cow_graphs.py:gm"}'
+ENV LANGSERVE_GRAPHS='{"agent": "/deps/outer-workspace/src/agent.py:agent", "hearth": "/deps/outer-workspace/src/hearth_graph.py:hearth", "roundtable": "/deps/outer-workspace/src/roundtable_graph.py:roundtable", "dept_0": "/deps/outer-workspace/src/cow_graphs.py:dept_0", "dept_1": "/deps/outer-workspace/src/cow_graphs.py:dept_1", "dept_2": "/deps/outer-workspace/src/cow_graphs.py:dept_2", "dept_3": "/deps/outer-workspace/src/cow_graphs.py:dept_3", "gm": "/deps/outer-workspace/src/cow_graphs.py:gm"}'
+# r35（Qoder P0-2）：此前本 ENV 停在 r34 前旧构建——hearth/roundtable（r36/r37）缺席、
+# LANGGRAPH_AUTH（R80 auth 纵深）整项没有。现网容器 env 实测两者都在位（langgraph.json 为
+# 权威、由 build 注入），本文件是构建产物快照；两份清单自此对齐，重建镜像不再倒退。
+ENV LANGGRAPH_AUTH='{"path": "/deps/outer-workspace/src/auth.py:auth", "disable_studio_auth": true}'
 
 # -- Ensure user deps didn't inadvertently overwrite langgraph-api --
 RUN mkdir -p /api/langgraph_api /api/langgraph_runtime /api/langgraph_license && touch /api/langgraph_api/__init__.py /api/langgraph_runtime/__init__.py /api/langgraph_license/__init__.py
