@@ -130,7 +130,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       if (images.length) {
         const ep = await visionEndpoint();
         sendMessage(
-          `爸爸上传了图片：${images.join("、")}。请按流程派 visual 牛马识图：图片已落盘（files 里有确切路径），让它在沙箱里 curl -s -X POST ${ep} -H "Content-Type: application/json" -H "X-Proxy-Key: $VISION_PROXY_TOKEN" -d '{"image_path": "<上面的路径>", "question": "详细描述这张图片"}'，把结果汇总告诉爸爸。（R10 修 Cora 识图断链：workplatform:8000 已被 R80 物理断网，宿主回环+二级钥匙是唯一活路）`,
+          `爸爸上传了图片：${images.join("、")}。图片已落盘（files 里有确切路径），请按流程派 visual 牛马识图，把结果汇总告诉爸爸。`,
           { webSearch: undefined }
         );
       } else if (texts.length) {

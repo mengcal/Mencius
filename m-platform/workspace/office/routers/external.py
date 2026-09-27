@@ -37,16 +37,14 @@ def _posts_mutate(mut):
     save 里重读又拿旧快照覆盖回去，读-改-写竞态根本没关死（注释过claim 的又一案）。
     mut(posts)->返回值；mut 内不落写，写由本函数统一原子做。"""
     import json
-    import os as _os
-    from settings_mgr import load_settings, SETTINGS_PATH
+    from settings_mgr import load_settings, save_section
     with _POSTS_LOCK:
         s = load_settings()
         posts = s.get("external_posts") or {}
         r = mut(posts)
-        s["external_posts"] = posts
-        tmp = SETTINGS_PATH.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
-        _os.replace(tmp, SETTINGS_PATH)
+        # r34（CB 2.2 P1）：第三写者收编——原 tmp+os.replace 在容器内 :ro 根必炸
+        # （r30 已实证），且绕过 .bak/_rev/敏感键隔离。统一走 save_section。
+        save_section("external_posts", posts)
         return r
 
 

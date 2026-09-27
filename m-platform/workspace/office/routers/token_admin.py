@@ -345,8 +345,10 @@ async def api_token_clear(request: Request = None):
             result = _guard_post("/clear", payload, timeout=8.0)
         except urllib.error.HTTPError as e:
             # R10.8c：HTTP 层拒绝透传守卫真实原因；r32c F5：error 过翻译层不再直透
+            # r34（CB 2.1 P1）：原引用 _rj 在本作用域不存在（只有 api_token_rotate 里局部
+            # import 过）——爸爸点"重置密钥"即 NameError 裸 500。改用本文件已导入的 json。
             try:
-                _d = _rj.loads(e.read())
+                _d = json.loads(e.read())
                 _d = {"ok": False, "error": _human_error(_d.get("error"))}
             except Exception:
                 _d = {"ok": False, "error": "操作失败，请稍后再试"}

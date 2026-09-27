@@ -39,7 +39,7 @@ interface BatchApprovalInterruptProps {
 const HIGH_RISK = new Set([
   "execute", "delete", "email", "manage_departments", "start_async_task",
   "dispatch_to_xiaoquan", "task", "update_async_task", "cancel_async_task",
-  "write_file", "edit_file", "edit_memory",
+  "write_file", "edit_file", "edit_memory", "lark_send",
 ]);
 const isHighRisk = (name: string) =>
   HIGH_RISK.has(name) || name.toLowerCase().startsWith("mcp__");

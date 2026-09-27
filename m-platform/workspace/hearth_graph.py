@@ -146,7 +146,8 @@ def summarize(state: HearthState) -> dict:
         if cloth and not _complete:
             cloth += "\n\n（归纳位输出触到生成上限，可能有尾段被切。）"
     except Exception as e:
-        cloth = (f"（归纳位故障：{type(e).__name__}——聊天原文降级保留于下方。"
+        print(f"[hearth] 归纳异常: {type(e).__name__}: {e}", flush=True)
+        cloth = ("（归纳暂时出错，聊天原文完整保留在下方，请重发喊停口令再归纳。）"
                  f"请重发喊停口令再归纳。）\n\n{chat_txt}")
     if not cloth:
         cloth = ("（归纳位沉默：疑上游审核拦截。聊天原文降级保留于下方。"
