@@ -129,6 +129,11 @@ T("2 张静默", _ap.card_pressure(tid_probe) == "")
 with patch.object(ConfirmGateMiddleware, "_level", staticmethod(lambda: "strict")):
     gate2 = ConfirmGateC1()
     T("预算死链已连根拔（无 _over_budget 属性）", not hasattr(gate2, "_over_budget"))
+    # r36（09-27 爸令）：机器安全门"连击冻结"整链废除——退役回归断言（N1 家规：拆掉的钉住不许复活）
+    T("冻结链已废除（_guard_lock/_guard_streak/_frozen_hold/guard_unlock/_freeze_refusal 全部不存在）",
+      all(not hasattr(gate2, a) for a in ("_guard_lock", "_guard_streak", "_frozen_hold",
+                                           "_freeze_refusal", "_frozen"))
+      and not hasattr(ConfirmGateC1, "guard_unlock"))
 _ap._task_cards.clear(); _ap._counted_tc.clear(); _ap._card_pressure_soft.clear(); _ap._turn_marks.clear()
 
 # NO-TID：不进桶不耗预算、卡照弹

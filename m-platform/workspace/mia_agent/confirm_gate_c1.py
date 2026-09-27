@@ -77,7 +77,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
 
     # r61k 卫生项（hy4 十轮）：花名册声明原夹在类名与文档字符串之间，把 __doc__ 吃成
     # None——挪到 docstring 之后恢复。实例只增不减的隐患 hy4 判非本轮，只记此账不修。
-    _GATE_INSTANCES: list = []  # r61b：活实例花名册（guard_unlock 端点经此触达 _guard_lock）
+    _GATE_INSTANCES: list = []  # r61b：活实例花名册（reset_thread 经此触达各实例锁表）
 
     _PROXY = None  # 模块级单例（Eve 新炮1：档位读取入口统一+省实例化）
 
@@ -186,43 +186,17 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         return cls.level_and_source()[0]  # v0.3 件一：单行委托判定处（旧调用点零改动）
 
     @classmethod
-    def guard_unlock(cls, tid: str = "") -> int:
-        """r61h 九轮 N-4（hy4 九轮）：手动解冻动作收进门侧单一真源——misc.py 的
-        /approvals/guard_unlock 端点原直接 pop _guard_lock/_guard_streak，漏清
-        _frozen_hold：解封后 when 侧残留的接力登记仍会被 wrap 消费一次=误吃冻结拒信。
-        本件三集合同清（lock/streak/hold）。端点侧改调本方法是一行委托——r61j 已落，
-        r61k 格 A 已钉集成回归（test_r61h_gates.py 尾段）。返回 cleared 计数口径同旧端点
-        （guard_unlock/guard_ttl_release 落账仍在调用方，本件不动账）。"""
-        cleared = 0
-        for g in cls._GATE_INSTANCES:
-            for k in ([tid] if tid else list(g._guard_lock.keys())):
-                if k in g._guard_lock:
-                    g._guard_lock.pop(k, None)
-                    g._guard_streak.pop(k, None)
-                    # hold 键=gk（when 侧 `tid or "?"`；冻结须真 tid，两者在此同源）
-                    g._frozen_hold.pop(k, None)
-                    cleared += 1
-        return cleared
-
     @classmethod
     def _clear_three_locks(cls, tid: str) -> None:
-        """v0.3 件二抽出：三清动作单一真源（M3 正序"落账成功才清"与 force 倒序
-        "先清再落账"共用同一把扫帚，两条路径永不漂移）——guard_unlock 是冻结锁
-        单一真源（lock/streak/hold 三集合同清），超预算两表、压力钉、streak、
-        notice 在此齐扫。纯 dict 操作，不会失败。
-        d2v03fix3①②（若若 P1-②实锤+Cora 263"线程持久状态全清单"扩面）：
-        - _guard_freeze_n **清**——旧版不清，force 救回的线程保留退避梯次，下次连撞
-          直接 ttl=inf 永久锁（"刚救回一步回永久冻结"）；
-        - _guard_mid/_guard_hits **清**（Cora 判词：reset 后观察窗口不该带历史，
-          误杀降级环判据被 reset 前命中污染）；
-        - _guard_deny **刻意保留**（防重放安全特性，判词见其声明处注释，清=回退）；
-        - _guard_lock/_guard_streak/_frozen_hold 清（guard_unlock 原有，不重复列账）。
-        每件"清/留"判词齐=全清单过一遍，别再只修名单上那一个。"""
-        with cls._GATE_LOCK:  # d2v03fix3③（Cora④）：清扫与 when 侧钉/冻结读-改-写互斥
-            cls.guard_unlock(tid)
+        """v0.3 件二抽出：多锁齐清出口单一真源。r36（09-27 爸令）：冻结锁已整链废除，
+        本函数现存两把（超预算两表+压力钉）+D2 连败计数+notice 齐扫；
+        - _guard_mid/_guard_hits 清（reset 后观察窗口不该带历史误杀降级判据）；
+        - _guard_deny 刻意保留（防重放安全特性，判词见其声明处注释）。
+        纯 dict 操作，不会失败。"""
+        with cls._GATE_LOCK:
             for g in cls._GATE_INSTANCES:
                 for attr in ("_over_budget", "_abs_blocked",
-                             "_guard_freeze_n", "_guard_mid", "_guard_hits"):
+                             "_guard_mid", "_guard_hits"):
                     _bucket = getattr(g, attr, None)
                     if _bucket:
                         _bucket.pop(tid, None)
@@ -275,38 +249,23 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
 
     @classmethod
     def reset_thread(cls, tid: str, force: bool = False) -> dict:
-        """D2 挂账四件④（hy4 十二轮 P-B，09-15 爸爸令动工）：三锁叠加的唯一总出口。
-        冻结（guard_lock）+超预算（_over_budget/_abs_blocked）+压力钉（_PRESSURE_PIN）
-        三把同时扣住时，guard_unlock 只开第一把，而"批准卡放行"这条唯一解压路径在
-        无卡/超预算态走不到=线程死锁爸爸也救不回。本方法三锁齐清并落账
-        desk_state_reset（P-B 明令：必须落账；经此通道撤钉不落 desk_pressure_release——
-        那本账只认批准放行/TTL 到期两个出口，此处只见 desk_state_reset.pressure=1，
-        读账人查此）。approvals 侧卡片配额计数由端点侧
-        另调 _ap.reset_task_cards 清（与 /approvals/reset 同源，不在此双写）。
-        只认真 tid（"? 桶"不连坐，钉同款规矩）。
-        budget 为两表命中数之和（单实例最多 2），非线程数——明细另落 budget_detail
-        分列，读账人拿 budget 当"几个线程超预算"会算错。
-
-        hy4 十四轮 §⑤（本单主项）：**先算 → 先落账 → 落账成功才清锁**。
-        旧序是"清三锁→落账（except: pass）"，落账抛=无痕重置（比没落更坏：账上查不到
-        谁在何时清了哪三把锁）。新序下落账失败时锁**根本没清**，直接 return ok=False
-        且禁静默（stdout 有声+返回值指明需人工）——这与"不能因落账失败回滚已清的锁"
-        不冲突：账提到清锁之前，本就不存在要回滚的已清锁；出口语义变成"本次重置未完成、
-        请重试或人工"，强于"锁清了却没账"。三清本身是纯 dict 操作（不会失败）。
-
-        v0.3 件二（plan-d2-v03 §件二，十六轮三改）：治"解锁通道随审计链挂死"——M3 正序下
-        _audit 挂=三锁永远解不开，与 P-B"死锁爸爸也救不回"初衷相冲。force=True
-        倒序：不问账，直接三清（出口优先），再试落 desk_state_reset（带 forced:true）；
-        触发面=force 路**任一环节**（清锁抛/落账抛/部分成功同入兜底），死信行含
-        stage/cleared/forced_reset/ts+清前三锁计数，位置 mia_home/runtime/
-        bypass_deadletter.jsonl（与主账分离，目录不存在首写自建；无轮转+单行一次
-        写入）；死信写失败也吞（print 直出）→ 返回恒为 ok/forced/deadletter，
-        ok=True 无条件。二次确认=请求体 force 字段（无 settings 键，L26 不破；
-        前端按钮两步式后置）。"""
+        """D2 挂账四件④（hy4 十二轮 P-B，09-15 爸令动工）：多锁叠加的唯一总出口。
+        r36（09-27 爸令）：冻结锁（guard_lock）整链已废除——现存超预算两表+压力钉
+        （+D2 连败计数）齐清并落账 desk_state_reset（P-B 明令：必须落账；经此通道撤钉不落
+        desk_pressure_release 那本账只认批准放行/TTL 到期两个出口，此处只记 desk_state_reset.press，
+        读账人查此）。approvals 侧卡片配额计数由端点侧另调 _ap.reset_task_cards 清
+        （与 /approvals/reset 同源，不在此双写）。只认真 tid（"? 桶"不连坐，钉同款规矩）。
+        budget 为两表命中数之和（单实例最大 2），非线程数——明细另落 budget_detail 分列，
+        读账人拿 budget 当"几个线程超预算"会算错。
+        hy4 十四轮 §④（本单主项）：**先算 → 先落账 → 落账成功才清锁**——
+        旧序是"清三锁→落账（except: pass）"，落账抛=无痕重置（比没落更坏：账本缺页+锁已没了）。
+        新序 peek→落账→成功才清；落账失败原样返回 ok=False，锁一根手指都没碰。
+        force 逃生门（爸 09-15 亲令）：落账失败死锁时 force=True 走"清锁+deadletter 落账"——
+        死信写 bypass_deadletter.jsonl（与主账分离），写失败也清（print 直出）→ 返回恒 ok。
+        二次确认=请求体 force 字段（无 settings 键，L26 不破，前端按钮两步式后置）。"""
         if not tid:
             return {"ok": False, "reason": "reset_thread 需要真 thread_id（? 桶不连坐）"}
         # (1) 只算不删（peek）：三把锁各自的命中数
-        freeze = sum(1 for g in cls._GATE_INSTANCES if tid in (g._guard_lock or {}))
         n_over = sum(1 for g in cls._GATE_INSTANCES
                      if tid in (getattr(g, "_over_budget", None) or {}))
         n_abs = sum(1 for g in cls._GATE_INSTANCES
@@ -321,7 +280,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         if force:
             # 计数 peek 已在 (1f) 之前算好——成功账、死信行、返回帧三处共用同一份
             # **清前三锁**快照（清锁抛的死信若记"清后"，半清态下就是假账）。
-            _snap = {"freeze": freeze, "budget": n_over + n_abs,
+            _snap = {"budget": n_over + n_abs,
                      "budget_detail": budget_detail, "pressure": pressure}
             _stage = "clear_locks"
             try:
@@ -346,19 +305,19 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         try:
             import approvals as _ap
             _ap._audit("desk_state_reset", thread_id=tid, by="admin",
-                       freeze=freeze, budget=n_over + n_abs,
+                       budget=n_over + n_abs,
                        budget_detail=budget_detail, pressure=pressure,
                        **({"pin_id": _pin_id} if pressure else {}))
         except Exception as _e:
             # (3) 落账失败禁静默：三锁原样未清，出声+返回未完成（调用方据此重试/转人工）
-            print(f"[gate] desk_state_reset 落账失败（三锁未清，需人工处理）：tid={tid} "
+            print(f"[gate] desk_state_reset 落账失败（各锁未清，需人工处理）：tid={tid} "
                   f"err={type(_e).__name__}", flush=True)
-            return {"ok": False, "reason": "落账失败，三锁未清（P-B：必须落账）"}
+            return {"ok": False, "reason": "落账失败，各锁未清（P-B：必须落账）"}
         # (4) 落账成功后三清（v0.3 件二：动作抽 _clear_three_locks 单一真源，
-        # 与 force 帧共用一把扫帚——纯 dict 操作，不会再失败；guard_unlock 仍是冻结锁真源）
+        # r36 冻结锁已废除（原 guard_unlock 通道随之退役）
         cls._clear_three_locks(tid)
         # (5) 出口计数（口径与账上完全一致：先算后清，算的就是清掉的）
-        return {"ok": True, "freeze": freeze, "budget": n_over + n_abs,
+        return {"ok": True, "budget": n_over + n_abs,
                 "budget_detail": budget_detail, "pressure": pressure}
 
     @classmethod
@@ -403,22 +362,8 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     _ap2._audit("guard_high", thread_id=tid, tool=name,
                                 fp=_h0.sha256(str((req.tool_call or {}).get("args") or "")
                                               .encode("utf-8", "replace")).hexdigest()[:12])
-                    # d2v03fix3③（Cora④）：滑窗推进→freeze_n 累加→锁写入→hits 写入
-                    # 整段是读-改-写，双线程同 gk 会丢档（freeze_n get+1 非原子）——入闸。
-                    with self._GATE_LOCK:
-                        st = self._guard_streak.setdefault(gk, [])
-                        st.append(__import__("time").time())
-                        while st and st[0] < __import__("time").time() - 300:
-                            st.pop(0)
-                        # r61b P1-2（hy4）：只有真 tid 才配冻结（"? 桶共享"案已修）。
-                        # r61e（NOVA ①）：TTL 退避 30min×2^N（30m→1h→2h），累计 3 次=永久锁
-                        # 等 /approvals/guard_unlock——否则 DoS 者按"每 TTL 两发"的节奏慢慢磨，
-                        # 锁线程从保险丝退化成速率限制器。
-                        if len(st) >= 2 and tid:
-                            n = self._guard_freeze_n[tid] = self._guard_freeze_n.get(tid, 0) + 1
-                            ttl = float("inf") if n >= 3 else 1800.0 * (2 ** (n - 1))
-                            self._guard_lock[tid] = (__import__("time").time(), ttl)
-                            print(f"[gate] guard_lock 冻结线程 {tid[:8]}（第{n}次，ttl={ttl}）", flush=True)
+                    with self._GATE_LOCK:  # r36（爸 09-27 令）：连击冻结机制整链废除——
+                        # 只留单次 high 拒绝与观测缓存；"规定工作多久"的锁不再存在
                         self._guard_deny.setdefault(gk, set()).add(tc_id)
                         self._guard_hits[gk] = _g["findings"]
                     return False
@@ -459,16 +404,6 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     self._guard_deny.setdefault(gk, set()).add(tc_id)
                 except Exception:
                     pass
-                return False
-            # r61b P0-4（hy4）：when=False 只等于"不弹卡"，不等于"拦"——冻结语义
-            # 必须落进 _check_budget_gate（见该方法冻结拒信），这里提前 return False
-            # 让 wrap 层出拒信。r61c 边界C：冻结判定抽 _frozen() 双处共用
-            # （TTL 推进不再依赖 when 先到）。
-            if self._frozen(tid):
-                # r61h P-1（hy4 八轮 E19-1）：排除出卡的 tc 同步记进不依赖 TTL 的
-                # 集合——wrap 先消费它出拒信；即使 when→wrap 之间锁恰好 TTL 到期
-                # （_frozen 变 False、又不在 _guard_deny），也不会走到"直接执行"。
-                self._frozen_hold.setdefault(gk, set()).add(tc_id)
                 return False
             # r46（Veda 治本炮+09-13 C1#3 复发实证）：execute 的数据区绝对路径形式
             # （/notes /memory /knowledge）与全盘 find=已知坑源，机械判参直接不弹卡
@@ -517,35 +452,18 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         return when
 
     def __init__(self, sub_mode: bool = False, **kw: Any):
-        # r61b（hy4 P1-1 闭环）：类级实例登记——office 端点 /approvals/guard_unlock
-        # 与 gate 同进程（单 uvicorn），靠这本花名册触达活实例的 _guard_lock。
         ConfirmGateC1._GATE_INSTANCES.append(self)
         # 反选架构下名单在 after_model 动态补全；初始空表。
         self.sub_mode = sub_mode
         self._clarify: dict = {}      # {tid: bool} r44b：task_brief 待澄清态（卡面提示用）
         self._abs_blocked: dict = {}  # {tid: set(tc_id)} r46 路径形态门扣卡的调用
-        # r61h P-1（hy4 八轮 E19-1）：when 判冻结排除出卡的 tc_id 登记处——
-        # {tid或?: set(tc_id)}，**不依赖 TTL**：wrap 先消费它出拒信，堵
-        # "when→wrap 之间锁恰好到期"的窄竞态 fail-open（敞怀执行）。
-        self._frozen_hold: dict = {}
         self._shown_seen: set = set()  # r49 {(tid,fp)} card_shown 幂等集
         self._guard_deny: dict = {}   # r60 {tid: set(tc_id)} 机器门 high 强制拦
         # intentionally NOT cleared by reset：被拒 tc_id 防重放（消费链见 _deny 命中分支——
         # 行号不钉死，09-16 二十轮 hy3④：L656 已漂至 L694，注释只描述紧邻真源），清=安全特性回退
         # （d2v03fix3② Cora 判词：reset 不该复活被拒的调用——这是设计不是遗漏；
-        #  _clear_three_locks 清 freeze_n/mid/hits 三件而独留此件。）
         self._guard_hits: dict = {}   # r60 {tid: findings} 最近 high 命中（落账用）
         self._guard_mid: dict = {}    # r60 {tid: {tc_id: findings}} 中危上卡面
-        # r61（Cora：锁粒度=线程不是全局。锁全局=被注入线程连环触 high 拿门
-        # 当武器瘫痪全家（DoS via guard）；锁线程则攻击半径=单线程，别的活照干）
-        self._guard_streak: dict = {}  # {tid: [ts,...]} 5 分钟滑窗 high 计数
-        # r61b P1-1（hy4）：锁带 TTL 自愈；r61e（NOVA ①）：{tid:(ts,ttl)} 且 TTL 按
-        # 冻结次数指数退避 30m→1h→2h，第 3 次=永久（防"每 TTL 两发"磨锁），
-        # 出口=/approvals/guard_unlock（已上线）。解封落账 guard_ttl_release 不静默。
-        self._guard_lock: dict = {}    # 冻结线程 {tid: (冻结时刻, ttl秒)}
-        self._guard_freeze_n: dict = {}  # {tid: 累计冻结次数}（退避档位）
-        self._unknown_seen: set = set()  # r61b P2-6：未登记工具名每个只落一次 guard_unknown
-        # D2 压力降档：与 _guard_streak **分账独立**——那个数 high 命中滑窗（冻结链），
         # 这个数一切 error 态连续失败（工具 error/门拒信/异常崩溃各计 1，成功清零）。
         # D2 四件②：两只 dict 已上提类级声明（见类头 _PRESSURE_PIN 旁），此处不再实例化。
         super().__init__(interrupt_on={}, **kw)
@@ -568,29 +486,6 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     continue  # 路由表未就绪（装配早期）不炸，真判到 pass 才炸
                 if _d not in ("ask", "to_deny"):
                     raise RuntimeError(f"guard coverage broken: {_t} routed to pass")
-
-    def _freeze_refusal(self, tid: str = "") -> str:
-        # r61h P-1（hy4 八轮）：冻结拒信抽文案真源——（r34：_budget_refusal 已随预算制退役摘除）
-        # _frozen 直判分支与 _frozen_hold 接力分支共用，防两处各写一份后漂移。
-        # r61h 九轮 N-4（hy4 九轮）：解除时限不再硬编码"30 分钟"（与 r61e 指数退避
-        # 不符）——读 _guard_lock 里的退避真值（when 侧 1800×2^(n-1)、n≥3=inf 唯一
-        # 写点，此处只换算不再立第二套常量）；永久锁指向 /approvals/guard_unlock 出口。
-        base = ("⛔ 本线程已被机器安全门冻结：短时间内连续命中高危形态，门已停止一切"
-                "审批交互等待爸爸接管。请停止调用工具，把本线程目标与最近尝试的操作"
-                "向爸爸汇报。")
-        lock = self._guard_lock.get(tid or "")
-        if lock and lock[1] == float("inf"):
-            return base + ("本锁为永久冻结（累计第 3 次，退避已到顶），不再自动解除——"
-                           "需爸爸在管理端 /approvals/guard_unlock 解冻，本线程方可继续。")
-        if lock:
-            import math
-            _m = max(1, math.ceil((lock[1] - (__import__("time").time() - lock[0])) / 60))
-            _span = f"{_m // 60} 小时" if _m >= 60 and _m % 60 == 0 else f"{_m} 分钟"
-            return base + f"冻结约 {_span}后自动解除。"
-        # hy4 十轮 N-4：兜底档不再枚举具体档位（30m→1h→2h→永久）——档位常量若漂移，
-        # 写死的枚举就成了谎话；只说实话，真值以 when 侧写点（guard 退避）为准。
-        return base + ("冻结按退避策略自动解除（具体档位见 guard 退避真值）；"
-                       "若为永久锁，需爸爸在管理端 /approvals/guard_unlock 解冻。")
 
     @staticmethod
     def _tc_key(tc: dict) -> str:
@@ -626,29 +521,6 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
             self._pressure_release(self._tid())
         return HumanInTheLoopMiddleware._process_decision(decision, tool_call, config)
 
-    def _frozen(self, tid: str) -> bool:
-        """r61c 边界C（hy4）：冻结判定单一函数（when 与 wrap 共用，TTL 只此一处推进）。
-        N20：TTL 到期时把 deny/hits/streak 一并清，不留只增集合。
-        r61e（NOVA ①）：解封不静默——落账 guard_ttl_release（爸爸要能看到
-        "刚解封一个冻过 N 次的线程"）；永久锁（ttl=inf）只能走 guard_unlock 端点。"""
-        if not tid or tid not in self._guard_lock:
-            return False
-        ts, ttl = self._guard_lock[tid]
-        if __import__("time").time() - ts > ttl:
-            self._guard_lock.pop(tid, None)
-            self._guard_streak.pop(tid, None)
-            self._guard_deny.pop(tid, None)
-            self._guard_hits.pop(tid, None)
-            _n = self._guard_freeze_n.get(tid, 0)
-            try:
-                import approvals as _apx
-                _apx._audit("guard_ttl_release", thread_id=tid, n=_n)
-            except Exception:
-                pass
-            print(f"[gate] guard_lock TTL 解封 {tid[:8]}（第{_n}次冻结到期）", flush=True)
-            return False
-        return True
-
     def _check_budget_gate(self, request):
         """wrap/awrap 共用：返回 ToolMessage=拒；None=放行。"""
         import approvals as _ap
@@ -668,21 +540,8 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         # 线程的 high 既不弹卡也读不到 deny=**敞怀放行**。键归一 `gk` 单一真源。
         # r61e（Cora N3 连锁自审）：when 侧 tc_id 已改指纹键（_tc_key），本侧读必须
         # 同步——否则空 id 调用写读错配=登记了拒信读不到。r61h P-1：gk/tck 上提到
-        # 取 tid 后即算——紧随其后的冻结接力集合也用同一对键做读写。
         gk = tid or "?"
         tck = self._tc_key(tc)
-        # r61h P-1（hy4 八轮 E19-1）："when 判冻结排除出卡 → wrap 兜拒信" 的接力链
-        # ——wrap 先消费不依赖 TTL 的登记集合 _frozen_hold：即使 when→wrap 之间锁
-        # 恰好到期（_frozen 已 False、又不在 _guard_deny），冻结 tc 仍吃拒信不执行。
-        if tck in (self._frozen_hold.get(gk) or set()):
-            self._frozen_hold[gk].discard(tck)
-            return ToolMessage(content=self._freeze_refusal(tid), tool_call_id=tc.get("id", ""))
-        # r61b P0-4（hy4 命门）：when=False 只等于"不弹卡"，不等于"拦"——wrap 层不出拒信的话，
-        # 被冻结线程的一切 ask 调用=自动放行（攻击者故意连撞 2 次 high 即换取
-        # 免审批执行，攻击方向与设计相反）。冻结态 ask 一律回冻结拒信；
-        # P1-3：文案与预算拒/机器 high 拒区分——爸爸一眼分清"接管解冻"还是"重开额度"。
-        if dec == "ask" and self._frozen(tid):
-            return ToolMessage(content=self._freeze_refusal(tid), tool_call_id=tc.get("id", ""))
         # r60 机器门 high：强制拦。
         # r61 拒信改造（hy4 A-4 脱敏 + Eve 正向出口 + Veda 撤"不要绕行"句）：
         # ①findings 细节不进模型拒信（只进 guard_high 账本+卡面）——拒信含命中

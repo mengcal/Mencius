@@ -416,37 +416,10 @@ async def api_reset_budget(req: dict = Body(...), request: Request = None):
     return {"ok": True, "cleared_cards": n}
 
 
-@router.post("/approvals/guard_unlock")
-async def api_guard_unlock(req: dict = Body(...), request: Request = None):
-    """r61b（hy4 P1-1 闭环）：爸爸接管后手动提前解冻线程。r61j N-4：退避真值
-    30min→1h→2h→第 3 次永久（永久锁只能走本端点），解冻动作收进门侧单一真源
-    ConfirmGateC1.guard_unlock（三集合同清 lock/streak/frozen_hold——端点旧自 pop
-    漏清 hold，解封后 wrap 会误吃一次接力拒信，r61h 九轮 hy4 N-4 点的名）。
-    {thread_id?}——不传=解全部。token 门内（/approvals 前缀）。
-    r61k：返回 ok=bool(cleared)——cleared=0（无匹配线程/门不在此进程）时
-    ok:false+hint，不再静默 ok:true。
-    d2v03fix3⑤ 命名债：hint 键退役改 reason（全仓 grep 消费方=m-gates 绊线一格+
-    本端点自产帧，前端零读此键——三处同批改，error 键绝迹口径不变）。"""
-    import approvals as _ap
-    from mia_agent.confirm_gate_c1 import ConfirmGateC1
-    tid = str(req.get("thread_id", ""))
-    cleared = ConfirmGateC1.guard_unlock(tid)
-    _ap._audit("guard_unlock", thread_id=tid or "*", by="admin", cleared=cleared)
-    _token_audit("approval_guard_unlock", bool(cleared), tid=tid[:8] or "*", cleared=cleared)
-    # r61k 第二笔（hy4 十轮端点侧点1）：cleared=0 不再静默 ok:true——跨进程部署/
-    # tid 拼错/花名册空三种情况下，审计账会说"爸爸解冻了"而门根本没动（静默失败=
-    # 双倍失败）。ok 必须跟 cleared 走；0 时给 reason 指排查方向。token 账同口径。
-    # d2v03fix3⑤：键名 hint→reason（与其余失败帧统一键形）。
-    if not cleared:
-        return {"ok": False, "cleared": 0,
-                "reason": "无匹配线程或门实例不在此进程（跨进程/tid 拼错/花名册空）"}
-    return {"ok": True, "cleared": cleared}
-
-
 @router.post("/approvals/reset_thread")
 async def api_reset_thread(req: dict = Body(...), request: Request = None):
     """D2 挂账四件④（hy4 十二轮 P-B，09-15 爸爸令动工）：管理端"重置本线程状态"=
-    三锁叠加（冻结+超预算+压力钉）的唯一总出口。guard_unlock 只开冻结那把，
+    各锁叠加（超预算+压力钉）的唯一总出口（r36：冻结锁已整链废除）。
     三把齐扣时批准卡路径走不到=线程死锁。本端点一次清三锁并落账 desk_state_reset
     （P-B 明令必须落账），卡片配额同步走 reset_task_cards（与 /approvals/reset 同源）。
     {thread_id} 必填真值（? 桶不连坐）。token 门内（/approvals 前缀）。
@@ -463,7 +436,7 @@ async def api_reset_thread(req: dict = Body(...), request: Request = None):
         return {"ok": False, "reason": "需要 thread_id（真值，? 桶不连坐）"}
     r = ConfirmGateC1.reset_thread(tid, force=bool(req.get("force")))
     if not r.get("ok"):
-        # hy4 十五轮③(b)：失败也是安全相关事件（落账失败=三锁未清需人工）——补落一条
+        # hy4 十五轮③(b)：失败也是安全相关事件（落账失败=各锁未清需人工）——补落一条
         # 失败账，零账不符"有声"家规；参数与成功账同名（tid/reason）。
         _token_audit("approval_reset_thread", False, tid=tid[:8], reason=r.get("reason", ""))
         return {"ok": False, "reason": r.get("reason", "")}
@@ -471,12 +444,12 @@ async def api_reset_thread(req: dict = Body(...), request: Request = None):
     try:
         cards = _ap.reset_task_cards(tid)
     except Exception:
-        pass  # 配额清失败不回滚三锁（门账已落，配额是软约束）
+        pass  # 配额清失败不回滚各锁（门账已落，配额是软约束）
     if r.get("audit") == "deadletter":
         # v0.3 件二死信帧（十六轮三改）：force 路任一环节失败都汇到此帧（出口优先），
         # desk_state_reset 账搬家到 mia_home/runtime/bypass_deadletter.jsonl——行内
         # stage/cleared 区分"锁已清只缺账"与"清锁抛、锁可能半清"，清前三锁计数与
-        # 异常名也在那行。token 账不带 freeze/budget/pressure：返回帧没有这些键，
+        # 异常名也在那行。token 账不带 budget/pressure：返回帧没有这些键，
         # 塞零=假账比缺账更坏。
         _token_audit("approval_reset_thread", True, tid=tid[:8], forced=True,
                      audit="deadletter", cards=cards)
@@ -484,11 +457,11 @@ async def api_reset_thread(req: dict = Body(...), request: Request = None):
     _flag = {"forced": True} if r.get("forced") else {}  # v0.3 件二：force 帧账注（普通帧账形零变化）
     # hy4 十五轮③(a) 账注：budget=两表命中数之和非线程数，多实例按实例累加
     _token_audit("approval_reset_thread", True, tid=tid[:8],
-                 freeze=r["freeze"], budget=r["budget"], pressure=r["pressure"],
+                 budget=r["budget"], pressure=r["pressure"],
                  cards=cards, **_flag)
     # hy4 十四轮 §⑤连带：budget 是两表命中数之和（单实例最多 2），明细 budget_detail
     # 原样透传给前端（token 账参数不变——账口径漂移比少一个字段更坏）。
-    return {"ok": True, "freeze": r["freeze"], "budget": r["budget"],
+    return {"ok": True, "budget": r["budget"],
             "budget_detail": r.get("budget_detail"),
             "pressure": r["pressure"], "cards": cards, **_flag}
 

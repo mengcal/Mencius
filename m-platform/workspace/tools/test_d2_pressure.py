@@ -16,7 +16,7 @@ C=件四折中案（钉下再触发账带 pin:1/常态帧零膨胀）；M5=死�
 落死信，ok=True 无条件，部分成功现场保全）；M6=死信缺省新址断言（runtime/）；
 D=件三护栏非空输入帧（三端点 error 键绝迹扩语义路径）。
 d2v03fix3 新增（09-15 夜，规格=若若261 P1+Cora263 五件）：Q=三清扩面（reset 后
-freeze_n/mid/hits 已清、deny 刻意保留）；R=竞态格（双线程并发 _note_fail 不丢数）；
+mid/hits 已清、deny 刻意保留；r36 冻结链已整链废除）；R=竞态格（双线程并发 _note_fail 不丢数）；
 P 组=上沿账（真落钉/残余帧皆 pin_set:1+pin_id，ttl/批准/reset 三路账统一带 pin_id——
 "一颗钉的一生"单查询）；J/C/M 组等手工钉一律改 (ts,pin_id) 元组形（_pin_alive 解包
 跟改）；件八补三漏=M 组落账侧 budget/budget_detail、M4/M5 死信行 ev/budget_detail。
@@ -415,30 +415,27 @@ with patch.object(ConfirmGateMiddleware, "_level", staticmethod(lambda: "auto_ed
         T("C 常态新触发帧（A 格账）不带 pin 键（常态零膨胀，旧账形向后兼容）",
           len(rec_a0) == 1 and "pin" not in rec_a0[0])
 
-# ── M：四件④ 三锁齐清出口（hy4 十二轮 P-B：冻结+超预算+压力钉叠加死锁→reset_thread）──
+# ── M：四件④ 各锁齐清出口（hy4 十二轮 P-B；r36 冻结锁废除后=超预算+压力钉双锁）──
 with patch.object(ConfirmGateMiddleware, "_level", staticmethod(lambda: "auto_edit")):
     gm = ConfirmGateC1(sub_mode=False)
     with patch.object(ConfirmGateC1, "_tid", staticmethod(lambda: "d2m")):
-        gm._guard_lock["d2m"] = (time.time(), 60)
-        gm._guard_streak["d2m"] = [time.time()]
-        gm._frozen_hold["d2m"] = {"t9"}
         gm._over_budget = {"d2m": {"t8"}}
         ConfirmGateC1._PRESSURE_PIN["d2m"] = (time.time(), "p-d2m")
         gm._fail_streak["d2m"] = {"n": 3, "recent": ["x"], "fired": True}
         r_m = ConfirmGateC1.reset_thread("d2m")
         T("M 三锁齐清：返回值三计数对且六本账全空",
-          r_m.get("ok") and r_m.get("freeze") == 1 and r_m.get("budget") == 1
+          r_m.get("ok") and r_m.get("budget") == 1
           and r_m.get("budget_detail") == {"over_budget": 1, "abs_blocked": 0}
           and r_m.get("pressure") == 1
-          and "d2m" not in gm._guard_lock and "d2m" not in gm._guard_streak
-          and "d2m" not in gm._frozen_hold and "d2m" not in gm._over_budget
+          
+          and "d2m" not in gm._over_budget
           and "d2m" not in ConfirmGateC1._PRESSURE_PIN
           and "d2m" not in gm._fail_streak)
         rec_m = [x for x in _recs("desk_state_reset") if x.get("tid") == "d2m"]
         T("M 重置落账 desk_state_reset（by=admin+三锁计数，P-B 明令）；账侧补断言"
           "budget/budget_detail（件八/若若①）+ pin_id（件五 reset 路）",
           len(rec_m) == 1 and rec_m[0].get("by") == "admin"
-          and rec_m[0].get("freeze") == 1 and rec_m[0].get("pressure") == 1
+          and rec_m[0].get("pressure") == 1
           and rec_m[0].get("budget") == 1
           and rec_m[0].get("budget_detail") == {"over_budget": 1, "abs_blocked": 0}
           and rec_m[0].get("pin_id") == "p-d2m")
@@ -455,32 +452,29 @@ r_m2 = ConfirmGateC1.reset_thread("d2m2")
 T("M2 两表同中：budget==2（命中数之和，单实例最多 2）且 budget_detail 分列 1/1",
   r_m2.get("ok") and r_m2.get("budget") == 2
   and r_m2.get("budget_detail") == {"over_budget": 1, "abs_blocked": 1}
-  and r_m2.get("freeze") == 0 and r_m2.get("pressure") == 1)
+  and r_m2.get("pressure") == 1)
 T("M2 两表键都真被清掉", "d2m2" not in gm._over_budget and "d2m2" not in gm._abs_blocked)
 rec_m2 = [x for x in _recs("desk_state_reset") if x.get("tid") == "d2m2"]
 T("M2 落账带 budget_detail 明细（账与返回值同口径）",
   len(rec_m2) == 1 and rec_m2[0].get("budget") == 2
   and rec_m2[0].get("budget_detail") == {"over_budget": 1, "abs_blocked": 1})
 
-gm._guard_lock["d2m3"] = (time.time(), 60)
-gm._guard_streak["d2m3"] = [time.time()]
-gm._frozen_hold["d2m3"] = {"t5"}
 gm._over_budget = {"d2m3": {"t6"}}
 ConfirmGateC1._PRESSURE_PIN["d2m3"] = (time.time(), "p-d2m3")
 with patch.object(ap, "_audit", side_effect=RuntimeError("audit down")):
     r_m3 = ConfirmGateC1.reset_thread("d2m3")
-T("M3 落账失败→ok=False 且 reason 明说三锁未清（禁静默，不假装成功）",
-  r_m3.get("ok") is False and "三锁未清" in str(r_m3.get("reason", "")))
+T("M3 落账失败→ok=False 且 reason 明说各锁未清（禁静默，不假装成功）",
+  r_m3.get("ok") is False and "各锁未清" in str(r_m3.get("reason", "")))
 T("M3 落账失败时三锁原样未动：钉在、冻结锁在、退避计数在、超预算登记在",
-  "d2m3" in ConfirmGateC1._PRESSURE_PIN and "d2m3" in gm._guard_lock
-  and "d2m3" in gm._guard_streak and "d2m3" in gm._over_budget
-  and "d2m3" in gm._frozen_hold)
+  "d2m3" in ConfirmGateC1._PRESSURE_PIN
+  and "d2m3" in gm._over_budget
+  )
 T("M3 落账失败不留 desk_state_reset 假账（无痕态=零条）",
   not [x for x in _recs("desk_state_reset") if x.get("tid") == "d2m3"])
 r_m3b = ConfirmGateC1.reset_thread("d2m3")  # 账恢复后重试即成（出口语义=请重试）
 T("M3 重试即成：ok=True 且三锁齐清",
-  r_m3b.get("ok") and r_m3b.get("freeze") == 1 and r_m3b.get("budget") == 1
-  and "d2m3" not in gm._guard_lock and "d2m3" not in gm._over_budget
+  r_m3b.get("ok") and r_m3b.get("budget") == 1
+  and "d2m3" not in gm._over_budget
   and "d2m3" not in ConfirmGateC1._PRESSURE_PIN)
 
 # ── M4：v0.3 件二 force 审计链（治"解锁通道随审计链挂死"）──
@@ -490,9 +484,6 @@ T("M3 重试即成：ok=True 且三锁齐清",
 # （_DEADLETTER_PATH 类属性直赋值即换向，同 ap._AUDIT_PATH 手法），断言后清场。
 _dl = os.path.join(tmp, "bypass_deadletter.jsonl")
 ConfirmGateC1._DEADLETTER_PATH = _dl
-gm._guard_lock["d2m4"] = (time.time(), 60)
-gm._guard_streak["d2m4"] = [time.time()]
-gm._frozen_hold["d2m4"] = {"t4"}
 gm._over_budget = {"d2m4": {"t9"}}
 ConfirmGateC1._PRESSURE_PIN["d2m4"] = (time.time(), "p-d2m4")
 gm._fail_streak["d2m4"] = {"n": 3, "recent": ["x"], "fired": True}
@@ -500,8 +491,8 @@ with patch.object(ap, "_audit", side_effect=RuntimeError("audit down")):
     r_m4 = ConfirmGateC1.reset_thread("d2m4", force=True)
 T("M4 force=True 落账仍抛：三锁齐清+返回 forced/audit=deadletter（出口优先，件二）",
   r_m4.get("ok") and r_m4.get("forced") and r_m4.get("audit") == "deadletter"
-  and "d2m4" not in gm._guard_lock and "d2m4" not in gm._guard_streak
-  and "d2m4" not in gm._frozen_hold and "d2m4" not in gm._over_budget
+  
+  and "d2m4" not in gm._over_budget
   and "d2m4" not in ConfirmGateC1._PRESSURE_PIN and "d2m4" not in gm._fail_streak)
 try:
     _dl_txt = open(_dl, encoding="utf-8").read()
@@ -512,7 +503,7 @@ T("M4 死信文件恰一行且含 tid/计数/异常名（账降尽力+死信兜�
   "且十六轮字段补齐：ts/stage=audit/cleared=True/forced_reset=True"
   "+件八补 ev 与 budget_detail 字段断言",
   len(_dl_recs) == 1 and _dl_recs[0].get("tid") == "d2m4"
-  and _dl_recs[0].get("freeze") == 1 and _dl_recs[0].get("budget") == 1
+  and _dl_recs[0].get("budget") == 1
   and _dl_recs[0].get("pressure") == 1 and _dl_recs[0].get("err") == "RuntimeError"
   and _dl_recs[0].get("ts") and _dl_recs[0].get("stage") == "audit"
   and _dl_recs[0].get("cleared") is True and _dl_recs[0].get("forced_reset") is True
@@ -523,16 +514,14 @@ T("M4 force=True 落账抛时不留 desk_state_reset 假账（真账搬家死信
 ConfirmGateC1._DEADLETTER_PATH = None  # 复位惰性（temp 目录里的死信随 tmp 自灭，不删档）
 
 # force=False 对照格：同一"落账抛"现场，正序必须纹丝不动（M3 原断言不动，此处再立一证）
-gm._guard_lock["d2m4f"] = (time.time(), 60)
 gm._over_budget["d2m4f"] = {"t5"}
 ConfirmGateC1._PRESSURE_PIN["d2m4f"] = (time.time(), "p-d2m4f")
 with patch.object(ap, "_audit", side_effect=RuntimeError("audit down")):
     r_m4f = ConfirmGateC1.reset_thread("d2m4f", force=False)
 T("M4 force=False 对照：正序不变（落账抛→ok=False+三锁原样未动，M3 语义零回归）",
   r_m4f.get("ok") is False and r_m4f.get("forced") is None
-  and "d2m4f" in gm._guard_lock and "d2m4f" in gm._over_budget
+  and "d2m4f" in gm._over_budget
   and "d2m4f" in ConfirmGateC1._PRESSURE_PIN)
-gm._guard_lock.pop("d2m4f", None)
 gm._over_budget.pop("d2m4f", None)
 ConfirmGateC1._PRESSURE_PIN.pop("d2m4f", None)
 # force 帧的账路正常态：设计"成功带 forced:true"——端点侧 force 判据（r.get("forced")）契约在此钉
@@ -540,7 +529,7 @@ ConfirmGateC1._PRESSURE_PIN["d2m4ok"] = (time.time(), "p-d2m4ok")
 r_m4ok = ConfirmGateC1.reset_thread("d2m4ok", force=True)
 rec_m4ok = [x for x in _recs("desk_state_reset") if x.get("tid") == "d2m4ok"]
 T("M4 force 帧账路正常：返回 forced+计数、desk_state_reset 真账注 forced=true、不触死信",
-  r_m4ok.get("ok") and r_m4ok.get("forced") and r_m4ok.get("freeze") == 0
+  r_m4ok.get("ok") and r_m4ok.get("forced") 
   and r_m4ok.get("pressure") == 1 and "audit" not in r_m4ok
   and "d2m4ok" not in ConfirmGateC1._PRESSURE_PIN
   and len(rec_m4ok) == 1 and rec_m4ok[0].get("forced") is True)
@@ -550,7 +539,6 @@ T("M4 force 帧账路正常：返回 forced+计数、desk_state_reset 真账注 
 # 反而比正序更脆）；新实现转死信+ok=True。死信仍 tempfile 改道，不污染真 mia_home。
 _dl5 = os.path.join(tmp, "bypass_deadletter_m5.jsonl")
 ConfirmGateC1._DEADLETTER_PATH = _dl5
-gm._guard_lock["d2m5"] = (time.time(), 60)
 gm._over_budget["d2m5"] = {"t3"}
 ConfirmGateC1._PRESSURE_PIN["d2m5"] = (time.time(), "p-d2m5")
 with patch.object(ConfirmGateC1, "_clear_three_locks", side_effect=RuntimeError("clear torn")):
@@ -563,18 +551,18 @@ try:
 except Exception:
     _dl5_recs = []
 T("M5 死信行=部分成功现场保全：stage=clear_locks/cleared=False/forced_reset=True/ts"
-  "/清前三锁计数（peek 在清之前，freeze=1/budget=1/pressure=1）/异常类名"
+  "/清前各锁计数（peek 在清之前，budget=1/pressure=1）/异常类名"
   "+件八补 ev 与 budget_detail 字段断言",
   len(_dl5_recs) == 1 and _dl5_recs[0].get("stage") == "clear_locks"
   and _dl5_recs[0].get("cleared") is False and _dl5_recs[0].get("forced_reset") is True
-  and _dl5_recs[0].get("ts") and _dl5_recs[0].get("freeze") == 1
+  and _dl5_recs[0].get("ts")
   and _dl5_recs[0].get("budget") == 1 and _dl5_recs[0].get("pressure") == 1
   and _dl5_recs[0].get("err") == "RuntimeError"
   and _dl5_recs[0].get("ev") == "bypass_deadletter"
   and _dl5_recs[0].get("budget_detail") == {"over_budget": 1, "abs_blocked": 0})
 T("M5 清锁抛不触账路：desk_state_reset 零条（账未落、锁未清全，读死信者自行接管）",
   not [x for x in _recs("desk_state_reset") if x.get("tid") == "d2m5"])
-for _d in (gm._guard_lock, gm._over_budget, ConfirmGateC1._PRESSURE_PIN):
+for _d in (gm._over_budget, ConfirmGateC1._PRESSURE_PIN):
     _d.pop("d2m5", None)  # 注入态下清锁没成功，键留在现场——本性格自行清场不外溢
 ConfirmGateC1._DEADLETTER_PATH = None  # 复位惰性（temp 死信随 tmp 自灭）
 T("M6 死信缺省新址=mia_home/runtime/（与主账 notes/ 分离——同目录=兜底同故障域+备份回滚风险；"
@@ -645,13 +633,12 @@ T("D api_reset_budget 零卡成功帧：ok=True+cleared_cards=0，error 键绝�
   _r_rb3.get("ok") is True and _r_rb3.get("cleared_cards") == 0 and "error" not in _r_rb3)
 
 # ── Q：三清扩面（d2v03fix3 件一/二——若若 P1-②实锤 + Cora263 线程持久状态全清单）──
-gm._guard_freeze_n["d2q"] = 2                    # 退避梯次：旧版 reset 后残留=救回即永久锁预备
 gm._guard_mid["d2q"] = {"tq": [("w", "x")]}      # 误杀降级环历史命中：reset 后观察窗口不该带
 gm._guard_hits["d2q"] = [("h", "y")]             # high 命中缓存：同 mid 性质
 gm._guard_deny["d2q"] = {"tc_old"}               # 被拒 tc_id：防重放，**reset 后必须在位**
 r_q = ConfirmGateC1.reset_thread("d2q")
-T("Q 三清扩面（件一/二）：reset 后 freeze_n/mid/hits 全清，deny 刻意保留（防重放安全特性）",
-  r_q.get("ok") and "d2q" not in gm._guard_freeze_n and "d2q" not in gm._guard_mid
+T("Q 扩面清（件一/二）：reset 后 mid/hits 全清，deny 刻意保留（防重放安全特性）",
+  r_q.get("ok") and "d2q" not in gm._guard_mid
   and "d2q" not in gm._guard_hits and gm._guard_deny.get("d2q") == {"tc_old"})
 gm._guard_deny.pop("d2q", None)
 
