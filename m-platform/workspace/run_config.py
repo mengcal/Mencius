@@ -3,7 +3,8 @@
 
 对话输入框的两个开关真正生效的地方：
 - 输入框选的模型 → 前端随消息带 mia_config.model → 本中间件在模型调用前换主脑
-- 输入框联网开关 → mia_config.web_search=false → 搜索工具被挡回"已关闭"
+- 联网搜索：按钮已退役（r32b，默认常开）；mia_config.web_search=false 作为协议字段保留
+  ——UI 不再提供关闭入口，但任何客户端显式带 false 仍被挡回（Eve/若若"协议活、UI 退役"口径）
 
 原则：官方机制（AgentMiddleware + 自定义 state 通道 mia_config），不碰消息文本，
 不改米娅提示词，什么都不选 = 完全默认行为。

@@ -124,7 +124,10 @@ _WHBK = os.environ.get("WEBHOOK_TOKEN", "")
 
 
 def _webhook_url(tid: str) -> str:
-    # 09-17 批②：回调基址走 env（compose 可覆盖），默认=本容器服务名
+    # 09-17 批②：回调基址走 env（compose 可覆盖），默认=本容器服务名。
+    # r35（Eve N-r35-1 对账）：此处保留 workplatform:8000 是有意的——webhook 的调用方是
+    # 牛马/外部岗容器（米娅→langgraph 回投，m_mia 网内可达，m-gates.sh 实证），
+    # 与 tools.py:143 的 SDK 自调面（宿主回环 127.0.0.1）是两个 env、两个消费者，勿再合并。
     base = os.environ.get("MIA_WEBHOOK_BASE", "http://workplatform:8000").rstrip("/")
     return f"{base}/tasks/webhook?tid={tid}&w={_WHBK}"
 

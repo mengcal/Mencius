@@ -179,16 +179,16 @@ export function ToolApprovalInterrupt({
         )}
       </div>
 
-      {/* Rejection Message Input */}
+      {/* 拒绝理由输入（回卷 NOVA/Cora：爸爸每拒一单都看的框，中文化） */}
       {showRejectionInput && !isEditing && (
         <div className="mb-4">
           <label className="mb-2 block text-xs font-medium text-foreground">
-            Rejection Message (optional)
+            拒绝理由（可选）
           </label>
           <Textarea
             value={rejectionMessage}
             onChange={(e) => setRejectionMessage(e.target.value)}
-            placeholder="Explain why you're rejecting this action..."
+            placeholder="说说为什么拒绝这个操作…（会转告米娅）"
             className="text-sm"
             rows={2}
             disabled={isLoading}

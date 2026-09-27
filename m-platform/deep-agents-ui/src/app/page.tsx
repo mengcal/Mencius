@@ -380,7 +380,7 @@ function HomePageContent() {
   }, [config, assistantId, setAssistantId]);
   // r36→r39：URL 权威入口改由 urlAssistantId prop 直供 HomePageInner（NOVA P0-1/P0-2 根治），
   // 不再 setConfig 回灌——旧回灌与上方回写 effect 相咬（删 URL 逃不出围炉）、
-  // 且 ConfigDialog 保存会把内存态 hearth 写进 localStorage（裸开默认被劫）。
+  // （r35：ConfigDialog.tsx 死文件已物理删除；此段保留的是 localStorage 保存链的隔离规矩本身。）
   const langsmithApiKey =
     config?.langsmithApiKey || process.env.NEXT_PUBLIC_LANGSMITH_API_KEY || "";
   // r32 F11：原 setupNeeded/loginNeeded 三行闸门分支整段删除（见 HomePageContent 头注释）

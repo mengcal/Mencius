@@ -43,7 +43,7 @@ export function FilesPopover({
     <>
       {Object.keys(files).length === 0 ? (
         <div className="flex h-full items-center justify-center p-4 text-center">
-          <p className="text-xs text-muted-foreground">No files created yet</p>
+          <p className="text-xs text-muted-foreground">还没有文件</p>
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(256px,1fr))] gap-2">

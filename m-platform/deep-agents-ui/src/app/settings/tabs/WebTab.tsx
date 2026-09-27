@@ -10,14 +10,14 @@
  */
 
 import { useSettings } from '../context';
-import { Section, Row, Switch, inputC, pageTitleClass, pageSubtitleClass } from '../ui';
+import { Section, Row, inputC, pageTitleClass, pageSubtitleClass } from '../ui';  // r35（Cora 联动3）：Switch 随四个假控件退役后为死 import，拔
 
 export default function WebTab() {
   const { val, set } = useSettings();
   return (
     <>
       <h2 className={pageTitleClass}>联网搜索</h2>
-      <p className={pageSubtitleClass}>对话联网开关、搜索引擎路由与引擎密钥</p>
+      <p className={pageSubtitleClass}>搜索引擎路由、结果数与引擎密钥（联网搜索已默认常开，无需开关）</p>
       <Section first title="搜索">
         <Row label="默认搜索引擎" description="米娅默认走智能路由：中文秘塔→博查，英文 Tavily。手动指定后固定用该引擎。">
           <select className={inputC + ' w-40'} defaultValue={val('search.engine', 'auto')} onChange={(e) => set('search.engine', e.target.value)}>

@@ -185,7 +185,7 @@ function StatusFilterItem({
 function ErrorState({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center">
-      <p className="text-sm text-red-600">Failed to load threads</p>
+      <p className="text-sm text-red-600">线程列表读取失败</p>
       <p className="mt-1 text-xs text-muted-foreground">{message}</p>
     </div>
   );
@@ -208,7 +208,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center">
       <MessageSquare className="mb-2 h-12 w-12 text-gray-300" />
-      <p className="text-sm text-muted-foreground">No threads found</p>
+      <p className="text-sm text-muted-foreground">还没有对话</p>
     </div>
   );
 }
@@ -328,20 +328,20 @@ export function ThreadList({
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="end">
-              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="all">全部状态</SelectItem>
               <SelectSeparator />
               <SelectGroup>
-                <SelectLabel>Active</SelectLabel>
+                <SelectLabel>活跃</SelectLabel>
                 <SelectItem value="idle">
                   <StatusFilterItem
                     status="idle"
-                    label="Idle"
+                    label="空闲"
                   />
                 </SelectItem>
                 <SelectItem value="busy">
                   <StatusFilterItem
                     status="busy"
-                    label="Busy"
+                    label="忙碌"
                   />
                 </SelectItem>
               </SelectGroup>
@@ -351,14 +351,14 @@ export function ThreadList({
                 <SelectItem value="interrupted">
                   <StatusFilterItem
                     status="interrupted"
-                    label="Interrupted"
+                    label="待批准"
                     badge={interruptedCount}
                   />
                 </SelectItem>
                 <SelectItem value="error">
                   <StatusFilterItem
                     status="error"
-                    label="Error"
+                    label="出错"
                   />
                 </SelectItem>
               </SelectGroup>
@@ -429,7 +429,7 @@ export function ThreadList({
                   {isLoadingMore ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
+                      加载中…
                     </>
                   ) : (
                     "Load More"

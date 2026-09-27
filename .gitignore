@@ -8,3 +8,7 @@ m-platform/workspace/skills_manifest.json
 *.log
 *.pid
 .env
+
+# 09-27 r35 searxng 复验案：运行时配置含 secret_key，永不进 git（家规同 pgdata 先例）
+m-platform/searxng/
+m-platform/docker-compose.yml.bak*

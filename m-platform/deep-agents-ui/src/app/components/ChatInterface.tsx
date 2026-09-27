@@ -203,7 +203,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
         >
           {isThreadLoading ? (
             <div className="flex items-center justify-center p-8">
-              <p className="text-muted-foreground">Loading...</p>
+              <p className="text-muted-foreground">加载中…</p>
             </div>
           ) : (
             <>
