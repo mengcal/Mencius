@@ -22,7 +22,6 @@ services:
       - DATABASE_URI=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/m
       - REDIS_URI=redis://redis:6379
       # 密钥一律从同目录 .env 读取（compose 自动加载），文件里不再写死任何密钥
-      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       # R65：OPENAI_* 托底已废（配置页 external 节=唯一服务商源），compose 不再注入
       - SEARXNG_URL=http://searxng:8080
       # R76 execute 沙箱：SandboxedShellBackend 用它连沙箱执行服务（.env 里同值，两端配对）

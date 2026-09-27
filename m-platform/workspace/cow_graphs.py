@@ -18,6 +18,13 @@ from deepagents import create_deep_agent, SubAgent
 # 部门/总管图的 backend 在函数内引 agent_multimodel.SandboxedShellBackend（同进程导入，避顶层环）。
 
 BASE = Path(__file__).resolve().parent
+def _ws_root() -> str:
+    # r36 工作区分区：与主图同源（settings.workspace.containerRoot）
+    try:
+        from settings_mgr import load_settings
+        return str((load_settings().get("workspace", {}) or {}).get("containerRoot") or "mia_home").strip() or "mia_home"
+    except Exception:
+        return "mia_home"
 _DEPT_CONFIG = BASE / "departments_config.json"
 _MAX_SLOTS = 4
 
@@ -163,7 +170,7 @@ def _build_dept_graph(dept: dict, slot: str):
                          "只准派部门在编牛马，general-purpose 是退役槽位，派过去=失职。"),
         tools=[search_knowledge_base],  # R66 #5：主管判断派活前可查私人知识库（此前无工具，派活铁律落空）
         subagents=subagents,
-        backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
+        backend=SandboxedShellBackend(root_dir=str(BASE / _ws_root())),
         middleware=_sup_mw,
     )
     return graph
@@ -318,7 +325,7 @@ def _get_gm_graph():
             "你是总管（任务分解官）。把跨部门任务分解成各部门的活，分派给部门主管，收齐结果汇总上交。"
             "分派只准用在编部门主管，general-purpose 是退役槽位。"),
         subagents=subs,
-        backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
+        backend=SandboxedShellBackend(root_dir=str(BASE / _ws_root())),
         # R66 层级确认门：总管图子层模式（拦截=上报米娅请示，不弹爸爸）；主管/牛马已在 _build_dept_graph 挂好
         # r41（C1）：总管同为子层=SubGate 全拦（ask 转文案链上报）
         middleware=_gm_mw,

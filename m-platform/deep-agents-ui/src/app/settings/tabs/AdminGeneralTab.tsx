@@ -117,6 +117,25 @@ export default function AdminGeneralTab() {
         </Row>
         <RememberRulesCard />
       </Section>
+      {/* r36（09-27 爸令工作区分区）：容器与宿主机两个域摆到明面上——
+          容器域=米娅与牛马的文件/执行边界（可配）；宿主域=完全访问档才可达（起点在宿主 .env，只读说明） */}
+      <Section title="工作区">
+        <Row label="容器工作区（米娅与牛马的活动域）" description="文件读写与命令执行都圈在这个目录内（相对平台数据目录）。改它=换米娅的“家”，重启平台后生效；牛马部门图与总管图同步跟随。">
+          <input className={inputC + ' w-44'} defaultValue={val('workspace.containerRoot')}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (!v || v.includes('..') || v.includes(':') || v.startsWith('/')) {
+                alert('目录名不能为空、不能含 .. 或盘符/绝对路径——工作区必须留在平台数据目录内');
+                e.target.value = String(val('workspace.containerRoot'));
+                return;
+              }
+              set('workspace.containerRoot', v);
+            }} />
+        </Row>
+        <Row label="宿主执行区（仅“完全访问”档可达）" description="切到完全访问档后，米娅经宿主执行器操作您电脑，起点目录由宿主机 .env 的 MIA_HOST_RUNNER_CWD 控制（默认 D:\m）。这里改不了它——那是宿主机上的文件，改动请在宿主机进行并重启执行器。">
+          <span className="text-sm text-muted-foreground">宿主机 .env 控制 · 平台不代发</span>
+        </Row>
+      </Section>
       {/* W3：技能清单独立成区（卡片式 + 增删改），不再挤在「米娅与安全」行里 */}
       <Section title="技能清单">
         <SkillsManager />

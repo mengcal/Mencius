@@ -175,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             p = subprocess.Popen([BASH, "-lc", cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  text=True, encoding="utf-8", errors="replace",
-                                 cwd=r"D:\m")
+                                 cwd=os.environ.get("MIA_HOST_RUNNER_CWD", r"D:\m"))
             try:
                 out_b, err_b = p.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:

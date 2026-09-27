@@ -20,6 +20,16 @@ from deepagents import AsyncSubAgent, create_deep_agent  # 原 L961 + L67（L67 
 
 # ── 家目录：记忆/技能/工作文件都住这，跨对话持久 ──（原 L808-816；BASE 由原 parent 改 parent.parent）
 BASE = Path(__file__).resolve().parent.parent
+# r36（09-27 爸令工作区分区）：容器域根可配（settings.workspace.containerRoot，默认 mia_home=零行为变更）。
+# 装配期读一次——改它=低频配置动作，重启容器生效（与档位文件同纪律）。
+def _container_root() -> str:
+    try:
+        from settings_mgr import load_settings
+        r = str((load_settings().get("workspace", {}) or {}).get("containerRoot") or "").strip()
+        return r or "mia_home"
+    except Exception:
+        return "mia_home"
+_WS_ROOT = _container_root()
 MEMORY_FILE = BASE / "mia_home" / "memory" / "MEMORY.md"
 MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 if not MEMORY_FILE.exists():
@@ -196,7 +206,7 @@ def _compaction_middleware():
         from deepagents.middleware.summarization import SummarizationMiddleware
         return [SummarizationMiddleware(
             model=comp_model,
-            backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
+            backend=SandboxedShellBackend(root_dir=str(BASE / _WS_ROOT)),
             **kwargs,
         )]
     except Exception:
@@ -214,7 +224,7 @@ ConfirmGateMiddleware._MCP_NAMES = {str(t.name).strip().lower() for t in _mcp_to
 # 顺序约束：必须在上面 ConfirmGateMiddleware._MCP_NAMES 注入之后构造（门的 MCP 来源判定吃这份名单）。
 _middleware = [
     ConfirmGateC1(),  # r41（C1）：官方 HITL 包装版四档门（批量卡/自包含拒出口）——替换现役 ConfirmGateMiddleware
-    ScribeMiddleware(root_dir=BASE / "mia_home"),
+    ScribeMiddleware(root_dir=BASE / _WS_ROOT),
     *_compaction_middleware(),
     RunConfigMiddleware(),  # 输入框的模型选择/联网开关在这里生效
     _flow_observer,  # r41 流程体系 v2 层3：动作序列观测（只记不拦）
@@ -239,7 +249,7 @@ agent = create_deep_agent(  # 原 L1011-1034
            dispatch_external, list_external_posts, list_external_results,  # r58 对外派活一期
            sd_generate,  # 09-16 本机 SD 出图（零成本不外网，无需批准门）
            *_mcp_tools, web_search, web_search_metaso, web_search_bocha, web_search_tavily],
-    backend=SandboxedShellBackend(root_dir=str(BASE / "mia_home")),
+    backend=SandboxedShellBackend(root_dir=str(BASE / _WS_ROOT)),
     state_schema=MiaState,
     middleware=_middleware,  # 09-15 夜：装配件提为具名变量交保险丝验身（内容与顺序逐字未动）
 )

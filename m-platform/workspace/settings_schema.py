@@ -37,6 +37,9 @@ SCHEMA = {
     "search.metasoUrl":            {"default": "https://metaso.cn/api/mcp", "type": "str", "ui": "联网搜索", "note": "同上"},
     # —— 图像 ——
     "images.sdUrl":                {"default": "http://host.docker.internal:7860", "type": "str", "ui": "图片", "note": "容器视角（09-17 修正语义）"},
+    # —— 工作区分区（r36 09-27 爸令：容器与宿主机明确分开，如 ZCode 的工作区概念） ——
+    "workspace.containerRoot":       {"default": "mia_home", "type": "str", "ui": "管理", "note": "容器工作区根（相对 workspace 的目录）——米娅与牛马的文件/执行域边界；改后重启容器生效"},
+    "workspace.hostNote":            {"default": "", "type": "str", "ui": "管理", "note": "宿主执行域（完全访问档经 host_runner 到达，起点由宿主 .env 的 MIA_HOST_RUNNER_CWD 控制，默认 D:\\m）——此键仅存说明，不控制行为"},
     # —— 对话压缩（r35 Qoder P1-7/P1-8：graph.py _compaction_middleware 真消费，此前整节未登记=验收官全盲） ——
     "interface.compaction.enabled":   {"default": True, "type": "bool", "ui": "界面", "note": "关掉=不挂压缩中间件"},
     "interface.compaction.threshold": {"default": "", "type": "str", "ui": "界面", "note": "触发阈值 token；留空=deepagents 官方默认（前端不许再假显 80000）"},
