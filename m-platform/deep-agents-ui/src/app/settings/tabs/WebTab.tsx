@@ -32,7 +32,7 @@ export default function WebTab() {
       </Section>
       <Section title="SearXNG">
         <div><label className="mb-1 block text-sm text-foreground">Searxng 查询接口地址</label>
-          <input className={inputC} defaultValue={val('search.searxngUrl', '')} placeholder="留空=后端默认 http://searxng:8080/search" onChange={(e) => set('search.searxngUrl', e.target.value)} /></div>
+          <input className={inputC} defaultValue={val('search.searxngUrl', '')} placeholder="留空=用平台自带的本地搜索服务（已配好，一般不用改）" onChange={(e) => set('search.searxngUrl', e.target.value)} /></div>
         <div><label className="mb-1 block text-sm text-foreground">Searxng 搜索语言（例如：all, en, es, de, fr 等）</label>
           <input className={inputC} defaultValue={val('search.searxngLang', 'all')} onChange={(e) => set('search.searxngLang', e.target.value)} /></div>
       </Section>

@@ -101,7 +101,7 @@ export default function SubagentsTab() {
                     const fbs = (draftRef.current[`agents.${k}.fallbacks`] ?? (a.fallbacks || [])) as any[];
                     return (
                       <div className="mt-3">
-                        <label className="mb-1 block text-sm text-muted-foreground">回退链（主模型异常时按顺序降级；留空 = 不回退，托底走 .env）</label>
+                        <label className="mb-1 block text-sm text-muted-foreground">回退链（主模型异常时按顺序降级；留空 = 不回退，报错如实出声）</label>
                         {fbs.map((fb: any, fi: number) => (
                           <div key={fi} className="mt-1 flex items-center gap-2">
                             <select

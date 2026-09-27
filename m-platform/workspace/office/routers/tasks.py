@@ -139,11 +139,14 @@ async def tasks_dispatch(req: dict = Body(...), request: Request = None):
     # 双钥匙门（≤15 行）：Bearer 管理员密钥（浏览器/管理端）**或** X-Internal-Key=WEBHOOK_TOKEN
     # （进程内 dispatch_to_xiaoquan 工具自带）二认一；都验不过 401。沙箱没钥匙也没 env=死路。
     import hmac as _h2
-    ah = request.headers.get("authorization", "") if request else ""
-    ptok = ah[7:].strip() if ah.lower().startswith("bearer ") else (request.headers.get("x-token") or "" if request else "")
+    from ..core import _presented_token
+    # r34（CB 5.1 P1）：凭证呈现统一走 _presented_token（Bearer/x-token 头优先，
+    # HttpOnly Cookie 兜底）——观测台 office.html 同源 fetch 带 Cookie 即可过门，
+    # 不再恒 401（旧版只认头，R80 上双钥匙门时这个同族消费方没跟上）。
+    ptok = _presented_token(request) if request else ""
     ik = (request.headers.get("x-internal-key") or "") if request else ""
     if not (_token_ok(ptok) or (_WHBK and _h2.compare_digest(_WHBK.encode(), str(ik).encode()))):
-        return _JSONResp({"ok": False, "error": "派活需要管理员密钥或内部钥匙（浏览器走 Bearer，工具走 X-Internal-Key）"}, status_code=401)
+        return _JSONResp({"ok": False, "error": "派活需要管理员密钥或内部钥匙（浏览器走 Bearer/Cookie，工具走 X-Internal-Key）"}, status_code=401)
     # R10.5（NOVA 遗留清单·dispatch 限频）：滑动窗口 60s≤20——派活=起真线程烧真模型，
     # 被刷爆=后台线程池+上游额度双烧；与三扇代理门独立计数（互不挤兑）。
     if not _rate_ok(_DISPATCH_HITS, 60.0, 20):

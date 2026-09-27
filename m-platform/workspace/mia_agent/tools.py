@@ -590,5 +590,5 @@ def sd_generate(prompt: str, negative_prompt: str = "", steps: int = 18,
     out_dir.mkdir(parents=True, exist_ok=True)
     fp = out_dir / (_time.strftime("%Y%m%d-%H%M%S") + f"_seed{payload['seed']}.png")
     fp.write_bytes(_b64.b64decode(imgs[0]))
-    return (f"图已生成：mia_home/sd_out/{fp.name}（爸爸电脑上 D:\\m\\workspace\\mia_home\\sd_out 可见）\n"
+    return (f"图已生成：mia_home/sd_out/{fp.name}（设置页→文档/图片区可见）\n"
             f"提示词: {payload['prompt'][:80]} | {payload['width']}x{payload['height']} steps{payload['steps']}")

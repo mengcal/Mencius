@@ -34,7 +34,7 @@ export function ModelPicker({ models, selectedModel, selectedProvider, onPick }:
           setModelSearch("");
         }}
         className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-tertiary transition-colors hover:bg-accent hover:text-primary"
-        title={selectedModel || "选择模型（接线中：当前仍由米娅主管模型应答）"}
+        title={selectedModel || "选择模型（本条消息用所选模型应答；不选=米娅默认模型）"}
       >
         {selectedModel || "模型"}
         <ChevronDown size={12} />

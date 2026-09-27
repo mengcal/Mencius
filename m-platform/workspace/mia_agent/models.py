@@ -4,7 +4,7 @@
 L858-908（拆分方案 #5；其中 L893-900 的 boss_model 构造在本段行号范围内，一并归入）。
 依赖：providers.make_model、settings_mgr.load_agents_config（模块级）；
 langchain_openai 在 _model 兜底分支内懒加载（与原实现一致）。
-被引用：mia_agent/graph.py（boss_model，原 L939/L1012；_interrupt_on，原 L1016）。
+被引用：mia_agent/graph.py（boss_model，原 L939/L1012）。
 """
 
 from providers import make_model  # 原 L124
@@ -55,8 +55,6 @@ boss_model = _model("boss", **_boss_kwargs)
 # R49 回退链改由 run_config.py 的模型调用层实现（异常时换备用模型重试），配置见设置页 settings.agents.boss.fallbacks（原 L901）
 
 
-def _interrupt_on():  # 原 L904-908
-    """R47：官方 HumanInTheLoop 已停用（interrupt_on 启动时烘焙，不能动态调档）。
-    确认全部改走 ConfirmGateMiddleware 动态确认门——四档、改设置即时生效、无需重启。
-    本函数保留返回空（万一设置页旧值残留也不双重要求确认）。"""
-    return []
+# r34（CB 3.6/10.3）：_interrupt_on 空壳拆除——R47 起官方 HITL 停用（interrupt_on
+# 启动时烘焙不能动态调档），确认全走 ConfirmGateC1 动态门。恒 [] 的壳+调用方
+# 注释"设置页可关"是谎言残留，一并清除。

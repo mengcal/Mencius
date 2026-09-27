@@ -69,7 +69,7 @@ from mia_agent.confirm_gate import ConfirmGateMiddleware  # 原 L212-464（C1 �
 from mia_agent.confirm_gate_c1 import ConfirmGateC1, assert_gate_order  # r41：官方 HITL 包装版（主图）；09-15 夜：连带启动保险丝
 from mia_agent.flow_observer import observer as _flow_observer  # r41：流程体系 v2 观测器
 from mia_agent.store import MiaState, _STORE  # 原 L120-122/L165-168/L804-854
-from mia_agent.models import _interrupt_on, boss_model  # 原 L124/L858-908
+from mia_agent.models import boss_model  # r34：_interrupt_on 空壳已拆
 from mia_agent.plan_check import PlanCheckMiddleware  # r45 层2 验收导航/clarify/同型连撞
 from mia_agent.tools import (_load_mcp_tools, dispatch_to_xiaoquan, edit_memory, email,  # 原 L171-210/L466-802
                              list_async_tasks, lark_send, manage_departments, search_knowledge_base,
@@ -225,9 +225,8 @@ assert_gate_order(_middleware)  # 现状语义=存在性检查（非顺序检查
 agent = create_deep_agent(  # 原 L1011-1034
     model=boss_model,
     name="mia",
-    # ── 官方 human-in-the-loop：动手跑代码前必须经爸爸确认（deepagents 官方 interrupt_on）──
-    # 设置页 subagents.interruptOnExecute=false 可关（默认开，省 token 防瞎跑）
-    interrupt_on=_interrupt_on(),
+    # r34（CB 3.6）：官方 interrupt_on 参数拆除（R47 停用后恒空壳）——
+    # 四档确认唯一实现=ConfirmGateC1 动态门（graph middleware 链内），改设置即时生效。
     system_prompt=_system_prompt(),  # 设置页 general.system_prompt 优先，_DEFAULT_PROMPT 只是出厂默认
     memory=["memory/MEMORY.md"],
     store=_STORE,  # R63 官方 store（PG 永久记忆）：跨线程共享，checkpointer 之外的全局记忆层
