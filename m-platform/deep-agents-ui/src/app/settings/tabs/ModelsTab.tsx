@@ -71,8 +71,8 @@ export default function ModelsTab() {
             defaultValue={val('general.params.temperature')}
             onChange={(e) => set('general.params.temperature', e.target.value)} />
         </Row>
-        <Row label="最大输出 tokens" description="单次回复输出上限；默认给满模型上限 131072（魔搭良心，宁给满不截断）">
-          <input className={inputC + ' w-40 text-right'} placeholder="131072（模型上限）"
+        <Row label="最大输出 tokens" description="全局兜底 32768；每模型可在下方「单独设置」里覆盖（魔搭 qwen-flash 已单独给满 131072，可在其卡片里改）">
+          <input className={inputC + ' w-40 text-right'} placeholder="32768（全局兜底）"
             defaultValue={val('general.params.max_tokens')}
             onChange={(e) => set('general.params.max_tokens', e.target.value)} />
         </Row>
