@@ -33,7 +33,7 @@ import { CONFIRM_TIERS } from "@/lib/confirmTiers"; // r32 F18：四档单一真
 function WorkspaceBadge() {
   // r36q（若若 P1-a/b + Eve/Veda/Cora 竣工票）：徽章跟**当前对话的工作区**走——
   // 读 localStorage 初值 + 监听选择器派发的 mia-workspace 事件；宿主机=橙色警示。
-  // 文案矛盾消除：不再说"待爸爸开通"（选择器已开放，档位与域两轴正交）。
+  // 文案矛盾消除：旧版徽章写"尚未开通"而选择器已开放=两套话，现统一为已开通实况（两轴正交）。
   const [ws, setWs] = useState<{ root: string; mode: string } | null>(null);
   useEffect(() => {
     import("@/lib/providerApi").then(({ getSettings }) => {
