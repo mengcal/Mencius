@@ -90,9 +90,10 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
   // R3 闭环：轮询后台任务，完成且未播报的 → 自动让米娅读结果汇报给爸爸（R64 持久化见 useTaskAnnouncer）
   useTaskAnnouncer(isLoading, sendMessage);
   // 上传：文本进 files 通道；图片存 base64 并自动请米娅派 visual 识图（R3）
-  const handleFileUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const list = e.target.files;
+  // r36x（爸 19:0x 令）：粘贴图片与文件选择共用同一条上传链——
+  // 此前只有文件选择按钮，Ctrl+V 粘贴截图静默无效（米娅平台一直没有这个功能，不是坏了）。
+  const processFiles = useCallback(
+    async (list: FileList | File[] | null) => {
       if (!list?.length) return;
       const next: Record<string, string> = { ...files };
       const images: string[] = [];
@@ -120,7 +121,6 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
         }
       }
       await setFiles(next);
-      e.target.value = "";
       // 自动派活提示（走 enqueue 队列，不卡聊天）
       if (images.length) {
         sendMessage(
@@ -133,6 +133,34 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       setInput("");
     },
     [files, setFiles, sendMessage, setInput]
+  );
+
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      await processFiles(e.target.files);
+      e.target.value = "";
+    },
+    [processFiles]
+  );
+
+  // 粘贴：截图（clipboardData.items 的 image）与复制的文件都进同一条链
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      const dt = e.clipboardData;
+      if (!dt) return;
+      const picked: File[] = [];
+      for (const it of Array.from(dt.items)) {
+        if (it.kind === "file") {
+          const f = it.getAsFile();
+          if (f) picked.push(f);
+        }
+      }
+      if (picked.length) {
+        e.preventDefault();
+        await processFiles(picked);
+      }
+    },
+    [processFiles]
   );
   const handleSubmit = useCallback(
     (e?: FormEvent) => {
@@ -293,7 +321,8 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isLoading ? "米娅正在干活…（点右侧停止可打断）" : "跟米娅说什么…"}
+              onPaste={(e) => void handlePaste(e)}
+              placeholder={isLoading ? "米娅正在干活…（点右侧停止可打断）" : "跟米娅说什么…（可直接 Ctrl+V 粘贴截图）"}
               className="font-inherit field-sizing-content min-h-[64px] flex-1 resize-none border-0 bg-transparent px-[18px] pb-[13px] pt-[14px] text-sm leading-7 text-primary outline-none placeholder:text-tertiary"
               rows={2}
             />
