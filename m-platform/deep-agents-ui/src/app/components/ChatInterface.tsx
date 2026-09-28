@@ -336,7 +336,8 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                 {/* 模型选择（OWUI 同款：输入框右下角） */}
                 {/* r36k 工作区选择器（对话头部，开聊即选——爸定标准：不在设置页） */}
                 <select
-                  className="h-8 rounded-md border border-border bg-transparent px-1.5 text-xs text-foreground"
+                  className="h-8 rounded-md border border-border bg-background px-1.5 text-xs text-foreground"
+  style={{ colorScheme: "dark" }}
                   value={workspace}
                   onChange={(e) => { setWorkspace(e.target.value); try { localStorage.setItem('mia.workspace', e.target.value); } catch {} }}
                   title="工作区=米娅在哪台机器上干活。容器=隔离沙箱（默认）；宿主机=您的电脑本体（经宿主执行器，高危操作仍按当前档位请示）。"
