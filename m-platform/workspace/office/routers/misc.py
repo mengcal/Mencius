@@ -279,10 +279,15 @@ async def context_threads():
             LIMITS[str(_k)] = int(_v)
         except (TypeError, ValueError):
             pass
-    try:
-        _DEF_LIMIT = int(_m.get("contextLimitDefault", _dof("models.contextLimitDefault")) or _dof("models.contextLimitDefault"))
-    except (TypeError, ValueError):
-        _DEF_LIMIT = 131072  # schema 读取失败时的最后防线
+    # r36u（爸 16:02 令）：未知模型兜底拔除——窗口查不到就如实不报，绝不编数。
+    # 每模型"单独设置"（model_overrides.<名>.context_limit）优先于总表。
+    for _k, _v in ((load_settings().get("model_overrides", {}) or {}).items()):
+        try:
+            _cl = int(str(_v.get("context_limit") or "").strip())
+            if _cl > 0:
+                LIMITS[str(_k)] = _cl
+        except (TypeError, ValueError):
+            pass
     per: dict = {}
     all_inputs = []
     if f.exists():
@@ -306,7 +311,7 @@ async def context_threads():
     baseline = min(all_inputs) if all_inputs else 0
     out = []
     for t in per.values():
-        limit = LIMITS.get(t["model"], _DEF_LIMIT)
+        limit = LIMITS.get(t["model"])  # r36u：查不到=None（前端显示未知），不编兜底数
         msgs = max(t["input"] - baseline, 0)
         out.append({**t, "limit": limit, "baseline": baseline, "messages": msgs,
                     "pct": round(t["input"] / limit * 100, 1) if limit else 0})

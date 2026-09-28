@@ -52,7 +52,7 @@ export function ContextMeter({ tidNow }: { tidNow: string }) {
               return (
                 <>
                   <div className="mb-1 flex justify-between">
-                    <span>{Math.round(mine.input).toLocaleString()} / {mine.limit.toLocaleString()} tokens</span>
+                    <span>{Math.round(mine.input).toLocaleString()} / {mine.limit != null ? mine.limit.toLocaleString() : '未知'} tokens{mine.limit == null && '（去模型页补窗口表）'}</span>
                     <span className={pct > 80 ? "text-orange-400" : "text-tertiary"}>{pct}%</span>
                   </div>
                   <div className="mb-2 h-2 w-full overflow-hidden rounded-full bg-gray-700">

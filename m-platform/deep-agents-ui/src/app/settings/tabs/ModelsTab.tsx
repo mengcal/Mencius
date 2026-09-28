@@ -82,9 +82,6 @@ export default function ModelsTab() {
         <Row label="请求超时秒 (model.requestTimeout)" description="单次模型请求的最长等待秒数">
           <input className={inputC + ' w-28'} type="number" defaultValue={val('model.requestTimeout', 90)} onBlur={(e) => set('model.requestTimeout', Number(e.target.value) || 90)} />
         </Row>
-        <Row label="未知模型窗口兜底 (models.contextLimitDefault)" description="上下文窗口表里查不到的模型用这个 token 数兜底">
-          <input className={inputC + ' w-32'} type="number" defaultValue={val('models.contextLimitDefault', 131072)} onBlur={(e) => set('models.contextLimitDefault', Number(e.target.value) || 131072)} />
-        </Row>
         <div>
           <label className="mb-1 block text-sm text-foreground">上下文窗口表 (models.contextLimits)</label>
           <p className="mb-1 text-xxs text-muted-foreground">JSON：模型名 → token 数，覆盖内置默认表。</p>

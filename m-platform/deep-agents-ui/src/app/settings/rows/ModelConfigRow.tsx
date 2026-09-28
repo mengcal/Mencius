@@ -18,7 +18,7 @@ export default function ModelConfigRow({ model, provider, val, set }: {
   set: (path: string, v: any) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const hasOverride = ['system_prompt', 'temperature', 'top_p', 'max_tokens'].some(
+  const hasOverride = ['system_prompt', 'temperature', 'top_p', 'max_tokens', 'context_limit'].some(
     (k) => val(`model_overrides.${model}.${k}`) !== ''
   );
   return (
@@ -44,6 +44,8 @@ export default function ModelConfigRow({ model, provider, val, set }: {
             onChange={(e) => { set(`model_overrides.${model}.system_prompt`, e.target.value); const t = e.currentTarget; t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight, 80) + 'px'; }}
           />
           <div className="mt-2 flex gap-3">
+            <div className="flex-1"><label className="mb-1 block text-sm text-muted-foreground">上下文窗口（留空用总表）</label>
+              <input type="number" className={inputC} defaultValue={val(`model_overrides.${model}.context_limit`)} onChange={(e) => set(`model_overrides.${model}.context_limit`, e.target.value === '' ? '' : +e.target.value)} /></div>
             <div className="flex-1"><label className="mb-1 block text-sm text-muted-foreground">temperature</label>
               <input type="number" step="0.1" className={inputC} defaultValue={val(`model_overrides.${model}.temperature`)} onChange={(e) => set(`model_overrides.${model}.temperature`, e.target.value === '' ? '' : +e.target.value)} /></div>
             <div className="flex-1"><label className="mb-1 block text-sm text-muted-foreground">top_p</label>

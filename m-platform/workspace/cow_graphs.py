@@ -53,6 +53,13 @@ def _role_model(role: str, **kw):
         _t = c.get("thinking")
         if _t not in (None, "", "default"):
             kw = {**kw, "thinking": _t}
+    # r36u（爸 16:02 令：牛马温度由米娅设置、爸爸配置页可见）——岗位级可选字段，
+    # agents.<role>.temperature（manage_departments 管理链已内建），不填=模型侧默认。
+    if "temperature" not in kw and c.get("temperature") not in (None, ""):
+        try:
+            kw = {**kw, "temperature": float(c.get("temperature"))}
+        except (TypeError, ValueError):
+            pass
     try:
         return make_model(c.get("provider", ""), c.get("model", ""), **kw)
     except Exception as e:
