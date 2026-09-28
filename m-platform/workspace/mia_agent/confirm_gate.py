@@ -114,9 +114,11 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
             return "pass" if ro else "deny"
         if ro:
             return "pass"
-        # r38 授权变更：set_model（升降配牛马模型）=爸爸 09-01 授予、09-29 重申"具体操作我会赋权给米娅去做"
-        # ——除 plan 档外各档放行，不再每次要爸爸扣章；密钥不经此路（在设置页/secrets）。
-        if name == "manage_departments" and a == "set_model":
+        # r38 授权变更→r38b 爸 09-29 01:30 政令修正：manage_departments **全部动作**=米娅自主人事，
+        # 总阀=顶栏"👑 米娅有权/无权"开关（permissions.miaManageAgents，tools.py 里关=直接拒）——
+        # 不再叠批准门（爸："我只关米娅，米娅关牛马""我想看到的是米娅自己调配，看她拆解部门的能力"）。
+        # plan 档在上面已 deny（讨论模式不动编制）；list/models 的 ro 行保留=plan 下仍可看。
+        if name == "manage_departments":
             return "pass"
         # 到这里=非只读=变更（含 execute/write_file/edit_file/delete/edit_memory/
         # manage_departments/dispatch/start_async_task/task/email-send/任意 mcp__* 工具）

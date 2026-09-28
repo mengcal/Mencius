@@ -440,10 +440,10 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
         cur = s.setdefault("agents", {}).setdefault(name.strip(), {})
         cur["provider"] = desc.strip()
         cur["model"] = (content or "").strip()
-        # R79→r38 更新（爸 09-29 令"具体操作我会赋权给米娅去做"）：此处直写 settings.json 的 agents 节
-        # 【合法绕过 HTTP token 门】——现行依据=闸门 _decision 对 manage_departments+set_model 定向放行
-        # （爸爸 09-01 授予、09-29 重申），不再依赖 ConfirmGate 外部批准；agents 节只有 provider/model 名，
-        # 凭据全在 secrets（米娅拿不到也写不到），整文件重写不泄密钥。结构性人事（增删部门/任命主管）仍走门。
+        # R79→r38b 更新（爸 09-29 01:30 政令"我只关米娅，米娅关牛马"）：此处直写 settings.json 的 agents 节
+        # 【合法绕过 HTTP token 门】——现行依据=闸门 _decision 对 manage_departments 全动作放行（米娅自主人事），
+        # 总阀=顶栏 👑 开关（permissions.miaManageAgents，本工具 305 行关=直接拒）；agents 节只有 provider/model 名，
+        # 凭据全在 secrets（米娅拿不到也写不到），整文件重写不泄密钥。
         (_BASE() / "settings.json").write_text(  # 原 L692: (_P(__file__).resolve().parent / "settings.json").write_text（拆分后经 _BASE() 取工作区根）
             __import__("json").dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
         # 配置缓存刷新：下次派活/重建部门图按新模型跑
