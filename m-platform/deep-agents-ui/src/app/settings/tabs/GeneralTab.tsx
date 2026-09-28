@@ -35,26 +35,6 @@ export default function GeneralTab() {
         {/* R80（Cora ⑧ 半条）：人设/系统提示词区补"需重启"提示——牛马矩阵区有、这里两轮漏了 */}
         <p className="mt-1 text-xxs text-muted-foreground">保存后需重启容器生效（米娅启动时读取 system_prompt）。</p>
       </Section>
-      <Section title="高级参数">
-        <Row label="模型参数" description="米娅主脑的生成参数——显示的数字即生效值（未填按官方推荐默认）。其余采样参数（top_p/seed 等）官方无接线需求，不摆假控件">
-          <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setParamsOpen(!paramsOpen)}>
-            {paramsOpen ? '关闭' : '显示'}
-          </button>
-        </Row>
-        {paramsOpen && [
-          ['temperature', '温度', '1.0（千问思考模式官方推荐）'],
-          ['max_tokens', '最大输出 tokens', '16384（模型上限 131072）'],
-        ].map(([k, label, dflt]) => (
-          <Row key={k} label={label}>
-            <input
-              className={inputC + ' w-40 text-right'}
-              placeholder={dflt}
-              defaultValue={val(`general.params.${k}`)}
-              onChange={(e) => set(`general.params.${k}`, e.target.value)}
-            />
-          </Row>
-        ))}
-      </Section>
       <Section title="对话压缩">
         <Row label="Context Compaction" description="已归位：在 管理 → 界面 设置（对话压缩，官方 SummarizationMiddleware）">
           <span className="text-sm text-muted-foreground">见「界面」页</span>

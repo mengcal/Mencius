@@ -339,7 +339,8 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                   className="h-8 rounded-md border border-border bg-background px-1.5 text-xs text-foreground"
   style={{ colorScheme: "dark" }}
                   value={workspace}
-                  onChange={(e) => { setWorkspace(e.target.value); try { localStorage.setItem('mia.workspace', e.target.value); } catch {} }}
+                  onChange={(e) => { setWorkspace(e.target.value); try { localStorage.setItem('mia.workspace', e.target.value); } catch {}
+    try { window.dispatchEvent(new CustomEvent('mia-workspace', { detail: e.target.value })); } catch {} }}
                   title="工作区=米娅在哪台机器上干活。容器=隔离沙箱（默认）；宿主机=您的电脑本体（经宿主执行器，高危操作仍按当前档位请示）。"
                 >
                   <option value="container">工作区：容器</option>

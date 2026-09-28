@@ -51,9 +51,9 @@ _boss_kwargs = {}
 # 设置页显示的数字=真正生效的数字。
 from settings_schema import default_of as _dof
 _tp = str(_gp.get("temperature", "")).strip()
-_mt = str(_gp.get("max_tokens", "")).strip()
 _boss_kwargs["temperature"] = float(_tp) if _tp != "" else float(_dof("general.params.temperature"))
-_boss_kwargs["max_tokens"] = int(_mt) if _mt != "" else int(_dof("general.params.max_tokens"))
+# r36s：max_tokens 交给 _model 按模型查表（per-model 表 > 全局兜底），此处不再焊死——
+# 设置页 models.maxOutputLimits 改了就按模型生效
 boss_model = _model("boss", **_boss_kwargs)
 # R49 回退链改由 run_config.py 的模型调用层实现（异常时换备用模型重试），配置见设置页 settings.agents.boss.fallbacks（原 L901）
 

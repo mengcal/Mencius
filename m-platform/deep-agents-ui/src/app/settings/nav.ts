@@ -16,10 +16,10 @@ export type Group = { heading: string | null; tabs: Tab[] };
 
 export const NAV: { section: string; groups: Group[] }[] = [
   {
-    section: 'Personal',
+    section: '个人',
     groups: [
       {
-        heading: 'Basic',
+        heading: '基本',
         tabs: [
           { id: 'general', label: '通用', icon: Settings, real: true },
         ],
@@ -39,7 +39,7 @@ export const NAV: { section: string; groups: Group[] }[] = [
     ],
   },
   {
-    section: 'Admin',
+    section: '系统',
     groups: [
       {
         heading: '系统',
@@ -49,7 +49,7 @@ export const NAV: { section: string; groups: Group[] }[] = [
         ],
       },
       {
-        heading: 'AI',
+        heading: '模型',
         tabs: [
           { id: 'admin:connections', label: '外部连接', icon: Link2, real: true },
           { id: 'admin:models', label: '模型', icon: Bot, real: true },
@@ -57,14 +57,14 @@ export const NAV: { section: string; groups: Group[] }[] = [
         ],
       },
       {
-        heading: 'Experience',
+        heading: '体验',
         tabs: [
           { id: 'admin:interface', label: '界面', icon: SlidersHorizontal, real: true },
           { id: 'admin:images', label: '图片', icon: ImageIcon, real: true },
         ],
       },
       {
-        heading: 'Tools',
+        heading: '工具',
         tabs: [
           { id: 'admin:documents', label: '文档', icon: FileText, real: true },
           { id: 'admin:web', label: '联网搜索', icon: Globe, real: true },

@@ -8,12 +8,12 @@ import { NAV, ALL_TABS, FUTURE_ROWS } from './nav';
  */
 
 describe('设置页导航树（src/app/settings/nav.ts · 工资单式核对）', () => {
-  it('section 顺序照抄 OWUI：Personal → 个人资料 → Admin', () => {
-    expect(NAV.map((s) => s.section)).toEqual(['Personal', '个人资料', 'Admin']);
+  it('section 顺序（r36r 中文化后）：个人 → 个人资料 → 系统', () => {
+    expect(NAV.map((s) => s.section)).toEqual(['个人', '个人资料', '系统']);
   });
 
-  it('Admin 区四个分组顺序：系统 / AI / Experience / Tools', () => {
-    expect(NAV[2].groups.map((g) => g.heading)).toEqual(['系统', 'AI', 'Experience', 'Tools']);
+  it('系统区四个分组顺序：系统 / 模型 / 体验 / 工具', () => {
+    expect(NAV[2].groups.map((g) => g.heading)).toEqual(['系统', '模型', '体验', '工具']);
   });
 
   it('所有 tab id 无重复', () => {

@@ -156,6 +156,11 @@ def _h(raw: bytes, key: str) -> str:
 
 
 def read(name: str, uid: str) -> str:
+    # r36q（Veda"根读取分裂成立"判词）：cli 分流收进库层，read/send 与 check 同口径
+    if _acct(name)[0].get("transport") == "cli":
+        if not _UID_RE.match(uid or ""):
+            return "uid 格式不对——请用 check 列表里的编号原样复制。"
+        return read_cli(name, uid)
     """读单封全文（只读）。"""
     # R73（Cora P2 实锤）：uid 直接进 IMAP 命令行、imaplib._command 零过滤——
     # 白名单只认纯数字，比消毒可靠。提示注入让米娅传 "1\r\nXXXX LOGOUT" 也进不去。
@@ -192,6 +197,8 @@ def read(name: str, uid: str) -> str:
 
 
 def send(name: str, to: str, subject: str, body: str) -> str:
+    if _acct(name)[0].get("transport") == "cli":
+        return send_cli(name, to, subject, body)
     """手动发信（一封一发；绝不自动回复任何来信）。"""
     acc, pw = _acct(name)
     msg = MIMEText(body, "plain", "utf-8")

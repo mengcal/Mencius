@@ -65,6 +65,17 @@ export default function ModelsTab() {
       )}
       {/* 09-17 深夜 schema 收口：批②③⑤新键补 UI（键名/默认值单一来源=settings_schema.py，此处只读写） */}
       <Section title="模型运行参数">
+        {/* r36r（爸令模型相关归堆）：主脑生成参数从通用页搬来——显示值=生效值 */}
+        <Row label="温度" description="米娅主脑采样温度；1.0=千问官方思考模式推荐值，留空按官方推荐显式传">
+          <input className={inputC + ' w-40 text-right'} placeholder="1.0（官方推荐）"
+            defaultValue={val('general.params.temperature')}
+            onChange={(e) => set('general.params.temperature', e.target.value)} />
+        </Row>
+        <Row label="最大输出 tokens" description="单次回复输出上限；默认给满模型上限 131072（魔搭良心，宁给满不截断）">
+          <input className={inputC + ' w-40 text-right'} placeholder="131072（模型上限）"
+            defaultValue={val('general.params.max_tokens')}
+            onChange={(e) => set('general.params.max_tokens', e.target.value)} />
+        </Row>
         <Row label="重试次数 (model.maxRetries)" description="模型调用失败（429/慢响应）时的自动重试次数">
           <input className={inputC + ' w-24'} type="number" defaultValue={val('model.maxRetries', 3)} onBlur={(e) => set('model.maxRetries', Number(e.target.value) || 3)} />
         </Row>

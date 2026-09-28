@@ -31,26 +31,41 @@ import { CONFIRM_TIERS } from "@/lib/confirmTiers"; // r32 F18：四档单一真
 // 数据源=后端 _runtime.workspace（settings.workspace.containerRoot 单源）。
 // 宿主工作区（完全访问档的电脑本体）等爸定夺一等公民化后再进选项列表。
 function WorkspaceBadge() {
+  // r36q（若若 P1-a/b + Eve/Veda/Cora 竣工票）：徽章跟**当前对话的工作区**走——
+  // 读 localStorage 初值 + 监听选择器派发的 mia-workspace 事件；宿主机=橙色警示。
+  // 文案矛盾消除：不再说"待爸爸开通"（选择器已开放，档位与域两轴正交）。
   const [ws, setWs] = useState<{ root: string; mode: string } | null>(null);
   useEffect(() => {
     import("@/lib/providerApi").then(({ getSettings }) => {
       getSettings().then((s: any) => {
         const w = s?._runtime?.workspace;
-        if (w?.containerRoot) setWs({ root: String(w.containerRoot), mode: String(w.mode || "container") });
+        if (w?.containerRoot) {
+          let cur = "container";
+          try { cur = localStorage.getItem("mia.workspace") || "container"; } catch {}
+          setWs({ root: String(w.containerRoot), mode: cur });
+        }
       }).catch(() => {});
     });
+    const onWs = (ev: Event) => {
+      const d = (ev as CustomEvent).detail as string;
+      setWs((prev) => (prev ? { ...prev, mode: d } : prev));
+    };
+    window.addEventListener("mia-workspace", onWs);
+    return () => window.removeEventListener("mia-workspace", onWs);
   }, []);
   if (!ws) return null;
+  const host = ws.mode === "host";
   return (
     <span
-      title={"当前工作区：容器（数据目录 / " + ws.root + "）。宿主工作区待爸爸开通后进选项。换工作区=换米娅能摸到的地盘，与档位（问不问）正交。"}
-      className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground"
+      title={host
+        ? "当前对话工作区=宿主机（您的电脑，经宿主执行器）。高危操作仍按当前档位请示；档位管问不问，这里管在哪干。"
+        : "当前对话工作区=容器（数据目录 / " + ws.root + "）。换工作区用输入框右侧下拉；两轴正交。"}
+      className={"rounded-md border px-2 py-1 text-xs " + (host ? "border-orange-500/60 text-orange-600 dark:text-orange-400" : "border-border text-muted-foreground")}
     >
-      工作区：容器 · {ws.root}
+      工作区：{host ? "宿主机" : "容器 · " + ws.root}
     </span>
   );
 }
-
 function QuickToggles() {
   const [confirmLevel, setConfirmLevel] = useState<string>("strict");
   const [miaManage, setMiaManage] = useState<boolean>(true);
