@@ -240,7 +240,7 @@ function HomePageInner({
       <div className="flex h-screen flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border px-6">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold">小全车间</h1>
+            <h1 className="text-xl font-semibold">米娅的办公室</h1>
             {!sidebar && (
               <Button
                 variant="ghost"
