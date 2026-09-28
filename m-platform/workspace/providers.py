@@ -163,8 +163,8 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
         # 无 key 就占位、调用时才报错；绝不借 .env 别家 key 越权（爸爸零硬编码原则：配置页是唯一源）
         api_key=p["api_key"] or "EMPTY",
         base_url=p["base_url"],
-        temperature=kwargs.pop("temperature", 0.7),
-        max_tokens=kwargs.pop("max_tokens", 2048),
+        temperature=kwargs.pop("temperature", float(__import__("settings_schema").default_of("general.params.temperature") or 1.0)),
+        max_tokens=kwargs.pop("max_tokens", int(__import__("settings_schema").default_of("general.params.max_tokens") or 32768)),  # r36v（竣工票判词）：2048 硬兜底撤，接全局参数
         max_retries=max_retries,
         request_timeout=request_timeout,
         extra_body=extra_body or None,
