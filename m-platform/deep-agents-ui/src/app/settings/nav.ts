@@ -79,27 +79,5 @@ export const NAV: { section: string; groups: Group[] }[] = [
 export const ALL_TABS = NAV.flatMap((s) => s.groups.flatMap((g) => g.tabs));
 
 // 未实现功能的占位开关（存 future 节，作为路线图）
-export const FUTURE_ROWS: Record<string, [string, string][]> = {
-  interface: [
-    ['darkMode', '深色/浅色主题切换'],
-  ],
-  notifications: [['desktop', '桌面通知（任务完成时提醒）']],
-  shortcuts: [['hotkeys', '自定义快捷键']],
-  tools: [['toolServers', '外部工具服务器（MCP）']],
-  audio: [['tts', '语音朗读回复（TTS）'], ['stt', '语音输入（STT）']],
-  data: [['exportChats', '对话导出/备份']],
-  usage: [['tokenUsage', 'Token 用量统计']],
-  archived: [['archivedList', '已归档对话列表']],
-  personalization: [['memory', '长期个性化记忆开关']],
-  account: [['avatar', '头像与昵称']],
-  'admin:auth': [['login', '登录认证（多人模式）']],
-  'admin:interface': [['banners', '公告横幅']],
-  'admin:audio': [['whisper', '语音服务配置']],
-  'admin:evaluations': [['arena', '模型评价/竞技场']],
-  'admin:analytics': [['dashboard', '使用分析面板']],
-  'admin:integrations': [['functions', '函数/管道脚本']],
-  'admin:documents': [['rag', '文档知识库（RAG）']],
-  'admin:pipelines': [['pipelines', '工作流管道（对接 n8n）']],
-};
-delete FUTURE_ROWS['admin:documents']; // 已转真实页（RAG 知识库）
-delete FUTURE_ROWS['admin:interface']; // 已改为真实页（Context Compaction 等），下方手动渲染
+// r36w（CB P3）：FUTURE_ROWS 全表为永不渲染的死数据，整表退役（delete 行保留防引用断裂）。
+

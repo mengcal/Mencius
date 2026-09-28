@@ -70,7 +70,7 @@ export const cardClass = 'rounded-[10px] border border-border bg-card';
 
 /** 普通输入控件统一式：高 40px、圆角 10px、深色主题（bg-card 底 + text-foreground 字 + muted 占位）。
  *  用 min-h-10 而非 h-10——textarea 走 autoGrow 内联高度 / 显式 h-32 时不打架。 */
-export const inputC = 'w-full min-h-10 rounded-[10px] border border-border bg-card px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring';
+export const inputC = 'w-full min-h-10 rounded-[10px] border border-border bg-card px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring [color-scheme:dark]';  // r36w：原生下拉展开配色全局修正（爸截图灰字灰底病的根治，一处修全站）
 
 /** R10.8f 爸爸定纲（老花可读性）+R10.11（Eve/Cora 风格评审）收敛一式：密钥/密码类
  *  "重要输入框"专用——白底深字大号粗体。全站唯一例外（普通输入一律 inputC）；

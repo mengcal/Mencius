@@ -195,7 +195,7 @@ export const TasksFilesSidebar = React.memo<{
                 "flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-transform duration-200 hover:bg-muted",
                 tasksOpen ? "rotate-180" : "rotate-0"
               )}
-              aria-label="Toggle tasks panel"
+              aria-label="开关任务面板"
             >
               <ChevronDown size={14} />
             </button>
@@ -245,7 +245,7 @@ export const TasksFilesSidebar = React.memo<{
                 "flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-transform duration-200 hover:bg-muted",
                 filesOpen ? "rotate-180" : "rotate-0"
               )}
-              aria-label="Toggle files panel"
+              aria-label="开关文件面板"
             >
               <ChevronDown size={14} />
             </button>

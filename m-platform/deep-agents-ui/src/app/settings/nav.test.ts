@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NAV, ALL_TABS, FUTURE_ROWS } from './nav';
+import { NAV, ALL_TABS } from './nav';
 
 /**
  * 工资单式断言演示：像核对工资单一样逐项核对常量结构——
@@ -43,18 +43,5 @@ describe('设置页导航树（src/app/settings/nav.ts · 工资单式核对）'
     ]);
   });
 
-  it('已转真实页的占位键已从 FUTURE_ROWS 摘除', () => {
-    expect(FUTURE_ROWS['admin:documents']).toBeUndefined();
-    expect(FUTURE_ROWS['admin:interface']).toBeUndefined();
-  });
 
-  it('FUTURE_ROWS 每项都是 [key, label] 二元组', () => {
-    for (const [tab, rows] of Object.entries(FUTURE_ROWS)) {
-      for (const row of rows) {
-        expect(row, `${tab} 的占位行格式`).toHaveLength(2);
-        expect(row[0]).toBeTruthy();
-        expect(row[1]).toBeTruthy();
-      }
-    }
-  });
 });

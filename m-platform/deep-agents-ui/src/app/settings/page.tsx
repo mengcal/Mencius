@@ -20,7 +20,7 @@
 import { useState } from 'react';
 import { ChevronLeft, Search } from 'lucide-react';
 import { SettingsProvider, useSettings } from './context';
-import { NAV, ALL_TABS, FUTURE_ROWS } from './nav';
+import { NAV, ALL_TABS } from './nav';
 import type { Tab } from './nav';
 import {
   Section, Row, Switch, tabButtonClass, groupHeadingClass,
@@ -38,21 +38,7 @@ import InterfaceTab from './tabs/InterfaceTab';
 import DocumentsTab from './tabs/DocumentsTab';
 
 /** 未实现功能的占位开关页（存 future 节，作为路线图）。原 page.tsx futureTab() 函数。 */
-function FutureTab({ id }: { id: string }) {
-  const { val, set } = useSettings();
-  return (
-    <Section first>
-      {(FUTURE_ROWS[id] || [['todo', '该功能尚未实现']]).map(([k, label]) => (
-        <Row key={k} label={label} description="功能尚未实现，开关状态已保存，作为后续路线图">
-          <div className="flex items-center gap-2">
-            <span className="text-xxs text-yellow-600 dark:text-yellow-500 border border-yellow-600/40 dark:border-yellow-500/40 rounded px-1.5 py-px">未实现</span>
-            <Switch checked={!!val(`future.${id}.${k}`, false)} onChange={(v) => set(`future.${id}.${k}`, v)} />
-          </div>
-        </Row>
-      ))}
-    </Section>
-  );
-}
+// r36w（CB P3）：FutureTab 占位页随 FUTURE_ROWS 死数据整表退役（NAV 十项全为 real 页，占位永不可达）。
 
 function SettingsShell() {
   const { msg, save } = useSettings();
@@ -122,13 +108,6 @@ function SettingsShell() {
           {tab === 'admin:documents' && <DocumentsTab />}
 
           {/* ── 未实现占位页 ── */}
-          {FUTURE_ROWS[tab] && tab !== 'general' && (
-            <>
-              <h2 className={pageTitleClass}>{ALL_TABS.find((t) => t.id === tab)?.label}</h2>
-              <p className={pageSubtitleClass}>规划中 · 打开的开关会存入配置作为路线图</p>
-              <FutureTab id={tab} />
-            </>
-          )}
         </div>
 
         {/* ── 悬浮保存按钮（照抄 OWUI）── */}

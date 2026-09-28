@@ -28,9 +28,9 @@ type StatusFilter = "all" | "idle" | "busy" | "interrupted" | "error";
 
 const GROUP_LABELS = {
   pinned: "置顶",
-  interrupted: "Requiring Attention",
-  today: "Today",
-  yesterday: "Yesterday",
+  interrupted: "待处理",
+  today: "今天",
+  yesterday: "昨天",
   week: "This Week",
   older: "Older",
 } as const;
@@ -347,7 +347,7 @@ export function ThreadList({
               </SelectGroup>
               <SelectSeparator />
               <SelectGroup>
-                <SelectLabel>Attention</SelectLabel>
+                <SelectLabel>待处理</SelectLabel>
                 <SelectItem value="interrupted">
                   <StatusFilterItem
                     status="interrupted"
@@ -370,7 +370,7 @@ export function ThreadList({
               size="icon"
               onClick={onClose}
               className="h-8 w-8"
-              aria-label="Close threads sidebar"
+              aria-label="关闭对话侧栏"
             >
               <X className="h-4 w-4" />
             </Button>

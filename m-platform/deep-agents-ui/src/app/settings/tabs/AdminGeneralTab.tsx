@@ -120,7 +120,7 @@ export default function AdminGeneralTab() {
       {/* r36（09-27 爸令工作区分区）：容器与宿主机两个域摆到明面上——
           容器域=米娅与牛马的文件/执行边界（可配）；宿主域=完全访问档才可达（起点在宿主 .env，只读说明） */}
       <Section title="工作区">
-        <Row label="容器工作区（米娅与牛马的活动域）" description="文件读写与命令执行都圈在这个目录内（相对平台数据目录）。改它=换米娅的“家”，重启平台后生效；牛马部门图与总管图同步跟随。">
+        <Row label="容器工作区（米娅与牛马的活动域）" description="文件读写与命令执行都圈在这个目录内（相对平台数据目录）。改它=换米娅的“家”，重启平台后生效；目前执行域（sandbox._route）与主图/部门图装配已接此键，记忆/技能等数据路径的贯通排 r37。">
           <input className={inputC + ' w-44'} defaultValue={val('workspace.containerRoot')}
             onBlur={(e) => {
               const v = e.target.value.trim();

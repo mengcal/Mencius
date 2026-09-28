@@ -269,7 +269,7 @@ async def context_threads():
     基线（系统提示词+工具+技能）取全部记录中的最小 input 估算；差额即对话消息。"""
     f = BASE / "mia_home" / "usage.jsonl"
     # 09-17 批③（Lesson 68）：上下文窗口表进配置页 models.contextLimits（键=模型名 值=窗口），
-    # 代码表退为默认值；未知模型兜底窗读 models.contextLimitDefault（默认 131072）。
+    # r36u：未知模型兜底已拔（爸令：M 平台不存在未知模型）——窗口查不到就如实不报。
     from settings_mgr import load_settings
     _m = (load_settings().get("models", {}) or {})
     from settings_schema import default_of as _dof  # 09-17 深夜：默认表单一来源=总表

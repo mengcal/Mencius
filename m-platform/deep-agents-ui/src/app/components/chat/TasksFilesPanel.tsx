@@ -178,7 +178,7 @@ export function TasksFilesPanel({ todos, files, setFiles, isLoading, interrupt }
               </button>
             )}
             <button
-              aria-label="Close"
+              aria-label="关闭"
               className="flex-1"
               onClick={() => setMetaOpen(null)}
             />

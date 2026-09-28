@@ -1,7 +1,7 @@
 export interface StandaloneConfig {
   deploymentUrl: string;
   assistantId: string;
-  langsmithApiKey?: string;
+  langsmithApiKey?: string;  // r36w：已弃用字段（LangSmith 钥匙 licensed 版自管）——类型保留仅为旧 localStorage 兼容
 }
 
 const CONFIG_KEY = "deep-agent-config";

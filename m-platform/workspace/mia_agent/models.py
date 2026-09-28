@@ -36,7 +36,7 @@ def _model(key: str, **kwargs):  # 原 L864-880
 
 def _global_params() -> dict:  # 原 L883-890
     """用户全局模型参数（设置页 通用→Model parameters，存 general.params）。
-    三层优先级 = 代码显式 > model_overrides(按模型) > general.params(全局)。"""
+    三层优先级 = 代码显式 > model_overrides(按模型) > general.params(全局兜底)。（r36v：make_model 兜底 2048/0.7 已接 general.params，断链修复）"""
     try:
         from settings_mgr import load_settings
         return load_settings().get("general", {}).get("params", {}) or {}
