@@ -24,6 +24,7 @@ services:
       # 密钥一律从同目录 .env 读取（compose 自动加载），文件里不再写死任何密钥
       # R65：OPENAI_* 托底已废（配置页 external 节=唯一服务商源），compose 不再注入
       - SEARXNG_URL=http://searxng:8080
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}  # r36i：langgraph licensed 变体必需，非遥测开关
       # R76 execute 沙箱：SandboxedShellBackend 用它连沙箱执行服务（.env 里同值，两端配对）
       - SANDBOX_TOKEN=${SANDBOX_TOKEN}
       # R80（Eve P1）：沙箱已出 mia 网，runner 改经宿主回环调用；09-17 晚 9090→9099（9090 是爸爸 OWUI 的端口，R80 选端口时撞车未察觉=本次事故主犯）
@@ -67,7 +68,7 @@ services:
       - redis
       - sandbox
     networks: [mia, family]
-    restart: "no"
+    restart: always   # 09-29 深夜案：Docker 引擎重启后全栈 Exited(255) 不自愈，核心四件改 always
 
   # ──  沙箱：干活执行环境（重权限层）──
   # R76：沙箱兼作 execute 的隔离执行场——只挂数据区 /data/mia_home，**没有** settings/源码/control，
@@ -109,7 +110,7 @@ services:
       # R10.2（Eve P2）：检索二级钥匙——牛马经宿主回环带它调 /rag/query（X-Proxy-Key 头）
       - RAG_PROXY_TOKEN=${RAG_PROXY_TOKEN}
     networks: [sandbox-isolated]
-    restart: "no"
+    restart: always   # 09-29 引擎重启全灭案：随引擎自愈
 
   # ── ③ SearXNG：搜索（六引擎优化版）──
   searxng:
@@ -148,13 +149,13 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     networks: [mia, family]
-    restart: "no"
+    restart: always   # 09-29 引擎重启全灭案：随引擎自愈
 
   # ── ⑥ Redis：队列/缓存 ──
   redis:
     image: redis:7-alpine
     networks: [mia, family]
-    restart: "no"
+    restart: always   # 09-29 引擎重启全灭案：随引擎自愈
 
   # ── Ollama 说明（2026-08-30）：爸爸 Windows 本机已装 Ollama（11434），容器不再重复起。
   # 平台容器内访问本机 Ollama 用 http://host.docker.internal:11434（mxbai/bge/qwen2.5 都在本机）。
