@@ -190,16 +190,16 @@ class Handler(BaseHTTPRequestHandler):
                 trunc = len(out) > MAX_OUT
                 self._send(200, {"output": f"{out[:MAX_OUT]}\n[宿主执行超时 {timeout}s，进程树已全杀]",
                                  "exit_code": 124, "truncated": trunc})
-                _audit({"decision": "timeout", "stage": stage, "auth": auth, "cmd": cmd, "secs": timeout})
+                _audit({"decision": "timeout", "domain": "host-workspace", "auth": auth, "cmd": cmd, "secs": timeout})
                 return
             out = (out_b or "") + (("\n[stderr]\n" + err_b) if err_b else "")
             trunc = len(out) > MAX_OUT
             self._send(200, {"output": out[:MAX_OUT], "exit_code": p.returncode, "truncated": trunc})
-            _audit({"decision": "exec", "stage": stage, "auth": auth, "cmd": cmd,  # 全文不截断（hy4 复测③）
+            _audit({"decision": "exec", "domain": "host-workspace", "auth": auth, "cmd": cmd,  # 全文不截断（hy4 复测③）
                     "exit_code": p.returncode, "secs": round(time.time() - t0, 2), "timeout": timeout})
         except Exception as e:
             self._send(200, {"output": f"[宿主执行异常: {str(e)[:200]}]", "exit_code": 1, "truncated": False})
-            _audit({"decision": "error", "stage": stage, "auth": auth, "cmd": cmd, "err": str(e)[:200]})
+            _audit({"decision": "error", "domain": "host-workspace", "auth": auth, "cmd": cmd, "err": str(e)[:200]})
         finally:
             _SEM.release()
 
@@ -211,5 +211,5 @@ if __name__ == "__main__":
         # r35（Qoder P2-25）：钥匙 fail-fast 了，同一条启动路径的硬依赖 shell 没校——
         # Git 不在位时服务"干净启动"然后每条 execute 都以"执行异常"失败，归因误导米娅
         raise SystemExit(f"[拒绝] 宿主 shell 不存在：{BASH}——完全访问档将无实义（装好 Git Bash 再启动）")
-    print(f"[host_runner] listening 127.0.0.1:{_PORT} stage-file={SETTINGS} (每次请求现读档位)", flush=True)
+    print(f"[host_runner] listening 127.0.0.1:{_PORT} stage-file={SETTINGS} (r36k：域=对话工作区，档位不再互锁)", flush=True)
     ThreadingHTTPServer(("127.0.0.1", _PORT), Handler).serve_forever()

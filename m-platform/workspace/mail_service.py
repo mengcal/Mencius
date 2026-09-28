@@ -26,7 +26,7 @@ def accounts() -> list:
 def _acct(name: str):
     acc = next((a for a in accounts() if a.get("name") == name), None)
     if acc is None:
-        raise ValueError(f"邮箱账号「{name}」不在注册表（设置页 email 节 / 找知夏加）")
+        raise ValueError(f"邮箱账号「{name}」不在注册表（设置页 email 节 / 找 Celia 加）")
     if acc.get("enabled") is False:
         raise ValueError(f"邮箱「{name}」已被停用")
     pw = ""

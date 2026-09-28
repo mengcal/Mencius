@@ -173,8 +173,8 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         # R73（NOVA🔴1）：工具名用「」框死——前端批准按钮正则靠括号取词。
         if kind == "selflock":
             return (f"🔒 「{name}」指向平台自身的守卫源码/档位/密钥——这是米娅的「锁和脑」，"
-                    "任何权限档都不允许她改（对标：知夏 full 访问也关不掉 ZCode 的完全访问）。"
-                    "需要改平台代码/档位，只能爸爸或 ZCode 侧知夏在宿主上动手。已拒绝。")
+                    "任何权限档都不允许她改（对标：Celia 的完全访问也关不掉 ZCode 的完全访问）。"
+                    "需要改平台代码/档位，只能爸爸或 ZCode 侧 Celia 在宿主上动手。已拒绝。")
         if kind == "deny":
             head = f"⛔ 计划模式：变更类工具「{name}」被硬拦（此档只读，不出手）。"
         else:

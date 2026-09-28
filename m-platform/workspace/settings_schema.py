@@ -48,6 +48,9 @@ SCHEMA = {
     "interface.compaction.prompt":    {"default": "", "type": "str", "ui": "界面", "note": "自定义压缩提示词；留空=官方默认"},
     "interface.compaction.provider":  {"default": "", "type": "str", "ui": "界面", "note": "压缩模型服务商（与 model 成对）；留空=boss"},
     "interface.compaction.model":     {"default": "", "type": "str", "ui": "界面", "note": "压缩模型；配便宜档不烧大模型（R69）"},
+    # —— 模型参数（r36n 09-28 爸令实数化：显示值=生效值，出处=Qwen3.8 官方推荐） ——
+    "general.params.temperature":    {"default": 1.0, "type": "float", "ui": "通用", "note": "采样温度；1.0=千问官方思考模式推荐值（qwen.ai 评测口径 temp=1.0/top_p=0.95），留空也按此显式传给模型"},
+    "general.params.max_tokens":     {"default": 16384, "type": "int", "ui": "通用", "note": "单次回复输出上限；qwen3.8-flash 模型侧上限 131072，平台显式给 16384（长回复够用又不顶格）"},
     # —— 权限开关（r35 Qoder P2-14/P1-7：tools.py 真消费，miaManageEmail 此前前端零入口=死路文案） ——
     "permissions.miaManageAgents":    {"default": True, "type": "bool", "ui": "管理", "note": "关=米娅不能增删改牛马"},
     "permissions.miaManageEmail":     {"default": True, "type": "bool", "ui": "管理", "note": "关=米娅不能管理邮箱（r35 补 GeneralTab 开关入口）"},

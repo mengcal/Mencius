@@ -36,34 +36,24 @@ export default function GeneralTab() {
         <p className="mt-1 text-xxs text-muted-foreground">保存后需重启容器生效（米娅启动时读取 system_prompt）。</p>
       </Section>
       <Section title="高级参数">
-        <Row label="模型参数 (Model parameters)" description="显示或隐藏自定义生成参数（温度/max_tokens 已生效，其余参数存配置待接线）">
+        <Row label="模型参数" description="米娅主脑的生成参数——显示的数字即生效值（未填按官方推荐默认）。其余采样参数（top_p/seed 等）官方无接线需求，不摆假控件">
           <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setParamsOpen(!paramsOpen)}>
             {paramsOpen ? '关闭' : '显示'}
           </button>
         </Row>
         {paramsOpen && [
-          ['stream', '流式对话响应 (Stream Chat Response)'],
-          ['seed', '种子 (Seed)'],
-          ['stop', '停止序列 (Stop Sequence)'],
-          ['temperature', '温度 (Temperature)'],
-          ['reasoning_effort', '推理力度 (Reasoning Effort)'],
-          ['max_tokens', 'max_tokens'],
-          ['top_k', 'top_k'],
-          ['top_p', 'top_p'],
-          ['min_p', 'min_p'],
-          ['frequency_penalty', 'frequency_penalty'],
-          ['presence_penalty', 'presence_penalty'],
-        ].map(([k, label]) => (
+          ['temperature', '温度', '1.0（千问思考模式官方推荐）'],
+          ['max_tokens', '最大输出 tokens', '16384（模型上限 131072）'],
+        ].map(([k, label, dflt]) => (
           <Row key={k} label={label}>
             <input
-              className={inputC + ' w-32 text-right'}
-              placeholder="默认"
+              className={inputC + ' w-40 text-right'}
+              placeholder={dflt}
               defaultValue={val(`general.params.${k}`)}
               onChange={(e) => set(`general.params.${k}`, e.target.value)}
             />
           </Row>
         ))}
-        {paramsOpen && <div className="pt-1 text-center text-sm text-muted-foreground">＋ 增加自定义参数（后续支持）</div>}
       </Section>
       <Section title="对话压缩">
         <Row label="Context Compaction" description="已归位：在 管理 → 界面 设置（对话压缩，官方 SummarizationMiddleware）">

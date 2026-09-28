@@ -47,10 +47,13 @@ def _global_params() -> dict:  # 原 L883-890
 # 小全主管（拆派汇总）（原 L893-900）
 _gp = _global_params()
 _boss_kwargs = {}
-if str(_gp.get("temperature", "")) != "":
-    _boss_kwargs["temperature"] = float(_gp["temperature"])
-if str(_gp.get("max_tokens", "")) != "":
-    _boss_kwargs["max_tokens"] = int(_gp["max_tokens"])
+# r36n（爸令实数化）：未配置不再"不传"（默认值散在模型侧说不清）——显式传 schema 登记值，
+# 设置页显示的数字=真正生效的数字。
+from settings_schema import default_of as _dof
+_tp = str(_gp.get("temperature", "")).strip()
+_mt = str(_gp.get("max_tokens", "")).strip()
+_boss_kwargs["temperature"] = float(_tp) if _tp != "" else float(_dof("general.params.temperature"))
+_boss_kwargs["max_tokens"] = int(_mt) if _mt != "" else int(_dof("general.params.max_tokens"))
 boss_model = _model("boss", **_boss_kwargs)
 # R49 回退链改由 run_config.py 的模型调用层实现（异常时换备用模型重试），配置见设置页 settings.agents.boss.fallbacks（原 L901）
 

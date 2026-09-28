@@ -71,7 +71,7 @@ async def api_set_settings(section: str, data: dict = Body(...), request: Reques
                     # r32 Qoder P3#20：409 语义统一——此前 HTTP 200+conflict 与 token_admin.py
                     # 的真 409 两张皮，前端无法用状态码统一分流
                     return JSONResponse({"ok": False, "conflict": True,
-                                         "error": "设置已被后台修改（知夏/米娅/其他对话刚动过），请刷新页面后重改"},
+                                         "error": "设置已被后台修改（米娅/其他对话刚动过），请刷新页面后重改"},
                                         status_code=409)
             except (ValueError, TypeError):
                 pass  # _rev 非数字 → 不拦截（宽松路径，与 token_admin confirm-level 同款）
