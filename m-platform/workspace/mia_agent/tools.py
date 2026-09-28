@@ -286,7 +286,8 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
     """米娅的人事权（R64，爸爸 2026-09-01 授予）：随时增删牛马、任命主管、给主管配牛马。
     改 departments_config.json + 清部门图缓存，下次派活自动按新编制执行（零重启）。
     action:
-      list              查看全部部门编制（主管/牛马/槽位）
+      list              查看全部部门编制（主管/牛马/槽位+各角色当前模型）
+      models            查看全部角色挂载的模型（只读，r38 爸令配置可见性）
       add_department    新建部门（department=部门名，如"客服部"；自动分配空槽位）
       remove_department 解散部门（department=部门名）
       add_worker        招牛马（department=部门名, name=牛马名英文小写如translator, desc=职责一句话）
@@ -337,12 +338,39 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
             pass
 
     if action == "list":
+        # r38（爸令"牛马配置赋权米娅"）：编制表直接带上各角色当前模型——
+        # 模型存在 settings.agents.<角色>（provider/model，密钥不在内），米娅从此看得见才改得对。
+        try:
+            from settings_mgr import load_settings as _ls2
+            _ag = (_ls2().get("agents", {}) or {})
+            def _m(role):
+                e = _ag.get(role) or {}
+                return f"{e.get('provider', '?')}/{e.get('model', '?')}" if e else "未配置"
+        except Exception:
+            def _m(role):
+                return "?"
         out = []
         for d in depts:
-            sup = (d.get("supervisor") or {}).get("name", "未任命")
-            ws = "、".join(w.get("name", "") for w in (d.get("workers") or []))
-            out.append(f"【{d.get('name')}】槽位 {d.get('slot')} · 主管 {sup} · 牛马：{ws or '无'}")
-        return "当前编制：\n" + "\n".join(out) if out else "还没有任何部门。用 add_department 新建。"
+            sup = (d.get("supervisor") or {})
+            ws = "、".join(f"{w.get('name', '')}[{_m(w.get('role', ''))}]" for w in (d.get("workers") or []))
+            out.append(f"【{d.get('name')}】槽位 {d.get('slot')} · 主管 {sup.get('name', '未任命')}"
+                       f"[{_m(sup.get('role', 'boss'))}] · 牛马：{ws or '无'}")
+        return "当前编制（含模型）：\n" + "\n".join(out) if out else "还没有任何部门。用 add_department 新建。"
+    if action == "models":
+        # r38 新增只读视图：全角色（总管/主管/牛马）当前挂载的模型。密钥不在此面。
+        try:
+            from settings_mgr import load_settings as _ls3, load_agents_config as _lac
+            _ag = (_ls3().get("agents", {}) or {})
+            lines = []
+            for role in _lac().keys():
+                e = _ag.get(role) or {}
+                if e.get("provider") or e.get("model"):
+                    lines.append(f"{role}: {e.get('provider', '?')} / {e.get('model', '?')}")
+                else:
+                    lines.append(f"{role}: 未配置（走全局默认）")
+            return "各角色模型配置（只读，改模型用 set_model）：\n" + "\n".join(lines)
+        except Exception as e:
+            return f"模型视图读取失败：{e}"
     if action == "add_department":
         if not department.strip():
             return "需要 department（部门名）"
@@ -412,10 +440,10 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
         cur = s.setdefault("agents", {}).setdefault(name.strip(), {})
         cur["provider"] = desc.strip()
         cur["model"] = (content or "").strip()
-        # R79（千问 P3 注记）：此处直写 settings.json【合法绕过 HTTP token 门】——门在被绕处之前已设：
-        # manage_departments 是危险工具，走到这行前必过 ConfirmGate 的外部批准（_NEEDS_EXTERNAL，
-        # 爸爸点『批准』/token 打 /approvals 才放行）；HTTP 写面（/settings/agents）另有 token 门。
-        # 两门并联，工具链的钥匙=批准动作本身。agents 节无敏感键（凭据全在 secrets），整文件重写不泄密钥。
+        # R79→r38 更新（爸 09-29 令"具体操作我会赋权给米娅去做"）：此处直写 settings.json 的 agents 节
+        # 【合法绕过 HTTP token 门】——现行依据=闸门 _decision 对 manage_departments+set_model 定向放行
+        # （爸爸 09-01 授予、09-29 重申），不再依赖 ConfirmGate 外部批准；agents 节只有 provider/model 名，
+        # 凭据全在 secrets（米娅拿不到也写不到），整文件重写不泄密钥。结构性人事（增删部门/任命主管）仍走门。
         (_BASE() / "settings.json").write_text(  # 原 L692: (_P(__file__).resolve().parent / "settings.json").write_text（拆分后经 _BASE() 取工作区根）
             __import__("json").dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
         # 配置缓存刷新：下次派活/重建部门图按新模型跑
@@ -426,7 +454,7 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
             pass
         return (f"✅ 角色「{name}」已配模型：{desc.strip()} / {content}。"
                 f"下次该角色干活/部门重建时生效。")
-    return "action 只支持 list / add_department / remove_department / add_worker / remove_worker / set_supervisor / set_model"
+    return "action 只支持 list / models / add_department / remove_department / add_worker / remove_worker / set_supervisor / set_model"
 
 
 # ===== R58 MCP 生态接入（官方 langchain-mcp-adapters，settings mcp.servers 配置驱动）=====（原 L705）

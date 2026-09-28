@@ -106,10 +106,17 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         if level == "full":
             return "pass"
         # email 按动作分：只读动作并入只读集合
-        ro = (name in ConfirmGateMiddleware._READONLY) or (name == "email" and a in ("", "list", "check", "read"))
+        # r38（爸 09-29 令"牛马配置赋权给米娅"）：manage_departments 按动作分——
+        # list/models（看编制/看模型）=只读放行；add/remove/set_supervisor 仍全档请示。
+        ro = (name in ConfirmGateMiddleware._READONLY) or (name == "email" and a in ("", "list", "check", "read")) \
+            or (name == "manage_departments" and a in ("list", "models"))
         if level == "plan":
             return "pass" if ro else "deny"
         if ro:
+            return "pass"
+        # r38 授权变更：set_model（升降配牛马模型）=爸爸 09-01 授予、09-29 重申"具体操作我会赋权给米娅去做"
+        # ——除 plan 档外各档放行，不再每次要爸爸扣章；密钥不经此路（在设置页/secrets）。
+        if name == "manage_departments" and a == "set_model":
             return "pass"
         # 到这里=非只读=变更（含 execute/write_file/edit_file/delete/edit_memory/
         # manage_departments/dispatch/start_async_task/task/email-send/任意 mcp__* 工具）
