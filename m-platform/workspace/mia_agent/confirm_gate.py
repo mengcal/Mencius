@@ -70,7 +70,10 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
 
     @staticmethod
     def _level() -> str:
-        # R75（爸爸定调：设置页=唯一真源、自由选、凌驾一切，对标 ZCode 四档）：
+        # R75（爸爸定调：设置页=唯一真源、自由选、凌驾一切，对标 ZCode 四档）
+        # ⚠ 自造语义标注（09-28 检测卷若若判词）：官方 HITL 的 interrupt_on 只有
+        # '放行/加指引'两出口、按工具名静态配——plan/strict/auto_edit/full 四档与
+        # 按参数特征动态路由全是咱家产品发明，官方文档里没有，勿当官方件引用：
         # 档位只读 settings.general.confirmLevel（设置页/顶栏快切都写这一个真源）。
         # 未配置/非法 → fail-closed strict（宁拦不放）。
         # "米娅改不动档位"不靠文件地板限制爸爸的选择，而靠：① 写端点要管理员 token（米娅没有）；
