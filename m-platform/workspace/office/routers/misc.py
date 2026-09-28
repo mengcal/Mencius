@@ -30,7 +30,7 @@ from . import tasks as _tasks_mod  # R10.9（hy4 P1-2）：必须走模块属性
 
 router = APIRouter()
 
-_SKILLS_DIR = BASE / "mia_home" / "skills"  # 原 :241（原 Path(__file__).parent=workplatform 根；包化后改用 BASE，语义等价）
+_SKILLS_DIR = __import__("settings_mgr").workspace_root() / "skills"  # r37 贯通  # 原 :241（原 Path(__file__).parent=workplatform 根；包化后改用 BASE，语义等价）
 
 # W3：技能名白名单——只许小写字母/数字/-/_，2-41 位，首字符限字母或数字（天然拒 "/" 与 ".."，堵路径穿越）。
 _SKILL_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,40}$")
@@ -235,7 +235,7 @@ async def skills_delete(req: dict = Body(...)):
 async def usage_today():
     """今日 token 消耗（读 mia_home/usage.jsonl，按 model 汇总；R45 观测台数据源）。"""
     import datetime
-    f = BASE / "mia_home" / "usage.jsonl"
+    f = __import__("settings_mgr").workspace_root() / "usage.jsonl"  # r37 贯通
     today = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()).isoformat()
     agg: dict = {}
     total = {"input": 0, "output": 0, "total": 0, "calls": 0}
@@ -267,7 +267,7 @@ async def usage_today():
 async def context_threads():
     """R53 上下文容量图数据源：usage.jsonl 按线程取最近一次模型调用的 input_tokens。
     基线（系统提示词+工具+技能）取全部记录中的最小 input 估算；差额即对话消息。"""
-    f = BASE / "mia_home" / "usage.jsonl"
+    f = __import__("settings_mgr").workspace_root() / "usage.jsonl"  # r37 贯通
     # 09-17 批③（Lesson 68）：上下文窗口表进配置页 models.contextLimits（键=模型名 值=窗口），
     # r36u：未知模型兜底已拔（爸令：M 平台不存在未知模型）——窗口查不到就如实不报。
     from settings_mgr import load_settings
@@ -421,6 +421,16 @@ async def api_reset_budget(req: dict = Body(...), request: Request = None):
     return {"ok": True, "cleared_cards": n}
 
 
+@router.get("/approvals/high-risk")
+async def api_high_risk():
+    """r37（CB 六门槛：高危清单双份无同源）——前端批量批准卡的名单从这里拉：
+    执行真源 confirm_gate._NEEDS_EXTERNAL ∪ 已注册 MCP 工具真名（adapters 工具名
+    不带 mcp__ 前缀，前端按前缀判会漏）。token 门内（/approvals 前缀）。"""
+    from mia_agent.confirm_gate import ConfirmGateMiddleware
+    tools = sorted(ConfirmGateMiddleware._NEEDS_EXTERNAL | getattr(ConfirmGateMiddleware, "_MCP_NAMES", set()) or set())
+    return {"tools": tools}
+
+
 @router.post("/approvals/reset_thread")
 async def api_reset_thread(req: dict = Body(...), request: Request = None):
     """D2 挂账四件④（hy4 十二轮 P-B，09-15 爸爸令动工）：管理端"重置本线程状态"=
@@ -562,7 +572,7 @@ async def memory_reflect():
     from providers import make_model
     from settings_mgr import load_agents_config
 
-    mem = _P(BASE) / "mia_home" / "memory"
+    mem = __import__("settings_mgr").workspace_root() / "memory"  # r37 贯通
     today = _t.strftime("%Y-%m")
     facts_file = mem / f"facts-{today}.md"
     if not facts_file.exists():
@@ -660,7 +670,7 @@ def _reflect_nightly_daemon():
     boot = _t2.time()
 
     def _last_ts() -> float:
-        f = _P2(BASE) / "mia_home" / "memory" / ".reflect_last"
+        f = __import__("settings_mgr").workspace_root() / "memory" / ".reflect_last"  # r37 贯通
         try:
             d = f.read_text(encoding="utf-8").strip()  # YYYYMMDD
             return _t2.mktime(_t2.strptime(d, "%Y%m%d")) if d else 0.0
@@ -668,7 +678,7 @@ def _reflect_nightly_daemon():
             return 0.0
 
     def _facts_lines() -> int:
-        f = _P2(BASE) / "mia_home" / "memory" / f"facts-{_t2.strftime('%Y-%m')}.md"
+        f = __import__("settings_mgr").workspace_root() / "memory" / ("facts-" + _t2.strftime("%Y-%m") + ".md")  # r37 贯通
         try:
             return sum(1 for _ in f.open(encoding="utf-8"))
         except Exception:

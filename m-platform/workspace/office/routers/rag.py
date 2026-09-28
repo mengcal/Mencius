@@ -29,7 +29,7 @@ router = APIRouter()
 # 兜底：PG/vector 不可用时自动回落 mia_home/rag_vectors.json（绝不挡功能），恢复后自动续用。
 # 相关度语义不变：1 - 余弦距离（pgvector 的 <=> 操作符）。
 
-_RAG_VEC = BASE / "mia_home" / "rag_vectors.json"   # 兜底存储 + 一次性迁移源
+_RAG_VEC = __import__("settings_mgr").workspace_root() / "rag_vectors.json"  # r37 贯通   # 兜底存储 + 一次性迁移源
 from settings_schema import default_of as _dof  # 09-17 深夜：默认值单一来源=总表
 _RAG_DIM_DEFAULT = _dof("rag.embeddingDim")
 

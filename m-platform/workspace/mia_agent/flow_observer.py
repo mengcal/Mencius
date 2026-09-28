@@ -222,6 +222,6 @@ class FlowObserver(AgentMiddleware):
 
 
 observer = FlowObserver(
-    jsonl_path=Path(__file__).resolve().parent.parent / "mia_home" / "notes"
-    / "flow_obs.%PID%.jsonl"  # r43（hy4 P1-1）：每 worker 进程独立文件，读时合并
+    jsonl_path=__import__("settings_mgr").workspace_root() / "notes"
+    / "flow_obs.%PID%.jsonl"  # r37 贯通  # r43（hy4 P1-1）：每 worker 进程独立文件，读时合并
 )  # 模块级单例（graph.py 挂载用）；r42 观测序列落盘（数据区 notes/，米娅可自查）

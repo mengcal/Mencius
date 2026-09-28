@@ -40,7 +40,7 @@ _AUDIT_PATH = None  # 首次 _audit 时惰性初始化（模块被 office 与 ag
 def _audit_path():
     global _AUDIT_PATH
     if _AUDIT_PATH is None:        _AUDIT_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                                    "mia_home", "notes", "approvals_log.jsonl")
+                                    __import__("settings_mgr").workspace_root().name, "notes", "approvals_log.jsonl")  # r37 贯通
     return _AUDIT_PATH
 
 

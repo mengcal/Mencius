@@ -131,7 +131,7 @@ def _scan():
                         try:
                             import json as _j
                             from pathlib import Path as _P
-                            _f = _P(__file__).resolve().parent.parent / "mia_home" / "notes" / "tier_audit.jsonl"
+                            _f = __import__("settings_mgr").workspace_root()  # r37 贯通 / "notes" / "tier_audit.jsonl"
                             _f.parent.mkdir(parents=True, exist_ok=True)
                             with open(_f, "a", encoding="utf-8") as _fh:
                                 _fh.write(_j.dumps({"ts": round(time.time(), 1),

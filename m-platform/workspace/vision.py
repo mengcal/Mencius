@@ -53,7 +53,7 @@ def _read_b64(image_path: str) -> str:
     {image_path:/data/secrets/.settings_secrets} 就能把明文密钥经识图模型外带（② 挪卷白挪）。
     现在路径白名单锁死数据目录 mia_home/（上传文件都落这），越界即 PermissionError。"""
     from pathlib import Path
-    base = Path(__file__).resolve().parent / "mia_home"
+    base = __import__("settings_mgr").workspace_root()  # r37 贯通
     p = Path(image_path).resolve()
     if not p.is_file() or base != p.parent and base not in p.parents:
         raise PermissionError("image_path 只允许数据目录 mia_home 下的文件（对话上传的图片在此），越界路径已拒绝")

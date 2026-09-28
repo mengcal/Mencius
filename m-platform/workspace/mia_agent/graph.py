@@ -23,14 +23,11 @@ BASE = Path(__file__).resolve().parent.parent
 # r36（09-27 爸令工作区分区）：容器域根可配（settings.workspace.containerRoot，默认 mia_home=零行为变更）。
 # 装配期读一次——改它=低频配置动作，重启容器生效（与档位文件同纪律）。
 def _container_root() -> str:
-    try:
-        from settings_mgr import load_settings
-        r = str((load_settings().get("workspace", {}) or {}).get("containerRoot") or "").strip()
-        return r or "mia_home"
-    except Exception:
-        return "mia_home"
+    # r37：收敛到 settings_mgr.workspace_root 单源（本函数保留兼容旧引用）
+    from settings_mgr import workspace_root as _wr
+    return _wr().name
 _WS_ROOT = _container_root()
-MEMORY_FILE = BASE / "mia_home" / "memory" / "MEMORY.md"
+MEMORY_FILE = __import__("settings_mgr").workspace_root() / "memory" / "MEMORY.md"  # r37 贯通
 MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 if not MEMORY_FILE.exists():
     MEMORY_FILE.write_text(
@@ -154,7 +151,7 @@ _async_subagents = _build_async_subagents()  # 原 L994
 # ── R10.3 skills_lock（Cora/NOVA 方案落地）：技能清单哈希锁——挂载回归保险 ──（原 L996-1009）
 # 基线落 secrets 卷；不符=本组技能整体停用（宁可不带技能不裸奔）+日志+审计。
 # 改挂载=必重启=必再校验，故启动校验覆盖回归场景；运行中宿主改文件到重启前不被捕获（诚实清单）。
-_SKILLS_DIR = BASE / "mia_home" / "skills"  # 原 L1000: Path(__file__).resolve().parent / "mia_home" / "skills"
+_SKILLS_DIR = __import__("settings_mgr").workspace_root() / "skills"  # r37 贯通  # 原 L1000: Path(__file__).resolve().parent / "mia_home" / "skills"
 if _skills_lock.enabled():
     _SKILLS_BAD = _skills_lock.verify(_SKILLS_DIR, _skills_lock.ensure_baseline(_SKILLS_DIR))
     if any(_SKILLS_BAD.values()):

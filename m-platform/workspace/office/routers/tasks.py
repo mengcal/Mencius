@@ -41,7 +41,7 @@ TASKS: dict[str, dict] = {}
 _TSEQ = 0
 _webhook_lock = asyncio.Lock()  # R59：webhook 重复投递并发竞态锁（防同一任务重复注入汇报刷屏）
 # R55：任务流水持久化（重启不丢，观测台/牛马进程面板数据源）
-_TASKS_FILE = BASE / "mia_home" / "tasks.json"
+_TASKS_FILE = __import__("settings_mgr").workspace_root() / "tasks.json"  # r37 贯通
 
 
 def _load_tasks_persisted():
@@ -109,7 +109,7 @@ async def files_save(req: dict = Body(...)):
     b64 = req.get("b64") or ""
     if not name or not b64 or "/" in name or "\\" in name or ".." in name:
         return {"error": "需要 name（纯文件名）和 b64"}
-    d = BASE / "mia_home" / "files"
+    d = __import__("settings_mgr").workspace_root() / "files"  # r37 贯通
     d.mkdir(parents=True, exist_ok=True)
     (d / name).write_bytes(_b64.b64decode(b64))
     # 返回 workplatform 容器内路径（/vision 的 image_path 直接可用）

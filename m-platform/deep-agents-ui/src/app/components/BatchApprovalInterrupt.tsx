@@ -35,14 +35,30 @@ interface BatchApprovalInterruptProps {
   isLoading?: boolean;
 }
 
-// 高危工具名单（与后端 _NEEDS_EXTERNAL 同源语义；MCP 工具前缀一律算高危）
-const HIGH_RISK = new Set([
+// r37（CB 六门槛）：高危名单单源化——后端 /approvals/high-risk 下发
+// （_NEEDS_EXTERNAL ∪ MCP 工具真名；MCP 真名不带 mcp__ 前缀，旧 startsWith 判据是死代码已删）。
+// 拉取失败回退内置 13 项（与后端当前值一致），成功后以后端为准。
+const HIGH_RISK_FALLBACK = new Set([
   "execute", "delete", "email", "manage_departments", "start_async_task",
   "dispatch_to_xiaoquan", "task", "update_async_task", "cancel_async_task",
   "write_file", "edit_file", "edit_memory", "lark_send",
 ]);
-const isHighRisk = (name: string) =>
-  HIGH_RISK.has(name) || name.toLowerCase().startsWith("mcp__");
+let HIGH_RISK = new Set(HIGH_RISK_FALLBACK);
+let highRiskLoaded = false;
+async function loadHighRisk() {
+  if (highRiskLoaded) return;
+  highRiskLoaded = true;
+  try {
+    const r = await fetch("/lg/approvals/high-risk");
+    if (r.ok) {
+      const j = await r.json();
+      if (Array.isArray(j.tools) && j.tools.length) HIGH_RISK = new Set(j.tools);
+    }
+  } catch { /* 回退内置 */ }
+}
+const isHighRisk = (name: string) => HIGH_RISK.has(name);
+
+void loadHighRisk();
 
 export function BatchApprovalInterrupt({
   actionRequests,

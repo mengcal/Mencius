@@ -161,8 +161,8 @@ def _hearth_note(txt: str) -> tuple[str, str, str]:
     否则取 notes/hearth/ 平台命名空间里最新的一份。返回 (文件名, 全文, 告警)。
     r39：点名不存在不再静默改读最新（Eve 新炮1——mismatch=作废不静默）；
     未来时间戳文件跳过并告警（Eve 问1）。"""
-    sub = BASE / "mia_home" / "notes" / "hearth"
-    legacy = BASE / "mia_home" / "notes"
+    sub = __import__("settings_mgr").workspace_root() / "notes" / "hearth"  # r37 贯通
+    legacy = __import__("settings_mgr").workspace_root() / "notes"  # r37 贯通
     m = NOTE_REF.search(txt)
     if m:
         name = m.group(1)
@@ -207,7 +207,7 @@ def _last_verdicts() -> str:
     """前场裁决回流（r39，Eve 问5/Lyra 问5/Cora P2-1：跨会话丢裁决=缺陷）：
     取最近两份圆桌【结论】行作参考材料——复审的语义本就是"维持或推翻前场"。
     只取结论行控制体量；圆桌子目录已入自锁禁写区，读的是可信平台件。"""
-    rd = BASE / "mia_home" / "notes" / "roundtable"
+    rd = __import__("settings_mgr").workspace_root() / "notes" / "roundtable"  # r37 贯通
     rows = []
     for f in sorted(rd.glob("roundtable-feasibility-*.md"), reverse=True)[:2]:
         try:
@@ -384,7 +384,7 @@ def host(state) -> dict:
             pass
 
     now = datetime.now()
-    notes = BASE / "mia_home" / "notes" / "roundtable"
+    notes = __import__("settings_mgr").workspace_root() / "notes" / "roundtable"  # r37 贯通
     notes.mkdir(parents=True, exist_ok=True)
     if cmd == "review":
         fp = notes / f"roundtable-feasibility-{now:%Y-%m-%d-%H%M%S}.md"

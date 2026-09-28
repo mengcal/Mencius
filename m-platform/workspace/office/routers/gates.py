@@ -150,7 +150,7 @@ if _cb_log_env:
 elif os.environ.get("MIA_SECRETS_PATH", "").strip():
     _CB_USAGE_LOG = _secrets_dir() / "codebuddy_usage.jsonl"
 else:
-    _CB_USAGE_LOG = BASE / "mia_home" / "logs" / "codebuddy_usage.jsonl"
+    _CB_USAGE_LOG = __import__("settings_mgr").workspace_root() / "logs" / "codebuddy_usage.jsonl"
 if not _CB_USAGE_LOG.is_absolute():
     _CB_USAGE_LOG = BASE / _CB_USAGE_LOG
 

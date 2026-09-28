@@ -169,7 +169,7 @@ def summarize(state: HearthState) -> dict:
     now = datetime.now()
     # r38（hy3 P0-1/P2-2）：平台件挪 notes/hearth/ 子目录命名空间（米娅 write_file 常规
     # 只落 notes/ 根，自动取最新不再被外部 hearth-*.md 投毒）；文件名带秒防同分覆盖。
-    notes = BASE / "mia_home" / "notes" / "hearth"
+    notes = __import__("settings_mgr").workspace_root() / "notes" / "hearth"  # r37 贯通
     notes.mkdir(parents=True, exist_ok=True)
     fp = notes / f"hearth-{now:%Y-%m-%d-%H%M%S}.md"
     atomic_write_text(fp,  # r39（Eve 新炮3）：tmp+rename 原子写，不留半张皮

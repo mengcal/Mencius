@@ -79,7 +79,7 @@ def _record_usage(model_name: str, result):
             tid = (get_config() or {}).get("configurable", {}).get("thread_id", "")
         except Exception:
             pass
-        f = Path(__file__).resolve().parent / "mia_home" / "usage.jsonl"
+        f = __import__("settings_mgr").workspace_root() / "usage.jsonl"  # r37 贯通
         f.parent.mkdir(parents=True, exist_ok=True)
         with open(f, "a", encoding="utf-8") as fp:
             fp.write(_json.dumps({

@@ -119,6 +119,19 @@ def load_agents_config() -> dict:
 # 半写毒化此前 = 登录/设置面/保存修复通道全 500 且 UI 无法自救（死锁态）。
 # 三防：短睡重试吃半写窗口 → 回落 .bak 自愈 → 无 .bak 才炸（fail-loud）。
 # 铁律：绝不静默 {} 兜底——admin_name 回落 "admin"=爸爸被自己的名字挡在门外（Cora：比炸更阴险）。
+def workspace_root():
+    """r37（爸 09-28 晚令贯通）：容器工作区根的单源 getter——全部数据路径
+    （memory/skills/tasks/files/notes/hearth/roundtable/sd_out/usage…）都从这里拿，
+    settings.workspace.containerRoot 改一处即全站生效。返回完整 Path。"""
+    from pathlib import Path as _P
+    r = "mia_home"
+    try:
+        r = str((load_settings().get("workspace", {}) or {}).get("containerRoot") or "mia_home").strip() or "mia_home"
+    except Exception:
+        r = "mia_home"
+    return SETTINGS_PATH.parent / r
+
+
 def load_settings() -> dict:
     if not SETTINGS_PATH.exists():
         return {}

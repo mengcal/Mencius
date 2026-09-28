@@ -48,7 +48,7 @@ def list_async_tasks() -> str:  # r48（09-13 M2 三连实证：说明书承诺�
                 lines.append(f"后台异步任务：{pending}")
         except Exception:
             pass
-        tf = _P(__file__).resolve().parent.parent / "mia_home" / "tasks.json"
+        tf = __import__("settings_mgr").workspace_root() / "tasks.json"  # r37 贯通
         if tf.exists():
             data = _json.loads(tf.read_text(encoding="utf-8"))
             items = data if isinstance(data, list) else data.get("tasks", [])
@@ -193,7 +193,7 @@ def edit_memory(action: str, section: str = "", content: str = "", project: str 
     else:
         _mem_name = "MEMORY.md"
         _mem_ns = ("memories",)
-    mem = _BASE() / "mia_home" / "memory" / _mem_name  # 原 L480: _Path(__file__).resolve().parent / "mia_home" / "memory" / _mem_name（拆分后经 _BASE() 取工作区根）
+    mem = __import__("settings_mgr").workspace_root() / "memory" / _mem_name  # r37 贯通  # 原 L480: _Path(__file__).resolve().parent / "mia_home" / "memory" / _mem_name（拆分后经 _BASE() 取工作区根）
     if not mem.exists():
         # R70：首次写记忆=自动建档（旧版"文件不存在"硬错误已修）
         # R73 补丁（Skye/Lyra 双双逮到）：退役角色卡时删了 _cid 赋值却漏改此行，
@@ -596,7 +596,7 @@ def sd_generate(prompt: str, negative_prompt: str = "", steps: int = 18,
     imgs = (r.json() or {}).get("images") or []
     if not imgs:
         return "SD 没返回图片"
-    out_dir = _P(__file__).resolve().parent.parent / "mia_home" / "sd_out"
+    out_dir = __import__("settings_mgr").workspace_root() / "sd_out"  # r37 贯通
     out_dir.mkdir(parents=True, exist_ok=True)
     fp = out_dir / (_time.strftime("%Y%m%d-%H%M%S") + f"_seed{payload['seed']}.png")
     fp.write_bytes(_b64.b64decode(imgs[0]))

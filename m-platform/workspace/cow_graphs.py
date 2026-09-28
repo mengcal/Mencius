@@ -22,7 +22,8 @@ def _ws_root() -> str:
     # r36 工作区分区：与主图同源（settings.workspace.containerRoot）
     try:
         from settings_mgr import load_settings
-        return str((load_settings().get("workspace", {}) or {}).get("containerRoot") or "mia_home").strip() or "mia_home"
+        from settings_mgr import workspace_root as _wr
+        return _wr().name
     except Exception:
         return "mia_home"
 _DEPT_CONFIG = BASE / "departments_config.json"
@@ -122,7 +123,7 @@ def _build_dept_graph(dept: dict, slot: str):
         # 纪律"类卡，零"免批准"暗示；卡文件增删受 skills_lock 基线管辖（主脑侧已验）。
         _card_txts = []
         for _sk in (w.get("skills") or []):
-            _skf = BASE / "mia_home" / "skills" / str(_sk) / "SKILL.md"
+            _skf = __import__("settings_mgr").workspace_root() / "skills" / str(_sk) / "SKILL.md"  # r37 贯通
             if _skf.is_file():
                 _card_txts.append(_skf.read_text(encoding="utf-8"))
             else:

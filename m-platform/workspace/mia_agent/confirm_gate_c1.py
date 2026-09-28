@@ -210,9 +210,8 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         与主账 notes/ 分离，理由见 _DEADLETTER_PATH 注释。拆成独立判定处是为了
         测试可断言缺址本身（M6 格），不靠真写生产目录验证。"""
         import os as _os
-        return _os.path.join(
-            _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
-            "mia_home", "runtime", "bypass_deadletter.jsonl")
+        # r37 贯通：deadletter 落工作区根（workspace_root 单源）
+        return str(__import__("settings_mgr").workspace_root() / "runtime" / "bypass_deadletter.jsonl")
 
     @classmethod
     def _deadletter_dump(cls, tid: str, snap: dict, err: str,
@@ -923,7 +922,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                             self._shown_seen.add(_key)
                             if len(self._shown_seen) > 2000:
                                 self._shown_seen.clear()
-                            _f = _P(__file__).resolve().parent.parent / "mia_home" / "notes" / "approvals_log.jsonl"
+                            _f = __import__("settings_mgr").workspace_root() / "notes" / "approvals_log.jsonl"
                             _f.parent.mkdir(parents=True, exist_ok=True)
                             with open(_f, "a", encoding="utf-8") as _fh:
                                 _fh.write(_aj.dumps({"ts": round(_t.time(), 1), "ev": "card_shown",
