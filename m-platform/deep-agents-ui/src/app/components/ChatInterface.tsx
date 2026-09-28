@@ -54,6 +54,11 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [input, setInput] = useState("");
+  // r36k（爸令完整分区）：工作区=对话级"在哪干"（container 沙箱域 / host 宿主执行器域），
+  // 与档位"问不问"正交；持久化到 localStorage，开聊即见（对话头部下拉）。
+  const [workspace, setWorkspace] = useState<string>(() => {
+    try { return localStorage.getItem("mia.workspace") || "container"; } catch { return "container"; }
+  });
   // ── OWUI 式输入框：左下角联网开关+思维档位，右下角模型选择（2026-08-29 知夏；r25 空壳🔧按钮已随爸爸令拔除）──
   const {
     // r32b：webSearchOn/setWebSearchOn 随联网按钮退役（恒传 true，见 handleSubmit）
@@ -139,6 +144,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       sendMessage(messageText, {
         model: selectedModel || undefined,
         provider: selectedProvider || undefined,
+        workspace: workspace || "container",
         // r32b（爸爸裁决"默认米娅可以联网搜索"）：恒传 true——按钮已退役，
         // 老的 localStorage 关闭态（webSearchOn=false）不再生效；后端缺省本就 True
         webSearch: true,
@@ -146,7 +152,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       });
       setInput("");
     },
-    [input, isLoading, sendMessage, setInput, submitDisabled, selectedModel, selectedProvider, thinking]
+    [input, isLoading, sendMessage, setInput, submitDisabled, selectedModel, selectedProvider, thinking, workspace]
   );
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -328,6 +334,16 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
               </div>
               <div className="flex items-center gap-2">
                 {/* 模型选择（OWUI 同款：输入框右下角） */}
+                {/* r36k 工作区选择器（对话头部，开聊即选——爸定标准：不在设置页） */}
+                <select
+                  className="h-8 rounded-md border border-border bg-transparent px-1.5 text-xs text-foreground"
+                  value={workspace}
+                  onChange={(e) => { setWorkspace(e.target.value); try { localStorage.setItem('mia.workspace', e.target.value); } catch {} }}
+                  title="工作区=米娅在哪台机器上干活。容器=隔离沙箱（默认）；宿主机=您的电脑本体（经宿主执行器，高危操作仍按当前档位请示）。"
+                >
+                  <option value="container">工作区：容器</option>
+                  <option value="host">工作区：宿主机</option>
+                </select>
                 <ModelPicker
                   models={models}
                   selectedModel={selectedModel}

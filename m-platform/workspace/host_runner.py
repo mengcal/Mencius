@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-r# r36（09-27 爸定）：本 runner 已停用（档位不再开后门）——代码保留待"宿主工作区"一等公民化时复用；
-# 进程与 Startup 自启件同日撤除。见 mia_agent/sandbox.py _route 注释。
-"""host_runner.py —— 米娅"完全访问档"的宿主执行后端（09-17 深夜爸爸定纲：米娅=知夏同等权限）
+# r36k（09-28 爸令完整分区）：本 runner 是「宿主机工作区」的执行后端——对话里选宿主域才走它；
+# 档位不开后门（路由见 mia_agent/sandbox.py _route）；Startup 自启件 m-host-runner.vbs 已恢复。
+r"""host_runner.py —— 米娅"完全访问档"的宿主执行后端（09-17 深夜爸爸定纲：米娅=知夏同等权限）
 
 语义：general.confirmLevel == "full" 时，米娅的 execute 经此服务落在宿主 Git Bash
 （与知夏同款 shell、同款权限）；其他档位本服务直接 403（沙箱路线不变）。
@@ -148,11 +148,10 @@ class Handler(BaseHTTPRequestHandler):
             _audit({"decision": "ticket_minted", "ttl": _TICKET_TTL})
             self._send(200, {"ticket": t, "ttl": _TICKET_TTL})
             return
-        stage = _stage()
-        if stage != "full":
-            _audit({"decision": "denied_stage", "stage": stage})
-            self._send(403, {"error": f"非完全访问档（当前={stage or '未配置'}），宿主执行关门（fail-closed）"})
-            return
+        # r36k（09-28 爸令两轴正交）：旧的"仅 full 档放行"检查=后门时代遗产，撤——
+        # 域由对话的工作区选（能到这里=爸爸在对话里选了宿主域，且 C1 档位门对 execute
+        # 照常把关：strict/auto_edit 每次弹卡请示、plan 档根本到不了 execute）。
+        # 档位与域不再互锁；审计照落（每次执行有 decision=ok 记录）。
         try:
             # R10.321 复测修（ds/glm 双评）：负 Content-Length 会 read(-1) 挂死线程、
             # 非 dict body 会让 req.get 抛未捕获异常——双双收紧

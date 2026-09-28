@@ -39,7 +39,15 @@ async def api_get_settings():
         pass
     # 09-17 深夜（hy4 挑刺·ChatInterface 内嵌地址收口）：容器侧运行时端点由后端下发，
     # 前端提示词不再写死 host.docker.internal:2024（env 可覆盖，单一来源）
-    s["_runtime"] = {"visionEndpoint": os.environ.get("MIA_VISION_ENDPOINT", "http://host.docker.internal:2024/vision")}
+    # r36j（09-28 爸问"选择器在哪"）：_runtime 附带工作区实况——前端对话区据此显示/选择
+    try:
+        from mia_agent.graph import _WS_ROOT as _wsr
+    except Exception:
+        _wsr = "mia_home"
+    s["_runtime"] = {"visionEndpoint": os.environ.get("MIA_VISION_ENDPOINT", "http://host.docker.internal:2024/vision"),
+                     "workspace": {"containerRoot": _wsr, "mode": "container",
+                             "options": [{"id": "container", "name": "容器（隔离沙箱，默认）"},
+                                       {"id": "host", "name": "宿主机（您的电脑，经宿主执行器）"}]}}
     return s
 
 

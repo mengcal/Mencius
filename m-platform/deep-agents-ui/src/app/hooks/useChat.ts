@@ -56,7 +56,7 @@ export function useChat({
   const sendMessage = useCallback(
     (
       content: string,
-      runOpts?: { model?: string; provider?: string; webSearch?: boolean; thinking?: string }
+      runOpts?: { model?: string; provider?: string; webSearch?: boolean; thinking?: string; workspace?: string }
     ) => {
       const newMessage: Message = { id: uuidv4(), type: "human", content };
       // 运行级配置随消息走官方 state 通道（run_config.py 中间件消费）
@@ -76,7 +76,9 @@ export function useChat({
           optimisticValues: (prev) => ({
             messages: [...(prev.messages ?? []), newMessage],
           }),
-          config: { ...(activeAssistant?.config ?? {}), recursion_limit: 100 },
+          // r36k（爸令工作区分区）：workspace 随 run 走官方 configurable 通道——
+          // 后端 sandbox._route 据此选域（container=沙箱 / host=宿主执行器）；档位只管问不问，两轴正交。
+          config: { ...(activeAssistant?.config ?? {}), recursion_limit: 100, configurable: { workspace: runOpts?.workspace || "container" } },
           // R3：干活时爸爸再发消息 → 排队接续，不打断后台任务（官方 multitask 机制）
           multitaskStrategy: "enqueue",
         }

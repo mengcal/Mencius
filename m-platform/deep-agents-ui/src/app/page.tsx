@@ -27,6 +27,30 @@ import { CONFIRM_TIERS } from "@/lib/confirmTiers"; // r32 F18：四档单一真
  *  （旧前端写 "off" 后端不认→fail-closed 回落 strict，按钮显示一直在撒谎）。
  *  r32（爸爸 09-26 裁决"个人平台管理员验证多此一举，等多用户版再考虑"）：
  *  顶栏四档自由切（原"放宽须到设置页验密、顶栏只收紧"限制整段撤除）。 */
+// r36j（09-28）：对话区工作区徽章——爸要的"看得见自己在哪个区干活"。
+// 数据源=后端 _runtime.workspace（settings.workspace.containerRoot 单源）。
+// 宿主工作区（完全访问档的电脑本体）等爸定夺一等公民化后再进选项列表。
+function WorkspaceBadge() {
+  const [ws, setWs] = useState<{ root: string; mode: string } | null>(null);
+  useEffect(() => {
+    import("@/lib/providerApi").then(({ getSettings }) => {
+      getSettings().then((s: any) => {
+        const w = s?._runtime?.workspace;
+        if (w?.containerRoot) setWs({ root: String(w.containerRoot), mode: String(w.mode || "container") });
+      }).catch(() => {});
+    });
+  }, []);
+  if (!ws) return null;
+  return (
+    <span
+      title={"当前工作区：容器（数据目录 / " + ws.root + "）。宿主工作区待爸爸开通后进选项。换工作区=换米娅能摸到的地盘，与档位（问不问）正交。"}
+      className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground"
+    >
+      工作区：容器 · {ws.root}
+    </span>
+  );
+}
+
 function QuickToggles() {
   const [confirmLevel, setConfirmLevel] = useState<string>("strict");
   const [miaManage, setMiaManage] = useState<boolean>(true);
@@ -237,6 +261,7 @@ function HomePageInner({
               <Bot className="mr-2 h-4 w-4" />
               办公室设置
             </Button>
+            <WorkspaceBadge />
             <QuickToggles />
             <Button
               variant="outline"

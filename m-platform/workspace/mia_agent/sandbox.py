@@ -34,11 +34,19 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
         return await self._acall(cmd, timeout or 120)
 
     def _route(self):
-        """09-17 深夜爸定纲"米娅=知夏同等权限"曾落地为 full 档→宿主 runner 后门；
-        09-27 晚爸改定（架构两轴）：档位只管"要不要问"，**域由工作区管**——
-        除非工作区/容器挂载调整，容器里就是容器里，不设档位触发的专门门。
-        host_runner 进程与自启已停；本文件与 runner 代码保留，
-        待"宿主工作区"作为一等公民实现时复用（届时入口=选工作区，不是切档位）。"""
+        """r36k（09-28 爸令完整分区）：execute 落哪个域跟着**对话的工作区**走——
+        前端 sendMessage 把 workspace 塞进 run 的 config.configurable（官方通道），
+        这里现读：host→宿主执行器（host_runner，正身后端非后门）；缺省 container→沙箱。
+        档位只管"要不要问"（门在 C1），两轴正交——09-27 的"full 档偷偷开宿主门"
+        是后门设计，已废；爸爸在对话里选"宿主机"才走这条线。"""
+        try:
+            from langgraph.config import get_config
+            ws = str(((get_config() or {}).get("configurable", {}) or {}).get("workspace") or "container")
+            if ws == "host":
+                return (os.environ.get("MIA_HOST_RUNNER_URL", "http://host.docker.internal:2026/exec"),
+                        os.environ.get("MIA_HOST_RUNNER_KEY", ""))
+        except Exception:
+            pass
         return (self._URL, self._tok)
 
     # hy4 backlog①（09-19）：宿主 runner 走短时票据——静态钥匙只在 /ticket 换票时过线，
