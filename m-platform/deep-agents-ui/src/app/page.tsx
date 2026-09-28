@@ -245,7 +245,7 @@ function HomePageInner({
           </div>
           <div className="flex items-center gap-2">
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Assistant:</span>{" "}
+              <span className="font-medium">当前助手:</span>{" "}
               {/* 页头随图显示（r38 小瑕；r39 换 effAssistantId 与入口同一供体） */}
               {effAssistantId === "hearth"
                 ? "围炉夜话"
@@ -271,7 +271,7 @@ function HomePageInner({
               className="border-[#2F6868] bg-[#2F6868] text-white hover:bg-[#2F6868]/80"
             >
               <SquarePen className="mr-2 h-4 w-4" />
-              New Thread
+              新对话
             </Button>
             {/* r31：退出登录（爸爸令"看看 OWUI"）——顶栏右侧，点了清 cookie 回登录页。
                 r32 F5/F7（CB/Qoder）：本地裸跑模式（无守卫）登录通道不存在=登出即自锁，
