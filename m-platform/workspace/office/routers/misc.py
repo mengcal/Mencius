@@ -289,6 +289,7 @@ async def context_threads():
         except (TypeError, ValueError):
             pass
     per: dict = {}
+    agg: dict = {}  # r39d：每线程轮次/输出累计（ZCode 同款信息密度）
     all_inputs = []
     if f.exists():
         try:
@@ -303,6 +304,10 @@ async def context_threads():
                     continue
                 all_inputs.append(inp)
                 ts = r.get("ts") or ""
+                a = agg.setdefault(tid, {"calls": 0, "out": 0, "total": 0})
+                a["calls"] += 1
+                a["out"] += int(r.get("output", 0) or 0)
+                a["total"] += int(r.get("total", 0) or 0)
                 cur = per.get(tid)
                 if not cur or ts >= cur["ts"]:
                     per[tid] = {"thread": tid, "model": r.get("model", ""), "input": inp, "ts": ts}
@@ -313,7 +318,9 @@ async def context_threads():
     for t in per.values():
         limit = LIMITS.get(t["model"])  # r36u：查不到=None（前端显示未知），不编兜底数
         msgs = max(t["input"] - baseline, 0)
+        a = agg.get(t["thread"], {})
         out.append({**t, "limit": limit, "baseline": baseline, "messages": msgs,
+                    "calls": a.get("calls", 0), "out_total": a.get("out", 0), "sum_total": a.get("total", 0),
                     "pct": round(t["input"] / limit * 100, 1) if limit else 0})
     out.sort(key=lambda x: x["ts"], reverse=True)
     return {"baseline": baseline, "threads": out[:10]}
