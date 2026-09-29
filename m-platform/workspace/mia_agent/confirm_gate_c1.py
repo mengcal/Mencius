@@ -576,7 +576,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         # 求盖章的机会"（无卡档本就没有可求的章）；mid/low 放行（mid 在 ask 路径只是
         # 上卡面意见，无卡档=爸爸选档时已接受的语义，拒=日常操作全变误杀，
         # Eve P1-A"guard 自伤停工"教训）。扫描崩溃=拒（fail-closed，r61e Cora N2 同案，
-        # execute 侧与 write 侧同规格）。冻结/滑窗链仍留在 when 侧：本路径不弹卡，// r36-G：冻结/滑窗链已整链废除（本行旧注释已按新实况改写）
+        # execute 侧与 write 侧同规格）。冻结/滑窗链已整链废除（r36-G），本路径不弹卡、
         # 不存在"磨卡"攻击面，不重复建。
         # 09-14 续单第二弹（P-A 扩面，工兵实核）：full 档 _decision 全工具 pass，
         # delete/派活三手/edit_memory 原在 pass 路零扫描直过=敞口——名单扩入。

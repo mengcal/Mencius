@@ -131,7 +131,7 @@ def _scan():
                         try:
                             import json as _j
                             from pathlib import Path as _P
-                            _f = __import__("settings_mgr").workspace_root()  # r37 贯通 / "notes" / "tier_audit.jsonl"
+                            _f = __import__("settings_mgr").workspace_root() / "notes" / "tier_audit.jsonl"  # r39f（Veda P1 刀）：r37 贯通时路径误入行内注释=_f 成目录，open 抛 IsADirectoryError 被吞=台账静默死；接回表达式
                             _f.parent.mkdir(parents=True, exist_ok=True)
                             with open(_f, "a", encoding="utf-8") as _fh:
                                 _fh.write(_j.dumps({"ts": round(time.time(), 1),
