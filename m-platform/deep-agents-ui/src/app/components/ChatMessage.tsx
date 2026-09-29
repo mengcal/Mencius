@@ -16,6 +16,8 @@ import {
   extractSubAgentContent,
   extractStringFromMessageContent,
 } from "@/app/utils/utils";
+import { API, apiFetch } from "@/lib/apiBase";
+import { authHeaders } from "@/lib/providerApi";
 import { cn } from "@/lib/utils";
 
 // R64 消息时间戳格式化：UTC ISO → 北京时间 HH:MM（前端渲染，零令牌）
@@ -76,6 +78,47 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
     const hasContent = messageContent && messageContent.trim() !== "";
+    // r39g（爸令图片回显）：用户消息里的落盘图片路径 → blob 缩略图行（后端 /files 门内取图）；
+    // 派单系统提示折叠（发送侧文本不动——米娅的 visual 流程靠它触发，只折显示）。
+    const imgNames = useMemo(
+      () =>
+        isUser
+          ? Array.from(
+              messageContent.matchAll(
+                /mia_home\/files\/([A-Za-z0-9._-]+\.(?:png|jpe?g|gif|webp))/g
+              )
+            ).map((m) => m[1])
+          : [],
+      [isUser, messageContent]
+    );
+    const userText = isUser && imgNames.length
+      ? messageContent.split("爸爸上传了图片")[0].trim()
+      : "";
+    const [thumbs, setThumbs] = useState<Record<string, string>>({});
+    const thumbKey = imgNames.join(",");
+    useEffect(() => {
+      if (!thumbKey) return;
+      let alive = true;
+      (async () => {
+        for (const n of thumbKey.split(",")) {
+          setThumbs((prev) => {
+            if (prev[n]) return prev;
+            (async () => {
+              try {
+                const r = await fetch(`${API}/files/${n}`, { headers: authHeaders() });
+                if (!r.ok) return;
+                const b = await r.blob();
+                if (alive) setThumbs((p2) => ({ ...p2, [n]: URL.createObjectURL(b) }));
+              } catch {}
+            })();
+            return prev;
+          });
+        }
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [thumbKey]);
     const hasToolCalls = toolCalls.length > 0;
     const [toolsOpen, setToolsOpen] = useState(false); // R54 牛马进程折叠：默认收起，想看才展开
     // R10.18（爸爸点名"变更前确认没有弹出"）：组内有 ⛔ 拦截 → 标题亮"待批准"并自动展开一次，
@@ -221,9 +264,34 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                     </pre>
                   </details>
                 ) : isUser ? (
-                  <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
-                    {messageContent}
-                  </p>
+                  imgNames.length > 0 ? (
+                    <>
+                      <div className="mb-1 flex flex-wrap gap-2">
+                        {imgNames.map((n) =>
+                          thumbs[n] ? (
+                            <img key={n} src={thumbs[n]} alt={n} className="max-h-44 rounded-lg border border-border" />
+                          ) : (
+                            <div key={n} className="h-24 w-32 animate-pulse rounded-lg bg-gray-800" />
+                          )
+                        )}
+                      </div>
+                      {userText && (
+                        <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">{userText}</p>
+                      )}
+                      <details className="mt-1 text-xs text-muted-foreground">
+                        <summary className="cursor-pointer select-none">
+                          📎 图片 {imgNames.length} 张已落盘 · 派单原文（点击展开）
+                        </summary>
+                        <pre className="mt-1 whitespace-pre-wrap break-words rounded bg-gray-900 p-2 text-[0.6875rem] text-gray-300">
+                          {messageContent}
+                        </pre>
+                      </details>
+                    </>
+                  ) : (
+                    <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
+                      {messageContent}
+                    </p>
+                  )
                 ) : hasContent ? (
                   <MarkdownContent content={messageContent} />
                 ) : null}

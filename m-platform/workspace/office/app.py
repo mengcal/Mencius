@@ -62,7 +62,7 @@ _TOKEN_GUARDED = ("/settings/", "/providers/", "/approvals", "/rag/ingest", "/ra
 # 配置全貌（打码）/服务商表/任务文本/线程用量/RAG 库。
 # R10.3（Lyra 唯一未修 + NOVA ⚪F）：/models/all /usage/today /stats 三统计端点补齐——
 # 前端 providerApi 早已带 Bearer（NOVA 51 实证），只差端点门，凑齐读面全收口。
-_GET_GUARDED = ("/settings", "/providers", "/tasks/list", "/context/", "/rag/", "/models/all", "/usage/today", "/stats", "/skills", "/remember-rules", "/external/list")  # 原 :1178；r49 双钮规则读面进门；r61b 外部岗名册读面进门（hy4 P2-1：岗名/URL/端口侦察面，前端尚未消费此端点零误伤）
+_GET_GUARDED = ("/settings", "/providers", "/tasks/list", "/context/", "/rag/", "/models/all", "/usage/today", "/stats", "/skills", "/remember-rules", "/external/list", "/files/")  # 原 :1178；r49 双钮规则读面进门；r61b 外部岗名册读面进门；r39g 图片回显进门（前端 blob+Bearer 取图）
 # 读面豁免：token 状态（未注册时前端要知道"该出注册向导了"）、webhook（w 内部钥匙自证）、health
 _GET_EXEMPT = ("/settings/token/status", "/tasks/webhook", "/health")  # 原 :1180
 

@@ -508,6 +508,22 @@ async def settings_page():
 async def office_page():
     return FileResponse(BASE / "office.html", media_type="text/html")
 
+_FILES_DIR = __import__("settings_mgr").workspace_root() / "files"  # r39g：上传图片落盘区
+
+@router.get("/files/{name}")
+async def serve_uploaded_file(name: str):
+    """r39g（爸令图片回显）：前端 <img> 无法带 Bearer，走 blob+authHeaders 取图——本路由在
+    GET token 门内（app.py _GET_GUARDED 已加 /files）。防穿越=_skill_dir 同款 realpath 双保险，
+    扩展名白名单限图片。"""
+    import re as _re
+    if not _re.match(r"^[A-Za-z0-9._-]{1,80}$", str(name)):
+        return HTMLResponse("bad name", status_code=400)
+    base = Path(os.path.realpath(_FILES_DIR))
+    p = Path(os.path.realpath(base / str(name)))
+    if p.parent != base or not p.exists():
+        return HTMLResponse("not found", status_code=404)
+    return FileResponse(p)
+
 @router.get("/")
 async def root():
     return HTMLResponse('<meta http-equiv="refresh" content="0;url=/office">')
