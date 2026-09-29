@@ -288,6 +288,7 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
     action:
       list              查看全部部门编制（主管/牛马/槽位+各角色当前模型）
       models            查看全部角色挂载的模型（只读，r38 爸令配置可见性）
+      catalog           查看各启用服务商的可用模型清单（r39b 权限，配模型前先对名）
       add_department    新建部门（department=部门名，如"客服部"；自动分配空槽位）
       remove_department 解散部门（department=部门名）
       add_worker        招牛马（department=部门名, name=牛马名英文小写如translator, desc=职责一句话）
@@ -356,6 +357,21 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
             out.append(f"【{d.get('name')}】槽位 {d.get('slot')} · 主管 {sup.get('name', '未任命')}"
                        f"[{_m(sup.get('role', 'boss'))}] · 牛马：{ws or '无'}")
         return "当前编制（含模型）：\n" + "\n".join(out) if out else "还没有任何部门。用 add_department 新建。"
+    if action == "catalog":
+        # r39b（爸 09-29 判例"权限问题就给米娅权限"）：列全部启用服务商的可用模型清单——
+        # 米娅配模型前先查真名，不再凭记忆猜（qwen-flash 422 案：她猜的准名缺 -Next 照样 422）。
+        # 只吐名称+模型清单，base_url/key 一概不出（key 在 secrets，米娅拿不到）。
+        try:
+            from settings_mgr import load_settings as _ls4
+            out = []
+            for p in (_ls4().get("external", {}).get("providers", []) or []):
+                if not p.get("enabled", True):
+                    continue
+                mc = p.get("models_cache") or []
+                out.append(f"{p.get('name')}: {'、'.join(mc[:12]) if mc else '(清单未缓存，让爸爸在设置页刷新一次)'}")
+            return "各服务商可用模型（配模型前先对名）：\n" + "\n".join(out) if out else "还没有启用中的服务商。"
+        except Exception as e:
+            return f"模型目录读取失败：{e}"
     if action == "models":
         # r38 新增只读视图：全角色（总管/主管/牛马）当前挂载的模型。密钥不在此面。
         try:
@@ -454,7 +470,7 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
             pass
         return (f"✅ 角色「{name}」已配模型：{desc.strip()} / {content}。"
                 f"下次该角色干活/部门重建时生效。")
-    return "action 只支持 list / models / add_department / remove_department / add_worker / remove_worker / set_supervisor / set_model"
+    return "action 只支持 list / models / catalog / add_department / remove_department / add_worker / remove_worker / set_supervisor / set_model"
 
 
 # ===== R58 MCP 生态接入（官方 langchain-mcp-adapters，settings mcp.servers 配置驱动）=====（原 L705）

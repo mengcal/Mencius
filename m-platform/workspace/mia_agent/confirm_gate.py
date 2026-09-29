@@ -109,7 +109,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         # r38（爸 09-29 令"牛马配置赋权给米娅"）：manage_departments 按动作分——
         # list/models（看编制/看模型）=只读放行；add/remove/set_supervisor 仍全档请示。
         ro = (name in ConfirmGateMiddleware._READONLY) or (name == "email" and a in ("", "list", "check", "read")) \
-            or (name == "manage_departments" and a in ("list", "models"))
+            or (name == "manage_departments" and a in ("list", "models", "catalog"))
         if level == "plan":
             return "pass" if ro else "deny"
         if ro:
