@@ -2,7 +2,7 @@
 """
 AgentDiary — §8 验收标准 lint 工具（机械可判，验收官跑全单的抓手）
 
-schema v1 RC2 §8 八项（v1.3.1 加 ⑦ refs 完整性；v1.3.3 加 ⑧ 版本一致，知夏二犯复盘）：
+schema v1 RC2 §8 八项（v1.3.1 加 ⑦ refs 完整性；v1.3.3 加 ⑧ 版本一致，西莉亚/Celia二犯复盘）：
 1. 字段完备     frontmatter 必填项缺失=0（open_question 可选，V4 决议允许缺失）
 2. id 唯一排序  正则 ^[a-z]+-\\d{8}-\\d{3}$，撞号=0
 3. canon 纯净   confidence=verified 之外条目=0（待审必须带 pending_review 标记，verified 不得带）
@@ -297,7 +297,7 @@ def _split_refs(refs_raw: str) -> list:
 
 def check_refs_integrity(store: DiaryStore) -> dict:
     """
-    §8 ⑦ refs 链接完整性（知夏提案 issue #8，v1.3.2 对齐判据）：
+    §8 ⑦ refs 链接完整性（西莉亚/Celia提案 issue #8，v1.3.2 对齐判据）：
     V2 共享靠 refs 链接——断链必须机器可见，不靠谁翻日记时想起来。
 
     判据（issue #8）：
@@ -357,7 +357,7 @@ def check_refs_integrity(store: DiaryStore) -> dict:
 
 def check_version_consistency(store: DiaryStore) -> dict:
     """
-    §8 ⑧ 版本一致（知夏 09-22 二犯复盘：v1.1.0→v1.2.0、v1.3.0-mvp1→v1.3.2）：
+    §8 ⑧ 版本一致（西莉亚/Celia 09-22 二犯复盘：v1.1.0→v1.2.0、v1.3.0-mvp1→v1.3.2）：
     agent_diary/__init__.py 的 __version__ 必须 == CHANGELOG.md 第一行的版本号。
     两次复发证明不能靠自觉——验收官跑 lint 单就能抓，不用记得单独跑 check_version.py。
     """

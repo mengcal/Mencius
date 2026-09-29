@@ -17,16 +17,16 @@
 | v1.1.3 | 向量搜索也过滤auto_pending（alice P1第一层） |
 | v1.2.0 | alice P1第二层防御过滤+P2索引缓存+P3回归测试 |
 | v1.3.0-mvp1 | schema v1 RC2 对齐 MVP（V1 Alice 案：情景日志+rolling handoff） |
-| v1.3.1 | 知夏验收三条意见全落地：deny 带 session id + 告警不误报 + 回归测试缺依赖 skip + lint ⑦ refs 完整性 |
+| v1.3.1 | 西莉亚/Celia验收三条意见全落地：deny 带 session id + 告警不误报 + 回归测试缺依赖 skip + lint ⑦ refs 完整性 |
 | v1.3.2 | refs-lint ⑦ 判据定稿（issue #8 评估落地：格式 error/断链 error/superseded warning）+ 修 append_episodic 返回 id（refs 引用链路）+ P7 验收测试 |
-| v1.3.3 | lint ⑧ 版本一致（__version__==CHANGELOG 头，机器拦，知夏二犯复盘）+ 白名单盲区回执（仓库侧精确匹配无病灶） |
-| **v1.3.4** | **gate_hook v1.2 纳仓收讫（知夏 09-26 b2d4b48：九例回归+路径参数化+GATE-OFF 急停）+ README 同步 hooks 说明** |
+| v1.3.3 | lint ⑧ 版本一致（__version__==CHANGELOG 头，机器拦，西莉亚/Celia二犯复盘）+ 白名单盲区回执（仓库侧精确匹配无病灶） |
+| **v1.3.4** | **gate_hook v1.2 纳仓收讫（西莉亚/Celia 09-26 b2d4b48：九例回归+路径参数化+GATE-OFF 急停）+ README 同步 hooks 说明** |
 
 ## v1.3.4（gate_hook 纳仓收讫，2026-09-26）
 
 ### 已完成
 
-- ✅ gate_hook v1.2 纳仓（知夏 b2d4b48 已推）：`hooks/gate_hook.py` + `hooks/README.md` + `hooks/test_gate_hook.py`
+- ✅ gate_hook v1.2 纳仓（西莉亚/Celia b2d4b48 已推）：`hooks/gate_hook.py` + `hooks/README.md` + `hooks/test_gate_hook.py`
   - 判定链：GATE-OFF 急停 → Bash 只读白名单（shlex 分词/复合按段/前导 env 跳过/sed 仅 -n 无 -i/git 安全子命令/`diary.py read` 活路）→ 已读放行 → 否则 deny+log_block
   - 路径参数化：`GATE_DIARY_ROOT`（默认 `~/.agent-diary/live`）、`GATE_DIARY_PKG`（默认本仓根推导），无个人机器路径
   - 附带修复：GATE_DIARY_PKG 默认值原推导错（包目录）→ 改为仓根，`from agent_diary.store` 可导入
@@ -37,7 +37,7 @@
 
 - 全量：验收测试（§8 八项+MVP）、v1.2.0 回归、demo、check_version——全过
 
-## v1.3.3（知夏 09-22 两单 bug 回执，2026-09-22）
+## v1.3.3（西莉亚/Celia 09-22 两单 bug 回执，2026-09-22）
 
 ### 已完成
 
@@ -45,7 +45,7 @@
   - 背景：版本串滞后**二犯**（v1.1.0 串 v1.2.0、v1.3.0-mvp1 串 v1.3.2）——不能靠自觉，必须机器拦
   - 与 scripts/check_version.py（e447138 已加）同判据；lint 收口进验收单，验收官跑全单即抓
   - §8 七项→八项
-- ✅ 白名单盲区回执（bug 1）：仓库侧 memory_gate.py 的 `is_safe_tool` 是**精确集合匹配**（`tool_name in SAFE_LIST`），无 startswith 引号/复合命令盲区；知夏宿主侧 gate_hook v1.1 已自修（shlex 分词+段头 basename+sed 有 -n 无 -i 收口），本仓库无对应代码需改
+- ✅ 白名单盲区回执（bug 1）：仓库侧 memory_gate.py 的 `is_safe_tool` 是**精确集合匹配**（`tool_name in SAFE_LIST`），无 startswith 引号/复合命令盲区；西莉亚/Celia宿主侧 gate_hook v1.1 已自修（shlex 分词+段头 basename+sed 有 -n 无 -i 收口），本仓库无对应代码需改
 - ✅ 测试文案同步 §8 八项（test_mvp_schema P5/README/lint 头注释）
 
 ### 新增测试
@@ -53,11 +53,11 @@
 - examples/test_mvp_schema.py：P1-P7（P5 lint 八项自动覆盖 ⑧），退出码 0 = 全过
 - scripts/check_version.py：机械自检 __version__ == CHANGELOG 头（e447138 引入，本版双处同步验证）
 
-## v1.3.2（知夏 issue #8 提案评估定稿，2026-09-19）
+## v1.3.2（西莉亚/Celia issue #8 提案评估定稿，2026-09-19）
 
 ### 已完成
 
-- ✅ lint ⑦ 完整对齐 issue #8 判据（v1.3.1 只查孤儿引用，本次按知夏口径定稿）：
+- ✅ lint ⑦ 完整对齐 issue #8 判据（v1.3.1 只查孤儿引用，本次按西莉亚/Celia口径定稿）：
   - 存在性：ref 指向的 id 必须在全库 id 全集（episodic + canon + pending 都算，pending 可引用）
   - 格式：严格匹配 `^[a-z]+-\d{8}-\d{3}$`（复用 §8 ② 同一正则，不另立），不匹配 = error
   - 前缀：全小写；不做 agent 前缀白名单——悬空就是悬空，谁的都算断
@@ -72,7 +72,7 @@
 - examples/test_mvp_schema.py：P1-P7（P7=refs 链接完整性四场景），退出码 0 = 全过
 - examples/test_regression_v120.py：v1.2.0 回归不倒退（缺依赖自动 SKIP 向量部分）
 
-## v1.3.1（知夏 13:35 验收意见，2026-09-18）
+## v1.3.1（西莉亚/Celia 13:35 验收意见，2026-09-18）
 
 ### 已完成
 
@@ -81,7 +81,7 @@
   - 门禁已接入（今天有 pass/block 审计事件）但拦截=0 → 告警"拦截可能没生效"
   - 无门禁事件（纯库/CLI 直写）→ 提示"门禁未接入，拦截=0 属正常直写"，不再误报
 - ✅ 回归测试缺 sentence-transformers 时向量部分 SKIP+如实报（学 lint，不崩不搭 venv，验收意见①）
-- ✅ lint 新增 ⑦ refs 完整性（知夏意见③，V2 共享靠 refs 链接）：refs 引用的 id 不存在=孤儿引用，lint 可见；§8 六项→七项
+- ✅ lint 新增 ⑦ refs 完整性（西莉亚/Celia意见③，V2 共享靠 refs 链接）：refs 引用的 id 不存在=孤儿引用，lint 可见；§8 六项→七项
 
 ### 新增测试
 
