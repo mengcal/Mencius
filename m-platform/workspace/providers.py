@@ -163,7 +163,7 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
         # 无 key 就占位、调用时才报错；绝不借 .env 别家 key 越权（爸爸零硬编码原则：配置页是唯一源）
         api_key=p["api_key"] or "EMPTY",
         base_url=p["base_url"],
-        temperature=kwargs.pop("temperature", float(__import__("settings_schema").default_of("general.params.temperature") or 1.0)),
+        temperature=kwargs.pop("temperature", (lambda _gp: float(_gp["temperature"]) if str(_gp.get("temperature", "")).strip() else float(__import__("settings_schema").default_of("general.params.temperature") or 1.0))((__import__("settings_mgr").load_settings().get("general", {}) or {}).get("params", {}) or {})),  # r39（Cora 抓镜像案）：temperature 与 r37w max_tokens 同款断链——读设置页现值，无值才落 schema 兜底
         max_tokens=kwargs.pop("max_tokens", (lambda _gp: int(_gp["max_tokens"]) if str(_gp.get("max_tokens", "")).strip() else int(__import__("settings_schema").default_of("general.params.max_tokens") or 32768))((__import__("settings_mgr").load_settings().get("general", {}) or {}).get("params", {}) or {})),  # r37w（CB 抓真 bug）：读设置页现值，无值才落 schema 兜底
         max_retries=max_retries,
         request_timeout=request_timeout,
