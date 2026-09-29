@@ -78,7 +78,8 @@ export function useChat({
           }),
           // r36k（爸令工作区分区）：workspace 随 run 走官方 configurable 通道——
           // 后端 sandbox._route 据此选域（container=沙箱 / host=宿主执行器）；档位只管问不问，两轴正交。
-          config: { ...(activeAssistant?.config ?? {}), recursion_limit: 100, configurable: { workspace: runOpts?.workspace || "container" } },
+          // r39c（09-29 递归爆案）：100=米娅排障长工具循环必撞墙（当日实测打满 100 层 run 死）→300
+          config: { ...(activeAssistant?.config ?? {}), recursion_limit: 300, configurable: { workspace: runOpts?.workspace || "container" } },
           // R3：干活时爸爸再发消息 → 排队接续，不打断后台任务（官方 multitask 机制）
           multitaskStrategy: "enqueue",
         }
