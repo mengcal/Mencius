@@ -130,16 +130,111 @@ services:
     image: n8nio/n8n:latest
     ports:
       - "127.0.0.1:15678:5678"   # R73（Lyra低危）：绑回环，局域网不再可达；挪到高位防以后撞车
+    depends_on:
+      sandbox-api:
+        condition: service_healthy   # 官方栈姿势：n8n 等沙箱控制面就绪
     environment:
       - N8N_HOST=localhost
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:15678/
       - GENERIC_TIMEZONE=Asia/Shanghai
+      # r39j（爸批"这两天装"，09-29）：n8n Assistant 沙箱四键（env 优先级高于 UI 向导=爸不用手填）
+      - N8N_INSTANCE_AI_SANDBOX_ENABLED=true
+      - N8N_INSTANCE_AI_SANDBOX_PROVIDER=n8n-sandbox
+      - N8N_SANDBOX_SERVICE_URL=http://sandbox-api:8080
+      - N8N_SANDBOX_SERVICE_API_KEY=${SANDBOX_API_KEYS}   # 必须是 SANDBOX_API_KEYS 列表里的值
+      - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}  # Code 节点 task runner 鉴权
     volumes:
       - n8n_data:/home/node/.n8n
     networks: [mia, family]
     restart: "no"
+
+  # ── ④b n8n 沙箱三件套（官方栈：certs 一次性→api 控制面→runner-1 特权 DinD）──
+  # 证书 mTLS 互认，全部内部网（family），端口一律不发布（官方警告：runner=特权 DinD，
+  # 泄露=本机 root；api 8080/9090 绝不映射宿主）。
+  sandbox-certs:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:${N8N_SANDBOX_VERSION}
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        bootstrap-mtls.sh --out-dir /tls --api-san sandbox-api
+        --control-san-prefix sandbox-runner --world-readable &&
+        chown -R sandbox-api:sandbox-api /tls/api && chmod -R a+rX /tls
+    environment:
+      NUM_RUNNERS: "1"
+    volumes:
+      - sandbox-tls:/tls
+    networks: [family]
+    restart: "no"          # 一次性任务，跑完退出属正常
+
+  sandbox-api:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:${N8N_SANDBOX_VERSION}
+    depends_on:
+      sandbox-certs:
+        condition: service_completed_successfully
+    environment:
+      SANDBOX_API_GRPC_TLS_CERT_FILE: /tls/api/grpc-server.crt
+      SANDBOX_API_GRPC_TLS_KEY_FILE: /tls/api/grpc-server.key
+      SANDBOX_API_GRPC_TLS_CLIENT_CA_FILE: /tls/api/ca.crt
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CA_FILE: /tls/api/ca.crt
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CERT_FILE: /tls/api/control-grpc-api-client.crt
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_KEY_FILE: /tls/api/control-grpc-api-client.key
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_SERVER_NAME: sandbox-runner-1
+      SANDBOX_API_KEYS: ${SANDBOX_API_KEYS}
+      SANDBOX_API_RUNNER_REGISTRATION_TOKEN: ${SANDBOX_API_RUNNER_REGISTRATION_TOKEN}
+      SANDBOX_API_RUNNER_API_KEY: ${SANDBOX_API_RUNNER_API_KEY}
+    volumes:
+      - sandbox-tls:/tls:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks: [family]
+    restart: always
+
+  sandbox-runner-1:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-runner-dind:${N8N_SANDBOX_VERSION}
+    privileged: true          # 官方要求（Docker-in-Docker）；笼子=无发布端口+仅 family 网
+    depends_on:
+      sandbox-api:
+        condition: service_healthy
+    environment:
+      SANDBOX_RUNNER_API_GRPC_ADDR: sandbox-api:9090
+      SANDBOX_RUNNER_HTTP_BASE_URL: https://sandbox-runner-1:8080
+      SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR: ":9091"
+      SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR: sandbox-runner-1:9091
+      SANDBOX_RUNNER_ID: runner-1
+      SANDBOX_RUNNER_DOCKER_SANDBOX_IMAGE: ghcr.io/n8n-io/n8n-sandbox-service-sandbox:${N8N_SANDBOX_VERSION}
+      SANDBOX_RUNNER_REGISTRATION_GRPC_CA_FILE: /tls/runner/ca.crt
+      SANDBOX_RUNNER_REGISTRATION_GRPC_CERT_FILE: /tls/runner/grpc-client.crt
+      SANDBOX_RUNNER_REGISTRATION_GRPC_KEY_FILE: /tls/runner/grpc-client.key
+      SANDBOX_RUNNER_REGISTRATION_GRPC_SERVER_NAME: sandbox-api
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_CERT_FILE: /tls/runner/control-grpc-server.crt
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_KEY_FILE: /tls/runner/control-grpc-server.key
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_CLIENT_CA_FILE: /tls/runner/ca.crt
+      SANDBOX_API_RUNNER_API_KEY: ${SANDBOX_API_RUNNER_API_KEY}
+      SANDBOX_RUNNER_API_KEYS: ${SANDBOX_RUNNER_API_KEYS}   # r39j 官方样例补刀：1.5.0 runner 必需（与 SANDBOX_API_KEYS 同值族）
+      SANDBOX_RUNNER_REGISTRATION_TOKEN: ${SANDBOX_RUNNER_REGISTRATION_TOKEN}   # runner 侧注册令牌（与 API 侧注册 token 同值族）
+    volumes:
+      - sandbox-tls:/tls:ro
+    networks: [family]
+    restart: always
+
+  # ── ④c n8n Code 节点 task runner（官方栈件：跑用户代码，端口不发布）──
+  n8n-runners:
+    image: ghcr.io/n8n-io/runners:latest
+    depends_on:
+      - n8n
+    environment:
+      N8N_RUNNERS_AUTH_TOKEN: ${N8N_RUNNERS_AUTH_TOKEN}
+      N8N_RUNNERS_TASK_BROKER_URI: http://n8n:5679
+      N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT: "15"
+    networks: [family]
+    restart: always
 
   # ── ⑤ PostgreSQL：对话历史/线程持久化 + pgvector（RAG 向量检索，R43 升级）──
   postgres:
@@ -164,6 +259,7 @@ services:
 volumes:
   pg_data:
   n8n_data:
+  sandbox-tls:   # r39j：n8n 沙箱栈 mTLS 证书卷（certs 生成→api/runner 只读共享）
 
 networks:
   mia:
