@@ -271,7 +271,12 @@ function HomePageInner({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => (window.location.href = "/settings")}
+              onClick={() => {
+                // r38c（爸问"哪个更科学"定版=保对话）：去设置前存当前线程，返回时带回——
+                // window.location 整页跳转会丢 URL 参数，回来变新对话=爸最烦的"接不上来"
+                if (threadId) sessionStorage.setItem('mk_thread', threadId);
+                window.location.href = "/settings";
+              }}
             >
               <Bot className="mr-2 h-4 w-4" />
               办公室设置

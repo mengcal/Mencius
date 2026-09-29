@@ -52,7 +52,7 @@ function SettingsShell() {
     <div className="fixed inset-0 flex bg-gray-50 dark:bg-gray-950 text-foreground">
       {/* ── 左侧导航（W6：Qoder 式分组感 + 克制的分组标题）── */}
       <aside className="flex w-[240px] shrink-0 flex-col border-r border-border">
-        <button onClick={() => (window.location.href = '/')} className="flex items-center gap-1 px-4 pt-4 pb-2 text-sm text-muted-foreground hover:text-foreground">
+        <button onClick={() => { const t = sessionStorage.getItem('mk_thread'); window.location.href = t ? `/?threadId=${encodeURIComponent(t)}` : '/'; }} className="flex items-center gap-1 px-4 pt-4 pb-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="size-4" /> 返回
         </button>
         <div className="px-4 pb-3">
