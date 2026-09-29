@@ -120,6 +120,10 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         # plan 档在上面已 deny（讨论模式不动编制）；list/models 的 ro 行保留=plan 下仍可看。
         if name == "manage_departments":
             return "pass"
+        # r39i（爸定 n8n=给米娅的第二套牛马班子）：n8n 全动作放行同 manage_departments 逻辑——
+        # 危险面已硬编码在工具内（7 动作白名单/管理端点不代理/触发执行不开放/目标 host 三重锁）。
+        if name == "n8n":
+            return "pass"
         # 到这里=非只读=变更（含 execute/write_file/edit_file/delete/edit_memory/
         # manage_departments/dispatch/start_async_task/task/email-send/任意 mcp__* 工具）
         if level == "strict":

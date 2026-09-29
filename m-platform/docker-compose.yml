@@ -25,6 +25,7 @@ services:
       # R65：OPENAI_* 托底已废（配置页 external 节=唯一服务商源），compose 不再注入
       - SEARXNG_URL=http://searxng:8080
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}  # r36i：langgraph licensed 变体必需，非遥测开关
+      - N8N_API_KEY=${N8N_API_KEY}  # r39i：n8n 工具桥（米娅主脑 n8n 工具用，真 key 只进本容器）
       # R76 execute 沙箱：SandboxedShellBackend 用它连沙箱执行服务（.env 里同值，两端配对）
       - SANDBOX_TOKEN=${SANDBOX_TOKEN}
       # R80（Eve P1）：沙箱已出 mia 网，runner 改经宿主回环调用；09-17 晚 9090→9099（9090 是爸爸 OWUI 的端口，R80 选端口时撞车未察觉=本次事故主犯）

@@ -473,6 +473,81 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
     return "action 只支持 list / models / catalog / add_department / remove_department / add_worker / remove_worker / set_supervisor / set_model"
 
 
+@_tool
+def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
+    """米娅的 n8n 编排权（r39i，爸 09-29 定"第二套牛马班子给你用"）：遥控本机 n8n 工作流引擎。
+    action:
+      list            列全部工作流（id/名字/激活态）
+      get             看单条工作流定义（workflow_id=数字）
+      create          建工作流（body=JSON：{"name":...,"nodes":[...],"connections":{...}}）
+      update          改工作流（workflow_id, body=JSON）
+      activate        启用（workflow_id）/ deactivate 停用
+      executions      最近 10 条执行记录（成没成、错在哪）
+    家规边界（硬编码在白名单，绕不过）：
+    - 只准上述 7 个动作；n8n 的凭据/用户/API key 管理端点**不在代理面内**（防读走 n8n 里存的凭据）；
+    - 不开放"触发执行"端点——含 Code 节点的工作流随便跑=任意代码执行，要跑由爸爸在 n8n 界面亲手点；
+    - create 的节点 JSON 格式复杂：先用 list/get 看现成模板，或在 n8n 界面手搭一条再照葫芦改。"""
+    import os as _os
+    import json as _j
+    import re as _re
+    import urllib.request as _ur
+    import urllib.error as _ue
+    key = _os.environ.get("N8N_API_KEY", "")
+    if not key:
+        return "⛔ N8N_API_KEY 未配置——喊爸爸在设置里补。"
+    act = str(action or "").strip().lower()
+    wid = str(workflow_id or "").strip()
+    if wid and not _re.fullmatch(r"[0-9]{1,15}", wid):
+        return "⛔ workflow_id 只收数字（n8n 的 id 规则），别的形状不收。"
+    # 固定路径表（无用户可控 host/协议）：wid 已过 fullmatch 数字校验
+    _paths = {
+        "list": "/workflows",
+        "get": "/workflows/" + wid,
+        "create": "/workflows",
+        "update": "/workflows/" + wid,
+        "activate": "/workflows/" + wid + "/activate",
+        "deactivate": "/workflows/" + wid + "/deactivate",
+        "executions": "/executions?limit=10",
+    }
+    if act not in _paths:
+        return "action 只支持 list / get / create / update / activate / deactivate / executions"
+    if act in ("get", "update", "activate", "deactivate") and not wid:
+        return f"需要 workflow_id（数字）——先用 list 查。"
+    _HOST = "http://n8n:5678/api/v1"  # 唯一合法目标：compose 内网 n8n 服务（容器名固定）
+    url = _HOST + _paths[act]
+    if not url.startswith(_HOST + "/"):  # 出站前边界自证：协议+host+前缀三重锁
+        return "⛔ 内部守卫：目标越界。"
+
+    class _NoRedirect(_ur.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None  # 3xx 一律不跟（SSRF 重定向面封死）
+
+    data = None
+    if act in ("create", "update"):
+        try:
+            _j.loads(body or "")  # 校验 JSON 合法性（body 原样透传，不解析改写）
+        except Exception as e:
+            return f"body 不是合法 JSON：{e}"
+        data = (body or "{}").encode("utf-8")
+    req = _ur.Request(url, data=data, method=method_of(act),
+                      headers={"X-N8N-API-KEY": key, "Content-Type": "application/json"})
+    opener = _ur.build_opener(_NoRedirect)
+    try:
+        with opener.open(req, timeout=20) as resp:
+            out = resp.read(6000).decode("utf-8", "replace")
+    except _ue.HTTPError as e:
+        return f"n8n 返回 {e.code}：{e.read(500).decode('utf-8', 'replace')}"
+    except Exception as e:
+        return f"n8n 调用失败：{type(e).__name__} {str(e)[:150]}（n8n 容器没起？喊爸爸）"
+    return f"[n8n {method_of(act)} {_paths[act]}] {out[:3000]}"
+
+
+def method_of(act: str) -> str:
+    return {"list": "GET", "get": "GET", "executions": "GET",
+            "create": "POST", "activate": "POST", "deactivate": "POST",
+            "update": "PATCH"}[act]
+
+
 # ===== R58 MCP 生态接入（官方 langchain-mcp-adapters，settings mcp.servers 配置驱动）=====（原 L705）
 def _load_mcp_tools():  # 原 L706-727
     """从 settings mcp.servers 加载 MCP 服务器工具。配置格式：
