@@ -62,6 +62,24 @@ try:
 except Exception as _e:  # SDK 结构升级对不上时不炸平台（侧栏顶多回到旧样子）
     print(f"[agent] cow_task 标记补丁未生效（不影响启动）：{_e}", flush=True)
 
+# r39e（09-29 递归爆案第二刀）：deepagents check_async_task 的 error fallback 是笼统文案
+# （"The async subagent encountered an error."），而 langgraph server 不持久化 run.error
+# （PG run 表无此列、checkpoint 亦无 error 通道，真实异常只在 worker 日志）——米娅看不到
+# 真实死因→连查打转→主图 100 层递归爆（当日实案）。patch：error 空时给诊断指引，防干等循环。
+try:
+    from deepagents.middleware import async_subagents as _asam
+    _orig_bcr = _asam._build_check_result
+    def _bcr_with_guidance(run, thread_id, thread_values):
+        result = _orig_bcr(run, thread_id, thread_values)
+        if result.get("status") == "error" and str(result.get("error", "")).startswith("The async subagent"):
+            result["error"] = ("后台任务失败（langgraph 未持久化错误详情，真实异常只在 worker 日志）。"
+                               "不要连续重查——把 task_id 交给管理员（爸爸/知夏）挖日志定因，"
+                               "或改派前台会话验证。连查打转会撞递归上限（09-29 实案）。")
+        return result
+    _asam._build_check_result = _bcr_with_guidance
+except Exception as _e:
+    print(f"[agent] check_async_task 报错指引补丁未生效（不影响启动）：{_e}", flush=True)
+
 try:  # R68（Eve D1）：R66 分档挪家后旧节残留要出声，防"strict 被静默降成 auto_edit"这类暗坑（原 L157-162）
     from settings_mgr import load_settings as _ls_probe
     if "confirmLevel" in (_ls_probe().get("subagents") or {}):
