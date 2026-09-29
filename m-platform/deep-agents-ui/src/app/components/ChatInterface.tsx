@@ -85,6 +85,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     stopStream,
     resumeInterrupt,
     getMessagesMetadata,
+    editMessage,
   } = useChatContext();
   const submitDisabled = isLoading || !assistant;
   // R3 闭环：轮询后台任务，完成且未播报的 → 自动让米娅读结果汇报给爸爸（R64 持久化见 useTaskAnnouncer）
@@ -265,6 +266,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                     toolCalls={data.toolCalls}
                     isLoading={isLoading}
                     createdAt={createdAt}
+                    onEditMessage={editMessage}
                     actionRequestsMap={
                       isLastMessage ? actionRequestsMap : undefined
                     }

@@ -57,6 +57,8 @@ interface ChatMessageProps {
     open: boolean;
     onToggle: () => void;
   };
+  // r39h（爸令消息编辑）：官方 updateState 同 id 覆盖文本，米娅下轮读到修正版
+  onEditMessage?: (messageId: string, newText: string) => Promise<void>;
 }
 
 export const ChatMessage = React.memo<ChatMessageProps>(
@@ -73,6 +75,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     graphId,
     createdAt,
     autoReport,
+    onEditMessage,
   }) => {
     const batchMode = !!(actionRequestsList && actionRequestsList.length > 0);
     const isUser = message.type === "human";
@@ -119,6 +122,9 @@ export const ChatMessage = React.memo<ChatMessageProps>(
         alive = false;
       };
     }, [thumbKey]);
+    // r39h 消息编辑态：✏️ 进编辑，保存走官方 updateState 同 id 覆盖（见 useChat.editMessage）
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState("");
     const hasToolCalls = toolCalls.length > 0;
     const [toolsOpen, setToolsOpen] = useState(false); // R54 牛马进程折叠：默认收起，想看才展开
     // R10.18（爸爸点名"变更前确认没有弹出"）：组内有 ⛔ 拦截 → 标题亮"待批准"并自动展开一次，
@@ -239,7 +245,17 @@ export const ChatMessage = React.memo<ChatMessageProps>(
           )}
         >
           {hasContent && (
-            <div className={cn("relative flex items-end gap-0")}>
+            <div className={cn("group relative flex items-end gap-0")}>
+              {isUser && onEditMessage && !editing && (
+                <button
+                  type="button"
+                  title="编辑这条消息（修正后米娅下一轮读到的是新文本）"
+                  onClick={() => { setDraft(messageContent); setEditing(true); }}
+                  className="absolute -left-9 top-5 hidden rounded-md border border-border bg-popover px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground group-hover:block"
+                >
+                  ✏️
+                </button>
+              )}
               <div
                 className={cn(
                   "mt-4 overflow-hidden break-words text-sm font-normal leading-[150%]",
@@ -253,7 +269,27 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                     : undefined
                 }
               >
-                {isUser && messageContent.startsWith("[小全调度·自动汇报]") ? (
+                {editing ? (
+                  <div className="w-full min-w-[280px]">
+                    <textarea
+                      className="w-full rounded-lg border border-border bg-background p-2 text-sm text-foreground"
+                      rows={Math.min(10, Math.max(3, draft.split("\n").length + 1))}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="mt-1 flex justify-end gap-2">
+                      <button type="button" onClick={() => setEditing(false)}
+                        className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent">取消</button>
+                      <button type="button"
+                        onClick={async () => {
+                          if (message.id && draft.trim()) await onEditMessage?.(message.id, draft.trim());
+                          setEditing(false);
+                        }}
+                        className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90">保存</button>
+                    </div>
+                  </div>
+                ) : isUser && messageContent.startsWith("[小全调度·自动汇报]") ? (
                   // R57 后台任务汇报折叠：自动汇报原文默认收起，想看才展开
                   <details className="w-full text-xs text-muted-foreground">
                     <summary className="cursor-pointer select-none">

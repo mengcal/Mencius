@@ -128,12 +128,26 @@ export function useChat({
     [client, threadId]
   );
 
+  // r39h（爸令消息编辑）：官方 updateState 原语按同 id 覆盖用户消息文本——
+  // langgraph 每轮从 state 重建模型输入，米娅下一轮读到的就是修正版（打错字根治）。
+  // 不截断历史不重跑：改完想让她重做，补一句即可（可控>自动）。
+  const editMessage = useCallback(
+    async (messageId: string, newText: string) => {
+      if (!threadId || !messageId || !newText.trim()) return;
+      await client.threads.updateState(threadId, {
+        values: { messages: [{ type: "human", content: newText, id: messageId }] },
+      });
+      onHistoryRevalidate?.();
+    },
+    [client, threadId, onHistoryRevalidate]
+  );
+
   const continueStream = useCallback(
     (hasTaskToolCall?: boolean) => {
       stream.submit(undefined, {
         config: {
           ...(activeAssistant?.config || {}),
-          recursion_limit: 100,
+          recursion_limit: 300, // r39c 同病补刀：批准续跑路也吃 100 上限（发送路已修，这漏了）
         },
         ...(hasTaskToolCall
           ? { interruptAfter: ["tools"] }
@@ -171,6 +185,7 @@ export function useChat({
     email: stream.values.email,
     ui: stream.values.ui,
     setFiles,
+    editMessage,
     messages: stream.messages,
     isLoading: stream.isLoading,
     isThreadLoading: stream.isThreadLoading,
