@@ -87,6 +87,7 @@ services:
     volumes:
       - D:\m\workspace\sandbox_runner.py:/runner.py:ro
       - D:\m\workspace\mia_home:/data/mia_home
+      - D:\m\workspace\mia_home\mail-bridge\dot-mail-cli:/root/.config/mail-cli   # r39m：mail-cli 凭据持久化（米娅 09-30 台账根治项——容器重建配置永在）
       # R10.11（千问 P0-1）：memory 沙箱侧只读——MEMORY.md 每轮进 system prompt，沙箱可写=持久化注入正门
       # （对照 skills 同款双层防护：本行 :ro + 写入只走主进程 edit_memory/书记员，有确认门与结构）
       - D:\m\workspace\mia_home\memory:/data/mia_home/memory:ro
