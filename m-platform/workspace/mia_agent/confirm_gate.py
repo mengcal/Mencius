@@ -124,6 +124,12 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
         # 危险面已硬编码在工具内（7 动作白名单/管理端点不代理/触发执行不开放/目标 host 三重锁）。
         if name == "n8n":
             return "pass"
+        # r39p（爸 09-30 授权"你们俩聊"）：姐妹岗对话通道免批——米娅→celia* 岗的
+        # dispatch_external 不弹卡（日常对话秒级，说东往西的税不在姐妹间收）；
+        # 外部产出回传照旧核验（list_external_results 抽检+按不可信输入对待）。
+        # 其他外部岗（cb-post 等）照常过卡。
+        if name == "dispatch_external" and str((args or {}).get("post") or "").lower().startswith("celia"):
+            return "pass"
         # 到这里=非只读=变更（含 execute/write_file/edit_file/delete/edit_memory/
         # manage_departments/dispatch/start_async_task/task/email-send/任意 mcp__* 工具）
         if level == "strict":

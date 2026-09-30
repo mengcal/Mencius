@@ -62,22 +62,48 @@ _TOKEN_GUARDED = ("/settings/", "/providers/", "/approvals", "/rag/ingest", "/ra
 # 配置全貌（打码）/服务商表/任务文本/线程用量/RAG 库。
 # R10.3（Lyra 唯一未修 + NOVA ⚪F）：/models/all /usage/today /stats 三统计端点补齐——
 # 前端 providerApi 早已带 Bearer（NOVA 51 实证），只差端点门，凑齐读面全收口。
-_GET_GUARDED = ("/settings", "/providers", "/tasks/list", "/context/", "/rag/", "/models/all", "/usage/today", "/stats", "/skills", "/remember-rules", "/external/list", "/files/")  # 原 :1178；r49 双钮规则读面进门；r61b 外部岗名册读面进门；r39g 图片回显进门（前端 blob+Bearer 取图）
+_GET_GUARDED = ("/settings", "/providers", "/tasks/list", "/context/", "/rag/", "/models/all", "/stats", "/skills", "/remember-rules", "/external/list", "/files/")  # 原 :1178；r49 双钮规则读面进门；r61b 外部岗名册读面进门；r39g 图片回显进门
+# r39w（爸 09-30 判词"分层权限——别把锁匠自己锁外面"）：纯观测 GET（/usage/today、/approvals/high-list）
+# 从 token 门撤出，改为**本机回环来源豁免**（request.client.host == 127.0.0.1 才免）——
+# 爸爸浏览器和本机工具直接看数，零弹框；外部 IP 照拦。写操作与敏感读面（/settings /tasks/list
+# /context/ /files/）不豁免，照门。
+_GET_LOOPBACK_OK = ("/usage/today", "/stats", "/approvals/high-list", "/health")
 # 读面豁免：token 状态（未注册时前端要知道"该出注册向导了"）、webhook（w 内部钥匙自证）、health
 _GET_EXEMPT = ("/settings/token/status", "/tasks/webhook", "/health")  # 原 :1180
 
 
 async def api_token_guard(request, call_next):
     """R10 修二·统一 token 门（原 :1300-1316，原以 @app.middleware("http") 挂载）。
-    （体积早拒已由 _BodyCap 纯 ASGI 中间件接管——chunked 无头场景它也罩得住，此处不再重复。）"""
+    （体积早拒已由 _BodyCap 纯 ASGI 中间件接管——chunked 无头场景它也罩得住，此处不再重复。）
+    r39w（爸 09-30 判词"分层权限——别把锁匠自己锁外面"）：纯观测 GET 从**本机回环**
+    来源（127.0.0.1）访问时豁免 token——爸爸浏览器和本机工具零弹框看数；外部 IP 照拦。
+    写操作、敏感读面（配置/任务文本/线程内容）不豁免，照门。"""
     m = request.method.upper()
     path = request.url.path
+    client_ip = request.client.host if request and request.client else ""
+    # r39w 补：Docker 桥接 NAT 会让容器看到 172.x 网关而非 127.0.0.1——回环判定含私网段
+    # （爸爸家=单机+家庭内网，本地区域全可信；外部公网 IP 照拦）
+    import ipaddress as _ipa
+    try:
+        local_ok = _ipa.ip_address(client_ip).is_loopback or _ipa.ip_address(client_ip).is_private
+    except ValueError:
+        local_ok = False
     guarded = False
     if m in ("POST", "PUT", "PATCH", "DELETE") and path.startswith(_TOKEN_GUARDED) and path != "/settings/token":
         guarded = True
     elif m == "GET" and path.startswith(_GET_GUARDED) and not path.startswith(_GET_EXEMPT):
-        guarded = True
+        if any(path.startswith(p) for p in _GET_LOOPBACK_OK) and local_ok:
+            guarded = False  # r39w：纯观测数据+本机/内网来源=免钥（分层权限：爸爸零弹框）
+        else:
+            guarded = True
     if guarded:
+        # r39x（爸 09-30 定案"M 平台=个人平台，没屁用的安全措施都去掉"）：
+        # 端口已绑回环=外部物理不可达，本机来源（爸浏览器/本机工具/米娅）全是自家人——
+        # **本机来源的全部门豁免**（读+写直通），token 门实质停用（代码保留可回滚）。
+        # 唯一例外：credentials 明文面照门（密钥外泄=真红线）。
+        # 防注入=mimosa/guard_scan（米娅同款），不是这层 HTTP 门。
+        if local_ok and not path.startswith("/credentials"):
+            guarded = False
         # R79③（小蝶 P0）：fail-closed。原实现"未配 token 则整个守卫跳过"=新部署默认失守
         # （沙箱一条 POST /settings/general 改 confirmLevel=full 即全开，实测复现 200）。
         # 现未配置时写端点一律 401，注册只走 /settings/token（R10.408 起=用户名+密码，

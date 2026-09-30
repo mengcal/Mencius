@@ -162,12 +162,33 @@ def chat_mode():
             print("发送失败:", type(e).__name__, str(e)[:200])
 
 
+def take_orders():
+    """取 celia-post 待办单（r39p 双向通道取单侧——米娅 dispatch_external 落的活）。
+    领取=external_claim（条件化原子领取），干活后 external_store 回传。"""
+    sys.path.insert(0, r"D:\m\workspace")
+    import approvals as _ap
+    rows = _ap.external_pending_view("celia-post", limit=5)
+    if not rows:
+        print("celia-post 暂无待办单。")
+        return
+    for r in rows:
+        did = r.get("id", "")
+        task = str(r.get("task", ""))[:200]
+        claim = _ap.external_claim("celia-post", did)
+        print(f"== 单 {did}（{'已领取' if claim else '领取失败/被抢'}）==")
+        print(f"任务：{task}")
+        print()
+
+
 def main():
     argv = sys.argv[1:]
     if not argv:
         chat_mode()  # 无参数=直接进入对话（爸要的"进入界面就自然语言交流"）
         return
     cmd = argv[0].lower()
+    if cmd == "orders":
+        take_orders()
+        return
     if cmd not in ("send", "new", "last"):
         print(__doc__)
         return

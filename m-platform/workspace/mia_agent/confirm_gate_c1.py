@@ -620,16 +620,28 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     "⛔ 机器安全门拦截：内容扫描异常（fail-closed），本次调用未执行。"
                     "停止并把本线程目标向爸爸汇报。"), tool_call_id=tc.get("id", ""))
             if _g["level"] == "high":
-                try:  # 落账与 when 侧同规格（guard_high+fp；D-1 挂账的无盐指纹代价同案）
+                try:  # 落账与 when 侧同规格（guard_high+fp+命令摘要；D-1 挂账的无盐指纹代价同案）
                     import hashlib as _h9
+                    _fp9 = _h9.sha256(str(args or "").encode("utf-8", "replace")).hexdigest()[:12]
+                    _summ9 = str((args or {}).get("command") or (args or {}).get("file_path") or "")[:150]
                     _ap._audit("guard_high", thread_id=tid, tool=name,
-                               fp=_h9.sha256(str(args or "").encode("utf-8", "replace")).hexdigest()[:12])
+                               fp=_fp9, summary=_summ9)
+                    _ap.set_blocked(tid, name, _fp9)  # r39p：登记待批（对话内批准通道）
+                except Exception:
+                    pass
+                # r39p（爸 09-30 令"要么彻底放行，要给我改到对话里"）：爸爸在对话里说
+                # "批准"→celia 代发 POST /approvals（同 thread/tool/fp）→本门 consume
+                # 命中放行一次；不再"此级别不进入批准流程"——裁量权回爸爸手里。
+                try:
+                    if _ap.consume(tid, name, _fp9):
+                        return None  # 爸爸专批生效：放行本次 execute
                 except Exception:
                     pass
                 return ToolMessage(content=(
-                    "⛔ 机器安全门拦截：本次写入/命令的内容或目标命中确定性高危形态，"
-                    "此级别不进入批准流程，本调用不可重试。请把目标与替代方案向爸爸"
-                    "汇报，由爸爸定夺。"), tool_call_id=tc.get("id", ""))
+                    "⛔ 机器安全门拦截：本次写入/命令的内容或目标命中确定性高危形态，本调用暂未执行。"
+                    "请如实把命令内容与风险向爸爸汇报——爸爸在对话里说\"批准\"后，"
+                    "管理端会按本条指纹〔fp:" + _fp9 + "〕放行一次，你原样重试即可；"
+                    "或改用 write_file/edit_file 等白名单工具达成目标。"), tool_call_id=tc.get("id", ""))
         return None
 
     # ---- D2 压力降档（plan-d2-pressure-v1，09-15 爸爸批 N=3）----

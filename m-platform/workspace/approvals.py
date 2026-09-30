@@ -169,20 +169,11 @@ def external_tid_owned(post_name: str, task_id: str) -> bool:
 
 def external_dispatch(post_name: str, task: str) -> str:
     """派活=落一条待办账（外部岗轮询取走）。返回派活 id（取单/领取/结果三账串链）。
-    r61：任务文本先过机器门（Veda/NOVA 出站注入面——派活动作人环批过≠文本逐字可信）。"""
-    # r61（Eve 审点②）：did 用 uuid4——旧时间戳+pid 尾是"侥幸正确"（靠单调性
-    # 碰巧不撞），唯一性要从碰巧变设计，一行的事。
+    r61（Eve 审点②）：did 用 uuid4——旧时间戳+pid 尾是"侥幸正确"（靠单调性
+    碰巧不撞），唯一性要从碰巧变设计，一行的事。
+    r39y 同权令（10-01 爸爸）：撤 r61 出站文本扫描拒派——西莉亚派活无此门，米娅不留。"""
     did = "d" + _uuid.uuid4().hex[:12]
     nonce = _uuid.uuid4().hex[:8]  # r61e Lyra②：一次性回调凭证（不依赖网络拓扑的身份）
-    try:
-        from mia_agent.guard_scan import scan_tool, rule_ids
-        g = scan_tool("execute", {"command": task})
-        if g["level"] == "high":
-            _audit("external_dispatch_blocked", thread_id=did, tool=str(post_name)[:40],
-                   rids=rule_ids(g["findings"][:3]))  # r61e Cora N4：拒账也脱敏存规则 ID
-            return ""  # 调用方见空串即知被机器门拒派
-    except Exception:
-        pass
     _audit("external_dispatch", thread_id=did, tool=str(post_name)[:40],
            task=str(task)[:2000], nonce=nonce)
     return did

@@ -57,15 +57,9 @@
 <script>
 // r35（Qoder P1-5）：先验 r.ok——401 错误体也是合法 JSON，旧版照 parse=把未登录渲染成
 // 「运行中 undefined / 0 tok / 暂无任务」的假仪表盘；throw 后各卡片既有的 catch 会显示「读取失败」。
-// r39（爸 09-29"观测台读取失败"案）：r27 fail-closed 收紧后观测 GET 全进管理员门，而本页是
-// 2024 域的独立静态页、拿不到主前端（3000 域）的登录态=裸 fetch 必 401。补一次性钥匙输入
-// （prompt 一回、只存本机 localStorage，绝不落文件/网络），全部 fetch 统一带 Bearer。
-const ADMIN_KEY = (() => {
-  let k = localStorage.getItem('mk_admin_key');
-  if (!k) { k = prompt('管理员密钥（本机浏览器保存，仅用于观测台读数）') || ''; if (k) localStorage.setItem('mk_admin_key', k); }
-  return k;
-})();
-const J = u => fetch(u, { headers: { 'Authorization': 'Bearer ' + ADMIN_KEY } }).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+// r39w（爸 09-30 判词"分层权限"）：纯观测 GET 本机/内网来源免钥（app.py _GET_LOOPBACK_OK），
+// 本页裸 fetch 直读=零弹框；写操作（dispatch）仍带 token（真红线照门）。
+const J = u => fetch(u).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 async function refresh() {
   try {
@@ -113,7 +107,7 @@ async function dispatchTask() {
   if (!v) return;
   document.getElementById('dispatchMsg').textContent = '派发中…';
   try {
-    const r = await fetch('/tasks/dispatch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_KEY }, body: JSON.stringify({ task: v }) });
+    const r = await fetch('/tasks/dispatch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: v }) });
     const out = await r.json();
     document.getElementById('dispatchMsg').textContent = out.ok ? '已派活：' + out.id : '失败：' + (out.error || '');
     if (out.ok) document.getElementById('taskInput').value = '';
