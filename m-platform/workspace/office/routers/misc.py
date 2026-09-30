@@ -418,11 +418,14 @@ async def api_high_list():
         except Exception:
             continue
         if r.get("ev") == "guard_high":
+            # 账本键名=tid（_audit 落账格式，15:5x 米娅验收时自查抓出：端点初版误读
+            # thread_id=永远读空→pending 永假→面板批不了。键名以账本实况为准）
+            _tid_full = str(r.get("tid") or r.get("thread_id") or "")
             entries.append({
-                "ts": r.get("ts", ""), "thread": str(r.get("thread_id", ""))[:8],
-                "thread_full": r.get("thread_id", ""), "tool": r.get("tool", ""),
+                "ts": r.get("ts", ""), "thread": _tid_full[:8],
+                "thread_full": _tid_full, "tool": r.get("tool", ""),
                 "fp": r.get("fp", ""), "summary": str(r.get("summary", ""))[:150],
-                "pending": (r.get("thread_id", ""), r.get("tool", ""), r.get("fp", "")) in _ap._blocked_fp,
+                "pending": (_tid_full, r.get("tool", ""), r.get("fp", "")) in _ap._blocked_fp,
             })
         if len(entries) >= 20:
             break
