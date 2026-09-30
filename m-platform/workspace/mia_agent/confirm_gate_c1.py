@@ -354,16 +354,26 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                 if _g["level"] == "high":
                     # r61（hy4 A-3）：high 命中落账（误杀率可算+注入换写法可见）+滑动窗计数
                     # r61f E18（hy4 五轮记档）：fp=无盐 sha256(args)[:12]——args 空间小
-                    # 理论可枚举反推，本账接受此代价（换"同参重撞可见"的审计价值）；
-                    # 下一个读账的人别把它当密码学强度。
+                    # 理论可枚举反推，本账接受此代价（换"同参重撞可见"的审计价值）。
+                    # r39o（爸 09-30 铁律"不许有连爸爸都没权限的规定"）：high 专批通道——
+                    # 爸爸在观测台"高危专批"面板对同 (thread,tool,fp) 点批准后，本处 consume
+                    # 命中即放行一次（90s 窗同 ask 规矩）；agent 永远碰不到 approve（token 门在 office 侧）。
                     import approvals as _ap2
                     import hashlib as _h0
-                    _ap2._audit("guard_high", thread_id=tid, tool=name,
-                                fp=_h0.sha256(str((req.tool_call or {}).get("args") or "")
-                                              .encode("utf-8", "replace")).hexdigest()[:12])
+                    _args = (req.tool_call or {}).get("args") or {}
+                    _fp = _h0.sha256(str(_args).encode("utf-8", "replace")).hexdigest()[:12]
+                    if _ap2.consume(tid, name, _fp):
+                        _ap2._audit("guard_high_pass_used", thread_id=tid, tool=name, fp=_fp)
+                        return True  # 爸爸专批生效：本次放行
+                    # r39o 专批登记：high 也进 blocked_fp（爸在面板能看到待批条目并批准）；
+                    # 落账带命令摘要（爸裁量要看内容——只进审计账本，不进模型拒信，防回显敏感面）
+                    _ap2.set_blocked(tid, name, _fp)
+                    _summ = str(_args.get("command") or _args.get("file_path") or _args.get("path") or "")[:150]
+                    _ap2._audit("guard_high", thread_id=tid, tool=name, fp=_fp, summary=_summ)
                     with self._GATE_LOCK:  # r36（爸 09-27 令）：连击冻结机制整链废除——
                         # 只留单次 high 拒绝与观测缓存；"规定工作多久"的锁不再存在
                         self._guard_deny.setdefault(gk, set()).add(tc_id)
+                        self._guard_fp.setdefault(gk, {})[tc_id] = _fp  # r39o 拒信带指纹
                         self._guard_hits[gk] = _g["findings"]
                     return False
                 if _g["level"] == "mid":
@@ -458,6 +468,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         self._abs_blocked: dict = {}  # {tid: set(tc_id)} r46 路径形态门扣卡的调用
         self._shown_seen: set = set()  # r49 {(tid,fp)} card_shown 幂等集
         self._guard_deny: dict = {}   # r60 {tid: set(tc_id)} 机器门 high 强制拦
+        self._guard_fp: dict = {}     # r39o {tid: {tc_id: fp}} high 专批指纹（拒信带〔fp:…〕供面板/人工核对）
         # intentionally NOT cleared by reset：被拒 tc_id 防重放（消费链见 _deny 命中分支——
         # 行号不钉死，09-16 二十轮 hy3④：L656 已漂至 L694，注释只描述紧邻真源），清=安全特性回退
         # （d2v03fix3② Cora 判词：reset 不该复活被拒的调用——这是设计不是遗漏；
@@ -549,10 +560,14 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         #   "换写法"这个选项存在。给正向出口：W2 实证"给她出口她就走出口"。
         if tck in (self._guard_deny.get(gk) or set()):
             self._guard_deny[gk].discard(tck)
+            _fp_h = (self._guard_fp.get(gk) or {}).pop(tck, "")
             return ToolMessage(content=(
-                "⛔ 机器安全门拦截：该调用形态被确定性规则拦截，此级别不进入批准流程，"
-                "本调用不可重试。若任务确需完成该类操作，请改用 write_file/edit_file 等"
-                "白名单工具达成目标，或把目标与替代方案向爸爸汇报，由爸爸定夺。"),
+                "⛔ 机器安全门拦截：该调用形态被确定性规则拦截，本调用不可重试。若任务确需完成该类操作，请改用 write_file/edit_file 等"
+                "白名单工具达成目标，或把目标与替代方案向爸爸汇报，由爸爸定夺。"
+                "（r39o 专批通道：爸爸若确认此调用无误，可在观测台“高危专批”面板对该条目"
+                "点一次批准——同参数重试即放行一次；你无法自行批准，也不得请求爸爸盲批，"
+                "如实汇报命令内容与风险由爸爸判断。）"
+                + (f"\n本条指纹〔fp:{_fp_h}〕" if _fp_h else "")),
                 tool_call_id=tc.get("id", ""))
         # r33（N1 裁定连根拔，NOVA/Veda 附议）：批准卡硬预算退役后 _over_budget 全仓
         # 写入点为零（grep 实锤，含包外），原 wrap 消费分支=永不触发的死口，整段拆除。

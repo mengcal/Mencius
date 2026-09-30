@@ -401,6 +401,34 @@ async def api_approve(req: dict = Body(...), request: Request = None):
     return {"ok": ok, "reason": why, "approved": f"{tid[:8]}…:{tool}" if ok else ""}
 
 
+@router.get("/approvals/high-list")
+async def api_high_list():
+    """r39o（爸 09-30 铁律"不许有连爸爸都没权限的规定"）：高危专批面板数据源——
+    近 20 条 guard_high 落账 + 待批状态核对（blocked_fp 在位=可批）。
+    批准动作复用 POST /approvals（同 thread/tool/fp），token 门全程罩着，agent 碰不到。"""
+    import approvals as _ap
+    try:
+        lines = open(_ap._audit_path(), encoding="utf-8", errors="replace").read().splitlines()
+    except FileNotFoundError:
+        return {"entries": []}
+    entries = []
+    for ln in reversed(lines[-4000:]):
+        try:
+            r = _json.loads(ln)
+        except Exception:
+            continue
+        if r.get("ev") == "guard_high":
+            entries.append({
+                "ts": r.get("ts", ""), "thread": str(r.get("thread_id", ""))[:8],
+                "thread_full": r.get("thread_id", ""), "tool": r.get("tool", ""),
+                "fp": r.get("fp", ""), "summary": str(r.get("summary", ""))[:150],
+                "pending": (r.get("thread_id", ""), r.get("tool", ""), r.get("fp", "")) in _ap._blocked_fp,
+            })
+        if len(entries) >= 20:
+            break
+    return {"entries": entries}
+
+
 @router.delete("/approvals")
 async def api_revoke(req: dict = Body(...), request: Request = None):
     """R10.3（NOVA ⚪E）：撤销未消费的批准/拦截登记——误点有后悔药，不再悬 24h 等米娅兑现。
