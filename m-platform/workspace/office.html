@@ -53,10 +53,6 @@
     </div>
     <div id="dispatchMsg" class="refresh-info"></div>
   </div>
-  <div class="card" style="grid-column: 1 / -1;"><h2>🛡 高危专批（机器门拦截后爸爸保留最终裁量——r39o 爸铁律“不许有连爸爸都没权限的规定”）</h2>
-    <table><thead><tr><th>时间</th><th>线程</th><th>工具</th><th>命令/目标摘要</th><th>状态</th><th>操作</th></tr></thead><tbody id="highrisk"><tr><td colspan="6" style="color:var(--muted)">加载中…</td></tr></tbody></table>
-    <div id="highMsg" class="refresh-info"></div>
-  </div>
 </div>
 <script>
 // r35（Qoder P1-5）：先验 r.ok——401 错误体也是合法 JSON，旧版照 parse=把未登录渲染成
@@ -110,29 +106,7 @@ async function refresh() {
       '<div class="kv"><span>' + esc(m) + '</span><b>' + a.total.toLocaleString() + ' tok / ' + a.calls + ' 次</b></div>').join('');
     document.getElementById('usage').innerHTML = '<div class="kv"><span>今日合计</span><b class="ok">' + (u.total?.total || 0).toLocaleString() + ' tok / ' + (u.total?.calls || 0) + ' 次</b></div>' + rows;
   } catch (e) { document.getElementById('usage').innerHTML = '<span class="err">读取失败</span>'; }
-  loadHighRisk();
   document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString();
-}
-// r39o 高危专批面板（爸铁律：机器门拦截后爸爸保留最终裁量；批准=同参重试放行一次）
-async function loadHighRisk() {
-  try {
-    const d = await J('/approvals/high-list');
-    const rows = (d.entries || []).map(e =>
-      '<tr><td>' + esc((e.ts || '').slice(5, 16)) + '</td><td>' + esc(e.thread) + '…</td><td>' + esc(e.tool) + '</td>' +
-      '<td style="max-width:420px;word-break:break-all">' + esc(e.summary || '(摘要未落账)') +
-      '<br><span class="refresh-info">fp ' + esc(e.fp) + '</span></td>' +
-      '<td>' + (e.pending ? '<span class="status-queued">待批</span>' : '<span style="color:var(--muted)">已消费/过期</span>') + '</td>' +
-      '<td>' + (e.pending ? '<button style="padding:4px 10px" onclick="approveHigh(\'' + esc(e.thread_full) + '\',\'' + esc(e.tool) + '\',\'' + esc(e.fp) + '\')">批一次</button>' : '') + '</td></tr>').join('');
-    document.getElementById('highrisk').innerHTML = rows || '<tr><td colspan="6" style="color:var(--muted)">暂无高危拦截记录</td></tr>';
-  } catch (e) { document.getElementById('highrisk').innerHTML = '<tr><td colspan="6" class="err">读取失败</td></tr>'; }
-}
-async function approveHigh(tid, tool, fp) {
-  try {
-    const r = await fetch('/approvals', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_KEY }, body: JSON.stringify({ thread_id: tid, tool: tool, fp: fp }) });
-    const out = await r.json();
-    document.getElementById('highMsg').textContent = out.ok ? '已批准：米娅同参数重试将放行一次（90 秒窗内）' : '批准失败：' + (out.reason || '');
-  } catch (e) { document.getElementById('highMsg').textContent = '请求失败：' + e.message; }
-  loadHighRisk();
 }
 async function dispatchTask() {
   const v = document.getElementById('taskInput').value.trim();

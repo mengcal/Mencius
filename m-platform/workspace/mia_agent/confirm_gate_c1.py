@@ -355,27 +355,22 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     # r61（hy4 A-3）：high 命中落账（误杀率可算+注入换写法可见）+滑动窗计数
                     # r61f E18（hy4 五轮记档）：fp=无盐 sha256(args)[:12]——args 空间小
                     # 理论可枚举反推，本账接受此代价（换"同参重撞可见"的审计价值）。
-                    # r39o（爸 09-30 铁律"不许有连爸爸都没权限的规定"）：high 专批通道——
-                    # 爸爸在观测台"高危专批"面板对同 (thread,tool,fp) 点批准后，本处 consume
-                    # 命中即放行一次（90s 窗同 ask 规矩）；agent 永远碰不到 approve（token 门在 office 侧）。
+                    # r39p（爸 09-30 令"要么彻底放行，要给我改到对话里"）：high 从"直接拒不弹卡"
+                    # 改为**与 mid 同构——上卡面弹确认**（机器意见随卡，爸爸对话里批/拒）。
+                    # 原"防注入求章"设计把爸爸的裁量权也锁死了（L80 铁律：拦动作不罚人、
+                    # 不许有连爸爸都没权限的规定）——裁量权优先，落账保留供审计。
                     import approvals as _ap2
                     import hashlib as _h0
                     _args = (req.tool_call or {}).get("args") or {}
                     _fp = _h0.sha256(str(_args).encode("utf-8", "replace")).hexdigest()[:12]
-                    if _ap2.consume(tid, name, _fp):
-                        _ap2._audit("guard_high_pass_used", thread_id=tid, tool=name, fp=_fp)
-                        return True  # 爸爸专批生效：本次放行
-                    # r39o 专批登记：high 也进 blocked_fp（爸在面板能看到待批条目并批准）；
-                    # 落账带命令摘要（爸裁量要看内容——只进审计账本，不进模型拒信，防回显敏感面）
-                    _ap2.set_blocked(tid, name, _fp)
                     _summ = str(_args.get("command") or _args.get("file_path") or _args.get("path") or "")[:150]
+                    _ap2.set_blocked(tid, name, _fp)  # 登记待批（对话内批准=同参放行一次）
                     _ap2._audit("guard_high", thread_id=tid, tool=name, fp=_fp, summary=_summ)
-                    with self._GATE_LOCK:  # r36（爸 09-27 令）：连击冻结机制整链废除——
-                        # 只留单次 high 拒绝与观测缓存；"规定工作多久"的锁不再存在
-                        self._guard_deny.setdefault(gk, set()).add(tc_id)
-                        self._guard_fp.setdefault(gk, {})[tc_id] = _fp  # r39o 拒信带指纹
+                    with self._GATE_LOCK:
+                        self._guard_mid.setdefault(gk, {})[tc_id] = _g["findings"]  # 与 mid 同构：意见上卡面
+                        self._guard_fp.setdefault(gk, {})[tc_id] = _fp
                         self._guard_hits[gk] = _g["findings"]
-                    return False
+                    # 不 return False——落到后面走官方 ask 确认卡（爸爸对话里批/拒）
                 if _g["level"] == "mid":
                     with self._GATE_LOCK:  # d2v03fix3③：mid 命中缓存写入同闸
                         self._guard_mid.setdefault(gk, {})[tc_id] = _g["findings"]
