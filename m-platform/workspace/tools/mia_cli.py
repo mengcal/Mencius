@@ -15,6 +15,7 @@
       _url() 对每个最终 URL 做 origin 白名单校验 + 3xx 不跟随，双闸。
 """
 import json
+import os
 import pathlib
 import sys
 import urllib.error
@@ -121,11 +122,16 @@ def extract_reply(state):
 
 
 def send_once(token, msg):
-    """发一条并打印米娅的回复（send 命令与交互模式共用）。"""
+    """发一条并打印米娅的回复（send 命令与交互模式共用）。
+    r39z：workspace 随 run 走官方 configurable 通道（对齐前端 page.tsx 同一条政令
+    r36k）——环境变量 MIA_CLI_WS 选域，缺省 container 与前端默认一致；
+    宿主域（MIA_CLI_WS=host）经 host_runner 落宿主 Git Bash，档位门照过不误。"""
     tid = get_thread(token)
+    ws = (os.environ.get("MIA_CLI_WS") or "container").strip() or "container"
     state = _req("/threads/" + tid + "/runs/wait", token,
                  data={"assistant_id": ASSISTANT,
-                       "input": {"messages": [{"role": "user", "content": msg}]}},
+                       "input": {"messages": [{"role": "user", "content": msg}]},
+                       "config": {"configurable": {"workspace": ws}}},
                  timeout=600)
     reply = extract_reply(state)
     print(reply, flush=True)
