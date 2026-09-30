@@ -93,25 +93,54 @@ def extract_reply(state):
     return "(米娅本轮没有文本回复)"
 
 
+def send_once(token, msg):
+    """发一条并打印米娅的回复（send 命令与交互模式共用）。"""
+    tid = get_thread(token)
+    state = _req("/threads/" + tid + "/runs/wait", token,
+                 data={"assistant_id": ASSISTANT,
+                       "input": {"messages": [{"role": "user", "content": msg}]}},
+                 timeout=600)
+    reply = extract_reply(state)
+    print(reply, flush=True)
+    LAST_FILE.write_text(json.dumps({"thread": tid, "reply": reply}, ensure_ascii=False),
+                         encoding="utf-8")
+
+
+def chat_mode():
+    """交互模式：直接进入自然语言对话，exit/quit 退出（爸 09-30 令：不要每次敲 send）。"""
+    token = login()
+    tid = get_thread(token)
+    print(f"已连接米娅（线程 {tid[:8]}…）——直接说话，exit 退出。")
+    while True:
+        try:
+            line = input("你> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return
+        if not line:
+            continue
+        if line.lower() in ("exit", "quit", "退出"):
+            return
+        try:
+            send_once(token, line)
+        except Exception as e:
+            print("发送失败:", type(e).__name__, str(e)[:200])
+
+
 def main():
-    cmd = (sys.argv[1] if len(sys.argv) > 1 else "help").lower()
+    argv = sys.argv[1:]
+    if not argv:
+        chat_mode()  # 无参数=直接进入对话（爸要的"进入界面就自然语言交流"）
+        return
+    cmd = argv[0].lower()
     if cmd not in ("send", "new", "last"):
         print(__doc__)
         return
     token = login()
     if cmd == "new":
         print("新线程:", get_thread(token, fresh=True))
-    elif cmd == "send" and len(sys.argv) > 2:
-        msg = " ".join(sys.argv[2:])
-        tid = get_thread(token)
-        state = _req("/threads/" + tid + "/runs/wait", token,
-                     data={"assistant_id": ASSISTANT,
-                           "input": {"messages": [{"role": "user", "content": msg}]}},
-                     timeout=600)
-        reply = extract_reply(state)
-        print(reply)
-        LAST_FILE.write_text(json.dumps({"thread": tid, "reply": reply}, ensure_ascii=False),
-                             encoding="utf-8")
+    elif cmd == "send" and len(argv) > 1:
+        send_once(token, " ".join(argv[1:]))
     elif cmd == "last":
         print(LAST_FILE.read_text(encoding="utf-8") if LAST_FILE.exists() else "(还没有记录)")
     else:
