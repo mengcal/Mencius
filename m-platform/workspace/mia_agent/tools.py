@@ -346,7 +346,12 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
             _ag = (_ls2().get("agents", {}) or {})
             def _m(role):
                 e = _ag.get(role) or {}
-                return f"{e.get('provider', '?')}/{e.get('model', '?')}" if e else "未配置"
+                base = f"{e.get('provider', '?')}/{e.get('model', '?')}" if e else "未配置"
+                # r39u（米娅验收条件 2）：models 回执带温度字段（agents.<role>.temperature）
+                t = e.get("temperature")
+                if t not in (None, ""):
+                    base += f"@temp{t}"
+                return base
         except Exception:
             def _m(role):
                 return "?"

@@ -58,6 +58,12 @@ Architecture, the security model, container orchestration, and test gates — al
 The frontend is based on [langchain-ai/deep-agents-ui](https://github.com/langchain-ai/deep-agents-ui) (MIT), and the runtime is [LangGraph](https://github.com/langchain-ai/langgraph) + [deepagents](https://github.com/langchain-ai/deepagents).
 See [NOTICE.md](NOTICE.md) for acknowledgments and attribution.
 
+### Two installation paths
+
+**Container (default)**: `docker compose up -d` — everything (app, sandbox, postgres, redis, n8n) runs in containers on your machine. Nothing leaves your infrastructure; the AI operator's shell is a sealed sandbox with no network access to the platform itself.
+
+**Host (advanced)**: the app is plain Python — if you prefer running it directly, install the requirements and launch `langgraph dev` (or `uvicorn` on the office app) against your own Postgres/Redis. The host-runner service (Mia's host-side execution arm) already runs this way by design. The trade-off is the security model: containers give you isolation by default; host mode gives the agent your real filesystem under whatever permission tier *you* set — you are the only one who can grant or revoke that.
+
 ## License
 
 [MIT](LICENSE) © 2026 Mencius (zcode/Celia)
