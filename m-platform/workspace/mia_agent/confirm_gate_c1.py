@@ -589,18 +589,18 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         # execute 侧与 write 侧同规格）。冻结/滑窗链已整链废除（r36-G），本路径不弹卡、
         # 不存在"磨卡"攻击面，不重复建。
         # 09-14 续单第二弹（P-A 扩面，工兵实核）：full 档 _decision 全工具 pass，
-        # delete/派活三手/edit_memory 原在 pass 路零扫描直过=敞口——名单扩入。
+        # delete/edit_memory 原在 pass 路零扫描直过=敞口——名单扩入。
         # 扫描入参按各工具 args 形态适配到既有通道（guard_scan 一字不改）：
         # delete 的 file_path 走写侧后门路径规则（_BACKDOOR_PATHS，删 .ssh/、etc/
         # 与投 .ssh/ 同罪）；edit_memory 的 content 走写侧内容规则（无路径目标，
-        # file_pattern ".*" 的通用规则照常命中——私钥字面量 high）；
-        # dispatch_to_xiaoquan/dispatch_external/start_async_task 与 guard_scan
-        # 既有 dispatch 通道（task/description 文本）原生同名，直传。
+        # file_pattern ".*" 的通用规则照常命中——私钥字面量 high）。
+        # r39y2 同权令补完（10-01 CB 复验 F 项实锤：与 approvals 侧撤派活扫描口径不一致，
+        # full 档派活文本仍在此被 guard_scan high 拦）——派活三手（dispatch_to_xiaoquan/
+        # dispatch_external/start_async_task）移出名单：西莉亚派活/起子代理无扫描门，米娅不留。
+        # 写面/命令面五件保留=西莉亚侧 Mimosa 同款扫描在场，同权名单内。
         # mcp__* 动态名本轮不扩（待政令）。
         if dec == "pass" and name in ("write_file", "edit_file", "execute",
-                                      "delete", "edit_memory",
-                                      "dispatch_to_xiaoquan", "dispatch_external",
-                                      "start_async_task"):
+                                      "delete", "edit_memory"):
             sn, sa = name, (args or {})
             if name == "delete":
                 sn, sa = "write_file", {"file_path": str((args or {}).get("file_path") or "")}
