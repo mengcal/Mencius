@@ -89,21 +89,29 @@ try:
         except Exception:
             return None
 
+    _LAST_STEPS: dict = {}  # r39t v2（Eve 洞1）：{task_id: 上次消息步数}——静默=超时+步数零增量
+
     def _bcr_with_guidance(run, thread_id, thread_values):
         result = _orig_bcr(run, thread_id, thread_values)
         diag = _diag_from_values(thread_values)
+        steps = diag["steps"] if diag else 0
         if result.get("status") == "error" and str(result.get("error", "")).startswith("The async subagent"):
             detail = ""
             if diag:
-                detail = (f"诊断：该任务线程已累积 {diag['steps']} 条消息，最后一条是 {diag['last_kind']} 说："
-                          f"「{diag['last_snippet']}」——牛马最后停在什么状态一目了然。")
+                # Eve 洞2：静默/诊断信号自证（步数+片段+口径随包，查账人引用现成证据）
+                detail = (f"诊断包：该任务线程已累积 {diag['steps']} 条消息，最后一条是 {diag['last_kind']} 说："
+                          f"「{diag['last_snippet']}」（Eve 洞2：活性证据=消息步数，勿凭印象脑补）——"
+                          "牛马最后停在什么状态一目了然。")
+            # Eve 洞4：r39e 防打转文案保留追加（09-29 递归爆实案淬出来的，不整个换掉）
             result["error"] = ("后台任务失败（langgraph 未持久化错误详情，真实异常只在 worker 日志）。"
                                + (" " + detail if detail else "")
-                               + " 不要连续重查——把 task_id 交给管理员（爸爸/知夏）挖日志定因，"
+                               + " 不要连续重查——把 task_id 交给管理员（爸爸/celia（西莉亚））挖日志定因，"
                                "或改派前台会话验证。连查打转会撞递归上限（09-29 实案）。")
         elif result.get("status") == "running":
-            # r39t 静默信号（米娅验收单⑤）：run 长时间未更新=疑似静默——直接干掉
-            # "脑补任务已完成"的高危场景（imp:10 血泪），也让连查打转失去动机。
+            # r39t 静默信号（米娅验收单⑤）：Eve 洞1——超时+步数零增量才报疑似静默
+            #（纯年龄会误伤正常慢步骤，误报多了米娅学会无视=设计白做）。
+            prev = _LAST_STEPS.get(str(thread_id))
+            _LAST_STEPS[str(thread_id)] = steps
             idle = None
             try:
                 import datetime as _dt
@@ -113,8 +121,9 @@ try:
                     idle = max(0, int((_dt.datetime.now(_dt.timezone.utc).timestamp() - epoch) / 60))
             except Exception:
                 pass
-            if idle is not None and idle >= 5:
-                detail = f"（最后活动 {diag['steps']} 条消息 / {idle} 分钟前）" if diag else ""
+            if idle is not None and idle >= 5 and prev is not None and steps == prev:
+                # Eve 洞2：自证随包（步数零增量 prev→steps + 最后发言片段已脱敏）
+                detail = f"（消息步数零增量 {prev}→{steps}，最后发言：{diag['last_snippet'] if diag else '无'}）"
                 result["silent_warning"] = (f"疑似静默（run 已 {idle} 分钟无更新{detail}）——"
                                             "任务大概率卡死而非在跑，别等也别脑补，报管理员核查。")
         return result
@@ -188,21 +197,16 @@ def _build_async_subagents():  # 原 L974-991
     # r25（hy4 A2.1 P1 修复）：主图此前没封 deepagents 自动注入的 general-purpose 影子子代理——
     # 它继承主图全工具却不带 ConfirmGate（deepagents/graph.py:751 注入条件 / :777 过滤自定义中间件），
     # 一次 task 批准=放出无门全权代理。照 cow_graphs 已验证的死胡同样板占领槽位（官方跳过条件=自带同名 spec）。
-    from deepagents.middleware.subagents import CompiledSubAgent
-    from langgraph.graph import StateGraph, MessagesState, END
-
-    def _gp_refuse(state):
-        return {"messages": [{"role": "assistant", "content":
-            "general-purpose 槽位已按军事纪律退役：主图只准派在编部门/总管（异步子代理）或用在编工具面干活，"
-            "派到这里只会得到退回指令。"}]}
-    _gpe = StateGraph(MessagesState)
-    _gpe.add_node("gp_refuse", _gp_refuse)
-    _gpe.set_entry_point("gp_refuse")
-    _gpe.add_edge("gp_refuse", END)
-    out.append(CompiledSubAgent(
+    # r39k（爸 09-29 令"简单问题派自身模型的子代理比启动牛马更快"）：该槽位从拒收站升级为
+    # **同步轻量子代理**——继承米娅的模型（qwen-flash）、无独立线程/checkpointer（秒级派生），
+    # tools 显式收窄为纯只读四件（同步子代理不经主图 ConfirmGate → 无危险动作可做=无门也安全，
+    # r25 的洞不复发）；读文件类主脑自己更快（内置 read_file），落盘交付/长任务仍走部门牛马。
+    from deepagents.middleware.subagents import SubAgent as _SyncSubAgent
+    out.append(_SyncSubAgent(
         name="general-purpose",
-        description="已退役槽位——不要派活（军事纪律：只准用在编部门/总管/工具面，派过来只会得到退回指令）。",
-        runnable=_gpe.compile(),
+        description="轻量快手（同步子代理，秒级）：简单查询、知识库检索、小分析、并列对比这类轻活用我。落盘交付/跨部门/长任务请派部门牛马。",
+        system_prompt="你是米娅的轻量子代理：快、准、短。一次任务一答，答案直接可用；不确定就说明不确定，别铺摊子。",
+        tools=[search_knowledge_base, list_async_tasks, list_external_posts, list_external_results],
     ))
     return out
 
