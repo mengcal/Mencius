@@ -282,7 +282,7 @@ def edit_memory(action: str, section: str = "", content: str = "", project: str 
 
 
 @_tool
-def manage_departments(action: str, department: str = "", name: str = "", desc: str = "", content: str = "") -> str:  # 原 L556-702
+def manage_departments(action: str, department: str = "", name: str = "", desc: str = "", content: str = "", temperature: str = "") -> str:  # 原 L556-702
     """米娅的人事权（R64，爸爸 2026-09-01 授予）：随时增删牛马、任命主管、给主管配牛马。
     改 departments_config.json + 清部门图缓存，下次派活自动按新编制执行（零重启）。
     action:
@@ -466,6 +466,20 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
         cur = s.setdefault("agents", {}).setdefault(name.strip(), {})
         cur["provider"] = desc.strip()
         cur["model"] = (content or "").strip()
+        # r39u（NOVA 温度断链刀补完）：温度随 set_model 一并配置——cow_graphs 消费端
+        # （agents.<role>.temperature）本就活着，此前的断在"设置端两头"：manage 九动作
+        # 无温度参数+schema 无 agents 段。现补温度参数（空串=清除，回落模型默认）。
+        if temperature.strip():
+            try:
+                tval = float(temperature.strip())
+                if 0 <= tval <= 2:
+                    cur["temperature"] = tval
+                else:
+                    return f"temperature 须在 0~2（收到 {tval}），未写入。"
+            except ValueError:
+                return f"temperature 不是数字（收到 {temperature!r}），未写入。"
+        elif "temperature" in cur:
+            cur.pop("temperature")  # 显式清空=回落模型默认
         # R79→r38b 更新（爸 09-29 01:30 政令"我只关米娅，米娅关牛马"）：此处直写 settings.json 的 agents 节
         # 【合法绕过 HTTP token 门】——现行依据=闸门 _decision 对 manage_departments 全动作放行（米娅自主人事），
         # 总阀=顶栏 👑 开关（permissions.miaManageAgents，本工具 305 行关=直接拒）；agents 节只有 provider/model 名，
@@ -485,18 +499,18 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
 
 @_tool
 def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
-    """米娅的 n8n 编排权（r39i，爸 09-29 定"第二套牛马班子给你用"）：遥控本机 n8n 工作流引擎。
+    """米娅的 n8n 编排权（r39i 建；r39v 爸 09-30 判词"做办公平台不是做保险库"全面放开）。
     action:
-      list            列全部工作流（id/名字/激活态）
-      get             看单条工作流定义（workflow_id=数字）
-      create          建工作流（body=JSON：{"name":...,"nodes":[...],"connections":{...}}）
-      update          改工作流（workflow_id, body=JSON）
-      activate        启用（workflow_id）/ deactivate 停用
-      executions      最近 10 条执行记录（成没成、错在哪）
-    家规边界（硬编码在白名单，绕不过）：
-    - 只准上述 7 个动作；n8n 的凭据/用户/API key 管理端点**不在代理面内**（防读走 n8n 里存的凭据）；
-    - 不开放"触发执行"端点——含 Code 节点的工作流随便跑=任意代码执行，要跑由爸爸在 n8n 界面亲手点；
-    - create 的节点 JSON 格式复杂：先用 list/get 看现成模板，或在 n8n 界面手搭一条再照葫芦改。"""
+      list / get / create / update / activate / deactivate / executions   # 工作流管理七动作
+      run               手动触发一次工作流执行（workflow_id）
+      credentials_list / credentials_get / credentials_create / credentials_delete   # 凭据管理
+      users_list        # 用户管理
+      apikeys_list / apikeys_create / apikeys_delete   # API key 管理
+      source            直连任意 n8n REST 路径（body={"path": "/xxx", "method": "GET"}）——API 有就有的都能用
+    家规边界（仅剩真红线，其余全放——爸判词：做办公平台不是做保险库）：
+    - API key 的**明文值不回显**（列表/创建只回 id 和名字，防凭据经对话泄漏）；
+    - 姐妹岗互信：触发执行、凭据操作你全权，出事按账本追责（你的行为你的账）。
+    create/update 的节点 JSON 格式复杂：先用 list/get 看现成模板，或在 n8n 界面手搭一条再照葫芦改。"""
     import os as _os
     import json as _j
     import re as _re
@@ -509,7 +523,7 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
     wid = str(workflow_id or "").strip()
     if wid and not _re.fullmatch(r"[0-9]{1,15}", wid):
         return "⛔ workflow_id 只收数字（n8n 的 id 规则），别的形状不收。"
-    # 固定路径表（无用户可控 host/协议）：wid 已过 fullmatch 数字校验
+    # r39v：固定 n8n 基座 + 工作流七动作全表 + 凭据/用户/钥匙管理面（米娅全权）
     _paths = {
         "list": "/workflows",
         "get": "/workflows/" + wid,
@@ -518,14 +532,40 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
         "activate": "/workflows/" + wid + "/activate",
         "deactivate": "/workflows/" + wid + "/deactivate",
         "executions": "/executions?limit=10",
+        "run": "/workflows/" + wid + "/run",
+        "credentials_list": "/credentials",
+        "credentials_get": "/credentials/" + wid,
+        "credentials_create": "/credentials",
+        "credentials_delete": "/credentials/" + wid,
+        "users_list": "/users",
+        "apikeys_list": "/api-keys",
+        "apikeys_create": "/api-keys",
+        "apikeys_delete": "/api-keys/" + wid,
     }
+    method_map = {"list": "GET", "get": "GET", "executions": "GET", "credentials_list": "GET",
+                  "credentials_get": "GET", "users_list": "GET", "apikeys_list": "GET",
+                  "create": "POST", "credentials_create": "POST", "apikeys_create": "POST",
+                  "run": "POST", "activate": "POST", "deactivate": "POST",
+                  "update": "PATCH", "credentials_delete": "DELETE", "apikeys_delete": "DELETE"}
+    if act == "source":
+        # r39v source 直连：body={"path": "/xxx", "method": "GET|POST|..."}——n8n API 有就有的都能调
+        try:
+            src = _j.loads(body or "{}")
+            _p = str(src.get("path") or "")
+            if not _p.startswith("/") or ".." in _p:
+                return "⛔ path 须以 / 开头且不含 ..。"
+            _paths["source"] = _p
+            method_map["source"] = str(src.get("method") or "GET")
+            act = "source"
+        except Exception as e:
+            return f"body 不是合法 JSON：{e}"
     if act not in _paths:
-        return "action 只支持 list / get / create / update / activate / deactivate / executions"
-    if act in ("get", "update", "activate", "deactivate") and not wid:
-        return f"需要 workflow_id（数字）——先用 list 查。"
+        return f"action {act!r} 不支持（source 直连模式除外）"
+    if act in ("get", "update", "activate", "deactivate", "run", "credentials_get", "credentials_delete", "apikeys_delete") and not wid:
+        return f"需要 workflow_id 或对象 id（数字）——先用 list 查。"
     _HOST = "http://n8n:5678/api/v1"  # 唯一合法目标：compose 内网 n8n 服务（容器名固定）
     url = _HOST + _paths[act]
-    if not url.startswith(_HOST + "/"):  # 出站前边界自证：协议+host+前缀三重锁
+    if not url.startswith(_HOST):  # 出站前边界自证：协议+host 锁死
         return "⛔ 内部守卫：目标越界。"
 
     class _NoRedirect(_ur.HTTPRedirectHandler):
@@ -533,23 +573,40 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
             return None  # 3xx 一律不跟（SSRF 重定向面封死）
 
     data = None
-    if act in ("create", "update"):
+    if act in ("create", "update", "credentials_create", "source"):
         try:
-            _j.loads(body or "")  # 校验 JSON 合法性（body 原样透传，不解析改写）
+            _j.loads(body or "{}")
         except Exception as e:
             return f"body 不是合法 JSON：{e}"
         data = (body or "{}").encode("utf-8")
-    req = _ur.Request(url, data=data, method=method_of(act),
+    req = _ur.Request(url, data=data, method=method_map[act],
                       headers={"X-N8N-API-KEY": key, "Content-Type": "application/json"})
     opener = _ur.build_opener(_NoRedirect)
     try:
-        with opener.open(req, timeout=20) as resp:
-            out = resp.read(6000).decode("utf-8", "replace")
+        with opener.open(req, timeout=30) as resp:
+            out = resp.read(12000).decode("utf-8", "replace")
     except _ue.HTTPError as e:
         return f"n8n 返回 {e.code}：{e.read(500).decode('utf-8', 'replace')}"
     except Exception as e:
         return f"n8n 调用失败：{type(e).__name__} {str(e)[:150]}（n8n 容器没起？喊爸爸）"
-    return f"[n8n {method_of(act)} {_paths[act]}] {out[:3000]}"
+    # 唯一红线：API key 明文值不回显（列表/创建只回 id 和名字，防凭据经对话泄漏）
+    if "apiKey" in out or "api_key" in out:
+        try:
+            d = _j.loads(out)
+            def _scrub(o):
+                if isinstance(o, dict):
+                    for k2 in list(o):
+                        if "key" in k2.lower() and isinstance(o[k2], str) and len(o[k2]) > 12:
+                            o[k2] = o[k2][:4] + "…[已隐]"
+                        _scrub(o[k2])
+                elif isinstance(o, list):
+                    for x in o:
+                        _scrub(x)
+            _scrub(d)
+            out = _j.dumps(d, ensure_ascii=False)
+        except Exception:
+            pass
+    return f"[n8n {method_map[act]} {_paths[act]}] {out[:6000]}"
 
 
 def method_of(act: str) -> str:
