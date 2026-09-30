@@ -104,10 +104,13 @@ async def api_token_guard(request, call_next):
         # 防注入=mimosa/guard_scan（米娅同款），不是这层 HTTP 门。
         if local_ok and not path.startswith("/credentials"):
             guarded = False
+    if guarded:
         # R79③（小蝶 P0）：fail-closed。原实现"未配 token 则整个守卫跳过"=新部署默认失守
         # （沙箱一条 POST /settings/general 改 confirmLevel=full 即全开，实测复现 200）。
         # 现未配置时写端点一律 401，注册只走 /settings/token（R10.408 起=用户名+密码，
         # 谁先注册谁是主人；激活码机制已废除）——首部署须先完成注册。
+        # r39x 补刀（10-01 破案）：旧版把本检查留在豁免块内——豁免只改了变量没拦住 401 返回，
+        # "本机免钥"实测假绿。现豁免后 guarded=False 就不进此块。
         if not _token_ok(_presented_token(request)):
             return _JSONResp({"ok": False, "error": "需要管理员密钥（改设置/服务商/批准/知识库写入是爸爸的权柄，米娅无此钥匙）"}, status_code=401)
     return await call_next(request)
