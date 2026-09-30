@@ -392,10 +392,15 @@ def manage_departments(action: str, department: str = "", name: str = "", desc: 
             return "需要 department（部门名）"
         if _find(department.strip()):
             return f"部门「{department}」已存在"
+        # r39p（爸 09-30 令"米娅想建立多少建立多少"）：部门数上限放开——槽位号取
+        # 现有最大 dept_N 的 N+1（不再限 4 槽），旧行号 dept_0..3 永久占用不受影响。
         used = {d.get("slot") for d in depts}
-        slot = next((f"dept_{i}" for i in range(4) if f"dept_{i}" not in used), None)
-        if not slot:
-            return "4 个槽位已满（dept_0..dept_3），请先解散一个部门"
+        _max = -1
+        for s in used:
+            m = re.match(r"dept_(\d+)$", str(s) or "")
+            if m:
+                _max = max(_max, int(m.group(1)))
+        slot = f"dept_{_max + 1}"
         depts.append({"slot": slot, "name": department.strip(),
                       "supervisor": {"name": "supervisor", "role": "boss",
                                      "system_prompt": f"你是{department}主管。拆解任务、派给牛马、汇总上交。"},
