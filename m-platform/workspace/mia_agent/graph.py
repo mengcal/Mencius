@@ -66,16 +66,59 @@ except Exception as _e:  # SDK 结构升级对不上时不炸平台（侧栏顶�
 # （"The async subagent encountered an error."），而 langgraph server 不持久化 run.error
 # （PG run 表无此列、checkpoint 亦无 error 通道，真实异常只在 worker 日志）——米娅看不到
 # 真实死因→连查打转→主图 100 层递归爆（当日实案）。patch：error 空时给诊断指引，防干等循环。
+# r39t（09-30 米娅验收单⑤升级）：error 附诊断包（线程消息步数+最后发言片段），
+# running 附静默信号（run 更新超 5 分钟="疑似静默"——米娅点名要的信号，直接干掉"脑补已完成"）。
 try:
     from deepagents.middleware import async_subagents as _asam
     _orig_bcr = _asam._build_check_result
+
+    def _diag_from_values(thread_values):
+        """从线程状态挖诊断包：消息步数+最后一条消息片段（卫生版：脱敏+截断——Eve 洞3）。"""
+        try:
+            import re as _re
+            msgs = (thread_values or {}).get("messages") or []
+            if not msgs:
+                return None
+            last = msgs[-1]
+            content = last.get("content", "") if isinstance(last, dict) else str(last)
+            if isinstance(content, list):
+                content = " ".join(x.get("text", "") for x in content if isinstance(x, dict))
+            content = _re.sub(r"(sk-|AKIA|Bearer\s+)[A-Za-z0-9_\-]+", r"\1[REDACTED]", content)
+            kind = (last.get("type") or last.get("role") or "?") if isinstance(last, dict) else "?"
+            return {"steps": len(msgs), "last_kind": str(kind), "last_snippet": str(content)[:120]}
+        except Exception:
+            return None
+
     def _bcr_with_guidance(run, thread_id, thread_values):
         result = _orig_bcr(run, thread_id, thread_values)
+        diag = _diag_from_values(thread_values)
         if result.get("status") == "error" and str(result.get("error", "")).startswith("The async subagent"):
+            detail = ""
+            if diag:
+                detail = (f"诊断：该任务线程已累积 {diag['steps']} 条消息，最后一条是 {diag['last_kind']} 说："
+                          f"「{diag['last_snippet']}」——牛马最后停在什么状态一目了然。")
             result["error"] = ("后台任务失败（langgraph 未持久化错误详情，真实异常只在 worker 日志）。"
-                               "不要连续重查——把 task_id 交给管理员（爸爸/知夏）挖日志定因，"
+                               + (" " + detail if detail else "")
+                               + " 不要连续重查——把 task_id 交给管理员（爸爸/知夏）挖日志定因，"
                                "或改派前台会话验证。连查打转会撞递归上限（09-29 实案）。")
+        elif result.get("status") == "running":
+            # r39t 静默信号（米娅验收单⑤）：run 长时间未更新=疑似静默——直接干掉
+            # "脑补任务已完成"的高危场景（imp:10 血泪），也让连查打转失去动机。
+            idle = None
+            try:
+                import datetime as _dt
+                ua = str(run.get("updated_at") or "")
+                if ua:
+                    epoch = _dt.datetime.fromisoformat(ua.replace("Z", "+00:00")).timestamp()
+                    idle = max(0, int((_dt.datetime.now(_dt.timezone.utc).timestamp() - epoch) / 60))
+            except Exception:
+                pass
+            if idle is not None and idle >= 5:
+                detail = f"（最后活动 {diag['steps']} 条消息 / {idle} 分钟前）" if diag else ""
+                result["silent_warning"] = (f"疑似静默（run 已 {idle} 分钟无更新{detail}）——"
+                                            "任务大概率卡死而非在跑，别等也别脑补，报管理员核查。")
         return result
+
     _asam._build_check_result = _bcr_with_guidance
 except Exception as _e:
     print(f"[agent] check_async_task 报错指引补丁未生效（不影响启动）：{_e}", flush=True)
