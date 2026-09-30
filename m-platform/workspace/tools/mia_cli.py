@@ -6,9 +6,11 @@
   python mia_cli.py send "消息"    # 发给米娅（固定线程=上下文连续），等回复打印
   python mia_cli.py new            # 开新线程（旧线程自然归档）
   python mia_cli.py last           # 读上次回复
+  python mia_cli.py                # 无参数=交互对话模式（进界面直接聊，exit 退出）
 
-鉴权: 密码从 D:/glm/secrets/m_cli_auth.txt 首行读（无则交互输入一次并保存）→
-      POST /auth/login 换管理员 token（与浏览器同一正门，R10.408 注册制）。
+鉴权: 凭据走 Cookie 罐持久化（D:/glm/secrets/m_cli_cookie.txt）——/auth/login 一次
+      （密码从 m_cli_auth.txt 或交互输入），之后冷启动直接用罐内 Cookie，长期免登录。
+      401 时不自动重登（每次 login=guard rotate 作废旧钥=会挤掉浏览器在线的爸爸）。
 目标: 只允许固定本机平台 origin（127.0.0.1:2024，爸爸本机自持 M 平台）——
       _url() 对每个最终 URL 做 origin 白名单校验 + 3xx 不跟随，双闸。
 """
@@ -41,15 +43,27 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None  # 3xx 一律不跟（防重定向出域）
 
 
+# Cookie 罐：/auth/login 种一次，落盘持久化——后续进程启动 load，长期免登录（CB/qodercn 姿势）
+_JAR_PATH = pathlib.Path("D:/glm/secrets/m_cli_cookie.txt")
+_JAR = __import__("http.cookiejar", fromlist=["MozillaCookieJar"]).MozillaCookieJar(str(_JAR_PATH))
+try:
+    if _JAR_PATH.exists():
+        _JAR.load(ignore_discard=True, ignore_expires=True)
+except Exception:
+    pass  # 罐坏=当作未登录，下次 login 重建
+_OPENER = urllib.request.build_opener(_NoRedirect, urllib.request.HTTPCookieProcessor(_JAR))
+
+
 def _req(path, token=None, data=None, timeout=300):
     body = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"Content-Type": "application/json"}
-    if token:
+    # 凭据走 Cookie 罐（/auth/login 种入）；cookie-session 假 Bearer 不发——
+    # 发了守卫会优先验 Bearer 而忽略合法 Cookie（12:5x 实测 401 的根因）。
+    if token and token != "cookie-session":
         headers["Authorization"] = "Bearer " + token
     req = urllib.request.Request(_url(path), data=body, headers=headers,
                                  method="POST" if body is not None else "GET")
-    opener = urllib.request.build_opener(_NoRedirect)
-    with opener.open(req, timeout=timeout) as r:
+    with _OPENER.open(req, timeout=timeout) as r:
         raw = r.read()
     return json.loads(raw) if raw else {}
 
@@ -71,11 +85,16 @@ def login():
         pw = input("M 平台密码（缓存后长期有效，本机凭据区不进 git/笔记）: ").strip()
         AUTH.write_text(name + "\n" + pw, encoding="utf-8")
     d = _req("/auth/login", data={"username": name, "password": pw}, timeout=15)
-    tok = d.get("token") or d.get("access_token") or ""
-    if not tok:
+    if d.get("ok") is not True:
         sys.exit("登录失败: " + json.dumps(d, ensure_ascii=False)[:200])
-    TOKEN_CACHE.write_text(tok, encoding="utf-8")
-    return tok
+    _JAR.save(ignore_discard=True, ignore_expires=True)  # 罐落盘：后续进程免登录
+    # r39q（爸被挤下线案）：cookie 值=guard token 同源，缓存之——后续冷启动直接
+    # Bearer 使用，**不再触发 /auth/login**（每次 login=guard rotate 作废旧钥=挤掉
+    # 浏览器在线的爸爸，useTaskAnnouncer 401 即此）。
+    for ck in _JAR:
+        TOKEN_CACHE.write_text(ck.value, encoding="utf-8")
+        break
+    return TOKEN_CACHE.read_text(encoding="utf-8").strip()
 
 
 def get_thread(token, fresh=False):
@@ -133,12 +152,10 @@ def chat_mode():
             send_once(token, line)
         except urllib.error.HTTPError as e:
             if e.code == 401 and TOKEN_CACHE.exists():
-                TOKEN_CACHE.unlink()  # token 失效：清缓存重登一次（自愈，不烦人）
-                token = login()
-                try:
-                    send_once(token, line)
-                except Exception as e2:
-                    print("发送失败:", type(e2).__name__, str(e2)[:200])
+                TOKEN_CACHE.unlink()  # 缓存失效：不再自动 login（login=guard rotate=挤掉爸浏览器）
+                print("token 已失效且已清缓存——为不挤掉爸爸浏览器的登录态，"
+                      "mia_cli 不再自动登录。请在浏览器 F12 复制 mia_admin_token 存入 "
+                      "D:/glm/secrets/m_cli_token.txt，或删除 m_cli_auth.txt 后重跑以密码登录（会触发 rotate）。")
             else:
                 print("发送失败:", type(e).__name__, str(e)[:200])
         except Exception as e:
@@ -163,8 +180,8 @@ def main():
         except urllib.error.HTTPError as e:
             if e.code == 401 and TOKEN_CACHE.exists():
                 TOKEN_CACHE.unlink()
-                token = login()
-                send_once(token, " ".join(argv[1:]))
+                print("token 已失效且已清缓存——不自动登录（防 rotate 挤掉爸爸浏览器）。"
+                      "请重新提供 token 或删除 m_cli_auth.txt 后密码登录。")
             else:
                 print("发送失败:", type(e).__name__, str(e)[:200])
     elif cmd == "last":
