@@ -146,70 +146,52 @@ class RunConfigMiddleware(AgentMiddleware):
     def wrap_model_call(self, request, handler):
         cfg = _cfg(request)
         want = str(cfg.get("model") or "").strip()
-        used = want
         if want:
             m = _model_for(request, want, self._thinking_for(cfg), cfg.get("provider"))
             if m is not None:
-                request.model = m
+                # r40e（爸 16:07 令"官方有组件用官方的"——qodercn 专项实锤违令）：回退链
+                # 手搓循环退役，改 **langchain 官方 RunnableWithFallbacks**（model.with_fallbacks，
+                # 官方件还带 Anthropic cache_control 清理=自建版缺的处理）。备选档来源不变=
+                # 设置页 settings.agents.boss.fallbacks（爸自己填自己选）。官方件无回调钩子，
+                # 回退发生时 usage 账记主模型名——透明面缺口列案（等官方暴露或从 response_metadata 提取）。
+                try:
+                    fbs = self._fallback_models()
+                    if fbs:
+                        request.model = m.with_fallbacks(fbs)
+                    else:
+                        request.model = m
+                except Exception as _fe:
+                    print(f"[fallback] 官方 fallback 包装失败（退回主模型裸跑）：{_fe}", flush=True)
+                    request.model = m
         _inject_time(request)
-        try:
-            result = handler(request)
-        except Exception:
-            # R49 回退链：主模型异常（429/余额不足/网络）→ 按配置依次换备用模型重试
-            result = self._run_fallbacks(request, handler)
-            if result is None:
-                raise
-        _record_usage(used or getattr(request.model, "model_name", "unknown"), result)
+        result = handler(request)
+        _record_usage(want or getattr(request.model, "model_name", "unknown"), result)
         return result
 
     async def awrap_model_call(self, request, handler):
         cfg = _cfg(request)
         want = str(cfg.get("model") or "").strip()
-        used = want
         if want:
             m = _model_for(request, want, self._thinking_for(cfg), cfg.get("provider"))
             if m is not None:
-                request.model = m
+                # r40e：与同步版同口径——官方 with_fallbacks（async 由官方件内部支撑）
+                try:
+                    fbs = self._fallback_models()
+                    if fbs:
+                        request.model = m.with_fallbacks(fbs)
+                    else:
+                        request.model = m
+                except Exception as _fe:
+                    print(f"[fallback] 官方 fallback 包装失败（退回主模型裸跑）：{_fe}", flush=True)
+                    request.model = m
         _inject_time(request)
-        try:
-            result = await handler(request)
-        except Exception:
-            result = await self._arun_fallbacks(request, handler)
-            if result is None:
-                raise
-        _record_usage(used or getattr(request.model, "model_name", "unknown"), result)
+        result = await handler(request)
+        _record_usage(want or getattr(request.model, "model_name", "unknown"), result)
         return result
 
-    # ---- R49 回退链：设置页 settings.agents.boss.fallbacks 顺序重试（同款 make_model 构造）----
-    # r40d（米娅运营反馈"静默才是锁"）：回退触发即记档，models 回执可读——透明即不是锁。
-    _FALLBACK_LAST: dict = {}  # {ts, provider, model, reason} 进程级最近一次回退记录
-
-    def _run_fallbacks(self, request, handler):
-        for fb in self._fallback_models():
-            try:
-                print(f"[fallback] 主模型异常，降级到 {fb.get('provider')}/{fb.get('model')}", flush=True)
-                request.model = fb
-                _r = handler(request)
-                self._FALLBACK_LAST.update({"ts": _now_bj(), "provider": str(fb.get("provider") or ""),
-                                            "model": str(fb.get("model") or ""), "reason": "主模型异常"})
-                return _r
-            except Exception:
-                continue
-        return None
-
-    async def _arun_fallbacks(self, request, handler):
-        for fb in self._fallback_models():
-            try:
-                print(f"[fallback] 主模型异常，降级到 {fb.get('provider')}/{fb.get('model')}", flush=True)
-                request.model = fb
-                _r = await handler(request)
-                self._FALLBACK_LAST.update({"ts": _now_bj(), "provider": str(fb.get("provider") or ""),
-                                            "model": str(fb.get("model") or ""), "reason": "主模型异常"})
-                return _r
-            except Exception:
-                continue
-        return None
-
+    # ---- R49 回退链 → r40e 官方件化：手搓循环（_run_fallbacks/_arun_fallbacks/_FALLBACK_LAST）
+    # 全删，改 langchain 官方 RunnableWithFallbacks（with_fallbacks，见 wrap_model_call）；
+    # _fallback_models 保留=官方件的备选档构造源（设置页 settings.agents.boss.fallbacks 唯一真源）。
     @staticmethod
     def _fallback_models():
         """回退链唯一真源 = 设置页 settings.agents.boss.fallbacks（爸爸自己填自己选）。

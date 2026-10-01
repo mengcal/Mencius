@@ -425,16 +425,10 @@ def _manage_departments_impl(action: str, department: str = "", name: str = "", 
                     lines.append(f"{role}: {e.get('provider', '?')} / {e.get('model', '?')}")
                 else:
                     lines.append(f"{role}: 未配置（走全局默认）")
-            # r40d 第三批（米娅提案"透明即不是锁"）：附回退链最近一次记录——静默换模型才是
-            # 暗改执行条件，有账可查=透明。
-            try:
-                from run_config import RunConfigMiddleware as _MRM
-                fb = getattr(_MRM, "_FALLBACK_LAST", None) or {}
-                tail = (f"\n回退链最近一次：{fb.get('ts','')} 降级到 {fb.get('provider','')}/{fb.get('model','')}"
-                        if fb else "\n回退链：本次进程启动以来未触发")
-                lines.append(tail + "（回退链=爸在设置页配的备用顺序，触发即记账）")
-            except Exception:
-                pass
+            # r40e（官方件化）：回退链已换 langchain 官方 with_fallbacks（自建循环删除）——
+            # 官方件无回调钩子，回退发生时 usage 账记主模型名；透明缺口列案候官方暴露。
+            lines.append("回退链：langchain 官方 with_fallbacks 接管（备选档=设置页 agents.boss.fallbacks），"
+                         "触发即自动降级；实际命中模型以 usage 账为准")
             return "各角色模型配置（只读，改模型用 set_model）：\n" + "\n".join(lines)
         except Exception as e:
             return f"模型视图读取失败：{e}"
