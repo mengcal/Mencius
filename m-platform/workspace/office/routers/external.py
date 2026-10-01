@@ -49,10 +49,11 @@ def _posts_mutate(mut):
 
 
 @router.post("/external/register")
-async def external_register(req: dict = Body(...)):
+async def external_register(req: dict = Body(...), request: Request = None):
     """登记外部岗：{name, url, ports:[int], overwrite?:true}。SSRF v3 校验（解析+钉 IP）。
     r61b P2-3（hy4）：同名登记必须显式 overwrite——静默覆盖=岗劫持面
-    （别人抢注你的岗名，回调全进他口袋）。存在性检查也在锁内（TOCTOU）。"""
+    （别人抢注你的岗名，回调全进他口袋）。存在性检查也在锁内（TOCTOU）。
+    r40g：私网来源（内器官）登记免 SSRF 校验——url 只是内部标识。"""
     from mia_agent.external_guard import validate_url, ExternalUrlError
     name = str(req.get("name") or "").strip()
     url = str(req.get("url") or "")
@@ -60,13 +61,27 @@ async def external_register(req: dict = Body(...)):
         ports = tuple(int(p) for p in (req.get("ports") or []))
     except (TypeError, ValueError):
         return {"ok": False, "error": "ports 必须是端口号列表（如 [9000]）"}
-    if not name or not url or not ports:
-        return {"ok": False, "error": "name/url/ports 都必填（端口白名单爸爸手填）"}
+    # r40g（爸 07:20 裁决"n8n 是平台内器官不是外部岗"）：私网来源登记内器官岗
+    # 免 SSRF 校验（自拉岗平台永不主动连它，url 只是内部标识；真外部岗照走全校验）。
+    _family_reg = False
     try:
-        checked = validate_url(url, ports)
-    except ExternalUrlError as e:
-        _audit("external_register", False, name=name, why=str(e)[:80])
-        return {"ok": False, "error": f"URL 校验拒绝：{e}"}
+        import ipaddress as _ipa
+        _fam_ip = _ipa.ip_address(request.client.host if request and request.client else "")
+        _family_reg = _fam_ip.is_private or _fam_ip.is_loopback
+    except ValueError:
+        _family_reg = False
+    if not name:
+        return {"ok": False, "error": "name 必填"}
+    if not _family_reg and (not url or not ports):
+        return {"ok": False, "error": "name/url/ports 都必填（端口白名单爸爸手填）"}
+    if not _family_reg:
+        try:
+            checked = validate_url(url, ports)
+        except ExternalUrlError as e:
+            _audit("external_register", False, name=name, why=str(e)[:80])
+            return {"ok": False, "error": f"URL 校验拒绝：{e}"}
+    else:
+        checked = {"ip": "family", "host": url or "internal", "scheme": "internal"}
 
     def _mut(p):
         if name in p and not req.get("overwrite"):
@@ -111,16 +126,44 @@ def _subkey_ok(name: str, auth: str) -> bool:
         return False
 
 
+def _requester_is_family(request) -> bool:
+    """r40g（爸 07:20 裁决）：n8n 等容器岗=平台**内器官**，不是'外部岗'——
+    归米娅调派、西莉亚也有权限调派，'这才是私人平台的意义'。私网来源
+    （Docker 内网容器/本机）跳过子钥检查，与 auth.py r40c 本机免钥同口径；
+    子钥通道保留给真正的外部岗（公网回调型）。审计照落（family-source）。"""
+    try:
+        import ipaddress
+        ip = ipaddress.ip_address(request.client.host if request and request.client else "")
+        return ip.is_private or ip.is_loopback
+    except ValueError:
+        return False
+
+
+def _gate(name: str, request, ev: str) -> tuple[bool, str]:
+    """r40g 统一放行口：私网=自家人免子钥；否则 HKDF 子钥。审计不缺页。"""
+    if _requester_is_family(request):
+        try:
+            _audit(ev, True, name=name, why="family-source")
+        except Exception:
+            pass
+        return True, "family"
+    auth = (request.headers.get("authorization") or "").replace("Bearer ", "").strip()
+    if _subkey_ok(name, auth):
+        return True, "subkey"
+    _audit(ev, False, name=name, why="bad-subkey")
+    return False, "bad-subkey"
+
+
 @router.get("/external/pending/{name}")
 async def external_pending(name: str, request: Request):
     """取单预览（r61 NOVA P0-4 拆分）：纯读零副作用——监控/探测 GET 不再顺手
-    领取饿死真岗。领单必须走 POST /external/claim（意图显式化）。"""
+    领取饿死真岗。领单必须走 POST /external/claim（意图显式化）。
+    r40g：内器官（私网容器/本机）免子钥直取。"""
     posts = _posts_load()
     if name not in posts:
         return {"ok": False, "error": "岗位未登记"}
-    auth = (request.headers.get("authorization") or "").replace("Bearer ", "").strip()
-    if not _subkey_ok(name, auth):
-        _audit("external_pending", False, name=name, why="bad-subkey")
+    ok, _how = _gate(name, request, "external_pending")
+    if not ok:
         return {"ok": False, "error": "子钥校验失败"}
     import approvals as _ap
     return {"ok": True, "tasks": _ap.external_pending_view(name)}
@@ -129,13 +172,13 @@ async def external_pending(name: str, request: Request):
 @router.post("/external/claim/{name}")
 async def external_claim(name: str, request: Request):
     """显式领单：{task_id}。领取落账 external_claim（30 分钟无回执超时重投）。
-    at-least-once 纪律：领了不交=该单挂到超时，岗脚本必须干活后回调或退单。"""
+    at-least-once 纪律：领了不交=该单挂到超时，岗脚本必须干活后回调或退单。
+    r40g：内器官免子钥（_gate）。"""
     posts = _posts_load()
     if name not in posts:
         return {"ok": False, "error": "岗位未登记"}
-    auth = (request.headers.get("authorization") or "").replace("Bearer ", "").strip()
-    if not _subkey_ok(name, auth):
-        _audit("external_claim", False, name=name, why="bad-subkey")
+    ok, _how = _gate(name, request, "external_claim")
+    if not ok:
         return {"ok": False, "error": "子钥校验失败"}
     body = await request.json()
     tid = str((body or {}).get("task_id") or "")
@@ -200,10 +243,18 @@ async def external_callback(name: str, request: Request):
         return {"ok": False, "error": "回调来源被拒（分级见审计）"}
     if cls == "observed-other":
         _audit("external_callback", True, name=name, why="SOURCE-PROBE-WARN:邻居容器IP")
-    auth = (request.headers.get("authorization") or "").replace("Bearer ", "").strip()
-    if not _subkey_ok(name, auth):
-        _audit("external_callback", False, name=name, why="bad-subkey")
-        return {"ok": False, "error": "子钥校验失败"}
+    # r40g：内器官（私网容器/本机）免子钥——n8n 岗线回传直通（真外部岗仍走子钥）
+    import ipaddress as _ipa
+    _fam = False
+    try:
+        _fam = _ipa.ip_address(request.client.host if request and request.client else "").is_private
+    except ValueError:
+        _fam = False
+    if not _fam:
+        auth = (request.headers.get("authorization") or "").replace("Bearer ", "").strip()
+        if not _subkey_ok(name, auth):
+            _audit("external_callback", False, name=name, why="bad-subkey")
+            return {"ok": False, "error": "子钥校验失败"}
     body = await request.body()
     # r61b P1-17（hy4）：回调体硬上限 64KB——旧版无上限，大 body 直灌内存+账文件
     if len(body) > 65536:
