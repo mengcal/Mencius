@@ -181,12 +181,18 @@ class RunConfigMiddleware(AgentMiddleware):
         return result
 
     # ---- R49 回退链：设置页 settings.agents.boss.fallbacks 顺序重试（同款 make_model 构造）----
+    # r40d（米娅运营反馈"静默才是锁"）：回退触发即记档，models 回执可读——透明即不是锁。
+    _FALLBACK_LAST: dict = {}  # {ts, provider, model, reason} 进程级最近一次回退记录
+
     def _run_fallbacks(self, request, handler):
         for fb in self._fallback_models():
             try:
                 print(f"[fallback] 主模型异常，降级到 {fb.get('provider')}/{fb.get('model')}", flush=True)
                 request.model = fb
-                return handler(request)
+                _r = handler(request)
+                self._FALLBACK_LAST.update({"ts": _now_bj(), "provider": str(fb.get("provider") or ""),
+                                            "model": str(fb.get("model") or ""), "reason": "主模型异常"})
+                return _r
             except Exception:
                 continue
         return None
@@ -196,7 +202,10 @@ class RunConfigMiddleware(AgentMiddleware):
             try:
                 print(f"[fallback] 主模型异常，降级到 {fb.get('provider')}/{fb.get('model')}", flush=True)
                 request.model = fb
-                return await handler(request)
+                _r = await handler(request)
+                self._FALLBACK_LAST.update({"ts": _now_bj(), "provider": str(fb.get("provider") or ""),
+                                            "model": str(fb.get("model") or ""), "reason": "主模型异常"})
+                return _r
             except Exception:
                 continue
         return None
