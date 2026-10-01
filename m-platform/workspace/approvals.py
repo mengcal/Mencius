@@ -244,7 +244,8 @@ def external_claim(post_name: str, task_id: str) -> bool:
 
 
 def external_recent(limit: int = 10) -> list:
-    """米娅抽检核验用：最近 N 条外部回传（新→旧，读批准账过滤）。"""
+    """米娅抽检核验用：最近 N 条外部回传（新→旧，读批准账过滤）。
+    r40d 轮2（米娅对账）：跳过 probe-* 测试岗的探针垃圾（原始审计留档，展示面不掺）。"""
     out = []
     try:
         with open(_audit_path(), "r", encoding="utf-8") as f:
@@ -254,6 +255,8 @@ def external_recent(limit: int = 10) -> list:
                 except Exception:
                     continue
                 if rec.get("ev") == "external_result":
+                    if str(rec.get("tid") or "").startswith("probe-"):
+                        continue
                     out.append(rec)
                     if len(out) >= max(1, min(int(limit), 50)):
                         break

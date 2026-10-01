@@ -791,12 +791,26 @@ class SubGate(AgentMiddleware):
 def _watch_launch_for(request, main_tid: str) -> None:
     """r40d（CB G10 断链定谳修复）：旧门退役时 _watch_launch 挂在旧 wrap 上一起死——
     本函数把 dept_watch 登记接回 C1 执行路径（start_async_task 放行成功=部门即将开张，
-    登记发起主线程，dept_watch 轮询部门 run 结束即唤醒）。异常吞掉不挡主链（同旧门口径）。"""
+    登记发起主线程，dept_watch 轮询部门 run 结束即唤醒）。异常吞掉不挡主链（同旧门口径）。
+    r40d 轮2（米娅对账⑤盲区）：同步写派活总账——官方 list_async_tasks 只看主对话本地账，
+    远程部门任务不进它；总账=list_all_tasks 工具的数据源，账是索引不是真值。"""
     try:
         tc = getattr(request, "tool_call", None) or {}
         if str(tc.get("name")) == "start_async_task" and main_tid:
+            desc = str((tc.get("args") or {}).get("description") or "")
             from mia_agent import dept_watch
-            dept_watch.register(main_tid, str((tc.get("args") or {}).get("description") or ""))
+            dept_watch.register(main_tid, desc)
+            try:
+                import json as _j
+                from settings_mgr import workspace_root as _wr
+                led = _wr() / "runtime" / "async_ledger.jsonl"
+                led.parent.mkdir(parents=True, exist_ok=True)
+                import time as _t
+                with open(led, "a", encoding="utf-8") as f:
+                    f.write(_j.dumps({"ts": _t.strftime("%m-%d %H:%M"), "tid": main_tid,
+                                      "desc": desc[:120]}, ensure_ascii=False) + "\n")
+            except Exception:
+                pass  # 账本写失败不挡登记主链
     except Exception as _e:
         print(f"[dept-watch] 登记钩子异常: {_e}", flush=True)
 
