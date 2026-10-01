@@ -81,17 +81,8 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
 
     _PROXY = None  # 模块级单例（Eve 新炮1：档位读取入口统一+省实例化）
 
-    # r40a 同权减锁（10-01 爸爸终版一句"celia 有的 Mia 都有，celia 没有的 Mia 也没有"）：
-    # D2 压力降档整链退役——西莉亚无"连败自动降档"，米娅不留。原 _PRESSURE_PIN/
-    # _fail_streak/_pressure_notice 三只类级 dict、_pin_ttl/_pin_alive/_pressure_n/
-    # _pressure_fire/_pressure_release/_note_fail/_safe_note/_attach_pressure 与
-    # wrap/awrap 计数钩子一并拔除（r36-G 冻结链同款拆法）；desk_pressure_* 账本事件
-    # 随链停发，settings 键 desk_pressure_n/desk_pressure_pin_ttl_s 成无消费死键（L68
-    # 单一来源：待下批配置收口时清）。level_and_source 返回形状不变（第二元恒 "true"），
-    # SubGate pinned 参数保留占位恒 False——消费端零改动。
-
-    # d2v03fix3③（Cora④）遗存：类级门闸继续护住余下持久状态（_guard_hits 等实例
-    # 属性）的读-改-写临界区。只闸 dict 变更临界区，不闸 scan/渲染等慢路径。
+    # r40a（10-01 爸令同权减锁）：D2 压力降档整链退役（符号表见 _assert_d2_retired）；
+    # desk_pressure_* settings 键已死，配置收口时清。_GATE_LOCK 继续护余下持久状态临界区。
     _GATE_LOCK = threading.RLock()
 
     # v0.3 件二（plan-d2-v03 §件二，十六轮裁决②改址）：force 审计链的最后一道死信——
@@ -569,11 +560,6 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     "管理端会按本条指纹〔fp:" + _fp9 + "〕放行一次，你原样重试即可；"
                     "或改用 write_file/edit_file 等白名单工具达成目标。"), tool_call_id=tc.get("id", ""))
         return None
-
-    # r40a（10-01 爸令，同权终版一句）：D2 压力降档整链退役（原 _pressure_n/
-    # _result_is_error/_pressure_release/_pressure_fire/_safe_note/_note_fail/
-    # _attach_pressure 七件+类头三只 dict 全拔）——西莉亚无"连败自动降档"，
-    # 米娅不留。连败处置回归自然形态：拒信/报错本身会说话，爸爸看到就会说"换个思路"。
 
     def wrap_tool_call(self, request, handler):
         """拒类出口（自包含）+预算精准拒：不赌 middleware 顺序，也不吞爸爸刚批的调用。

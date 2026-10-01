@@ -319,10 +319,6 @@ def _had_key(name: str) -> bool:
     return bool(secret_get(f"external.providers.{name}.had_key"))
 
 
-def get_plain_search_key(which: str) -> str:
-    return secret_get(f"search.{which}")
-
-
 def get_plain_key(path: str) -> str:
     """通用：按完整路径取明文。"""
     return secret_get(path)

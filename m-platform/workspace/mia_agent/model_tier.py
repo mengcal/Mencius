@@ -120,6 +120,3 @@ def tier_is_standard_floor(heavy_n: int, vc: str) -> bool:
     return heavy_n == 0 or vc == "read"
 
 
-def tier_stats() -> dict:
-    """档位分布计数（P2-6，二期准确率分析数据源）。"""
-    return dict(_TIER_STATS)

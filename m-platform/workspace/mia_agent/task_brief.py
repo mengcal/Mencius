@@ -100,13 +100,6 @@ def note_task(task_text: str, tid: str, n_human: int) -> dict:
     return brief
 
 
-def mark_done(tid: str) -> None:
-    with _lock:
-        b = _briefs.get(tid)
-        if b:
-            b["done"] = True
-
-
 def get_brief(tid: str) -> dict | None:
     with _lock:
         return dict(_briefs[tid]) if tid in _briefs else None

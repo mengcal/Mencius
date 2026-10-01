@@ -76,10 +76,3 @@ def hkdf_subkey(master_key: bytes, post_name: str) -> bytes:
     return hkdf.derive(master_key)
 
 
-def ssrf_pinned_request_kwargs(checked: dict) -> dict:
-    """给调用方（httpx）的连接参数：连钉定 IP、Host 头留原域名——rebinding 防线落地件。"""
-    return {
-        "extensions": {"sni_hostname": checked["host"]},
-        # httpx 用 transport 级 IP 钉定或 URL 改写：调用方以
-        # url.replace(host, ip) + headers Host 执行（一期调用点唯一，见 dispatch）
-    }

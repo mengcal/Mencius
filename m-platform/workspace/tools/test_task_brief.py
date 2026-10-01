@@ -18,11 +18,6 @@ def T(name, cond):
         print("  FAIL", name)
 
 
-def _new(tb, ap, tid):
-    tb._briefs.pop(tid, None)
-    ap.reset_task_cards(tid)
-
-
 # ── 1) 新-target 判定（P0-2）──
 tb._briefs.clear()
 b1 = tb.note_task("把 notes/a.md 里『TODO』改成『已完成』", "tA", 1)

@@ -161,12 +161,6 @@ def external_task_ctx(post_name: str, task_id: str) -> dict:
     return ctx
 
 
-def external_tid_owned(post_name: str, task_id: str) -> bool:
-    """r61b P2-4：回调的 task_id 必须是派给**本岗**的单（账尾找 dispatch 记录）——
-    持子钥给任意 tid 伪造 done 的路封死。"""
-    return external_task_ctx(post_name, task_id)["known"]
-
-
 def external_dispatch(post_name: str, task: str) -> str:
     """派活=落一条待办账（外部岗轮询取走）。返回派活 id（取单/领取/结果三账串链）。
     r61（Eve 审点②）：did 用 uuid4——旧时间戳+pid 尾是"侥幸正确"（靠单调性

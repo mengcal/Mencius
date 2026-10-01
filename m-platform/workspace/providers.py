@@ -172,6 +172,3 @@ def make_model(provider_name: str, model_name: str = "", **kwargs) -> ChatOpenAI
     )
 
 
-def list_providers() -> list[str]:
-    """列出所有可用服务商名"""
-    return list(load_providers().keys())

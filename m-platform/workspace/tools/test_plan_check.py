@@ -26,10 +26,6 @@ TID = "pc-t1"
 observer._runs[TID] = []
 
 
-class _Cfg:
-    configurable = {"thread_id": TID}
-
-
 import langgraph.config as _lg
 _orig = _lg.get_config
 _lg.get_config = lambda: {"configurable": {"thread_id": TID}}

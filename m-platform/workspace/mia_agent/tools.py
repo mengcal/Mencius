@@ -609,12 +609,6 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
     return f"[n8n {method_map[act]} {_paths[act]}] {out[:6000]}"
 
 
-def method_of(act: str) -> str:
-    return {"list": "GET", "get": "GET", "executions": "GET",
-            "create": "POST", "activate": "POST", "deactivate": "POST",
-            "update": "PATCH"}[act]
-
-
 # ===== R58 MCP 生态接入（官方 langchain-mcp-adapters，settings mcp.servers 配置驱动）=====（原 L705）
 def _load_mcp_tools():  # 原 L706-727
     """从 settings mcp.servers 加载 MCP 服务器工具。配置格式：
