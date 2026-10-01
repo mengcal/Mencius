@@ -289,6 +289,17 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                         className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90">保存</button>
                     </div>
                   </div>
+                ) : isUser && /^\s*【(部门自动汇报|部门自动汇总|小全调度·自动汇报)】/.test(messageContent) ? (
+                  // r40d（米娅轮1对账：系统注入与人工消息无视觉分级）——部门唤醒等系统注入
+                  // 一律折叠为灰条，不占人工气泡；人工消息回归纯净。
+                  <details className="w-full text-xs text-muted-foreground">
+                    <summary className="cursor-pointer select-none">
+                      🤖 系统注入（自动汇报，点击展开）
+                    </summary>
+                    <pre className="mt-1 whitespace-pre-wrap break-words rounded bg-gray-900 p-2 text-[0.6875rem] text-gray-300">
+                      {messageContent}
+                    </pre>
+                  </details>
                 ) : isUser && messageContent.startsWith("[小全调度·自动汇报]") ? (
                   // R57 后台任务汇报折叠：自动汇报原文默认收起，想看才展开
                   <details className="w-full text-xs text-muted-foreground">
