@@ -395,7 +395,11 @@ def _manage_departments_impl(action: str, department: str = "", name: str = "", 
         for d in depts:
             sup = (d.get("supervisor") or {})
             ws = "、".join(f"{w.get('name', '')}[{_m(w.get('role', ''))}]" for w in (d.get("workers") or []))
-            out.append(f"【{d.get('name')}】槽位 {d.get('slot')} · 主管 {sup.get('name', '未任命')}"
+            # r40d（米娅提案③"两套口径"）：list 面标注可派活性——在册≠可派（缺 supervisor/workers
+            # 的条目派活会吃占位图），编制面与执行面口径拉平。
+            _ready = bool(sup and (d.get("workers") or []))
+            _tag = "可派活" if _ready else "⚠ 配置不全（缺 supervisor/workers，派活会吃占位图）"
+            out.append(f"【{d.get('name')}】槽位 {d.get('slot')} · {_tag} · 主管 {sup.get('name', '未任命')}"
                        f"[{_m(sup.get('role', 'boss'))}] · 牛马：{ws or '无'}")
         return "当前编制（含模型）：\n" + "\n".join(out) if out else "还没有任何部门。用 add_department 新建。"
     if action == "catalog":

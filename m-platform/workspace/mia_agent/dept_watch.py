@@ -151,6 +151,12 @@ def _scan():
                                               f"条标志未在部门末条汇报中命中：" +
                                               "；".join(_miss[:3]) +
                                               "——用 check_async_task 取全文核对，未达成如实报，别替部门圆。")
+                        # r40d（米娅提案④"假成功背书"）：完工帧若末条汇报文本含失败特征，
+                        # 唤醒消息同步带警示——check 时读 result_has_error 字段核真假完工。
+                        if "失败" in tail3 or "错误" in tail3 or "未配置" in tail3:
+                            _mark_note = (f"⚠ 部门末条汇报含失败特征词——唤醒后 check_async_task "
+                                          f"读 result_has_error 字段核真假完工，别把失败报成功。"
+                                          + (" " + _mark_note if _mark_note else ""))
                         c.runs.create(main_tid, "agent",
                             input={"messages": [{"role": "user", "content":
                                 f"【部门自动汇报】检测到有部门任务（{info['desc'][:80] or '后台活'}）{stage}。"

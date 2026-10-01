@@ -231,7 +231,11 @@ def _get_dept_graph(slot: str):
             print(f"[cow_graphs] {slot} 构建失败，用占位图：{e}", flush=True)
             g = _placeholder(slot)
     else:
-        print(f"[cow_graphs] {slot} 未配置，用占位图", flush=True)
+        # r40d（米娅提案③"两套口径"）：占位提示带原因——list 面在册≠派活面可用，
+        # 缺 supervisor/workers 的条目要说清缺什么，不再笼统"未配置"。
+        _miss = [k for k, v in (("supervisor", (dept or {}).get("supervisor")),
+                                ("workers", (dept or {}).get("workers"))) if not v] if dept else ["登记"]
+        print(f"[cow_graphs] {slot} 不可派活（缺 {'/'.join(_miss) if _miss else '登记'}），用占位图", flush=True)
         g = _placeholder(slot)
     _dept_cache[slot] = g
     _cfg_mtime = mtime
