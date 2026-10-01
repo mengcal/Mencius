@@ -82,6 +82,10 @@ services:
   sandbox:
     image: mia-sandbox:pw   # r35：eve2 基础上叠 playwright+chromium（沙箱内渲染自验，不新增网络面）
     command: python3 /runner.py
+    # r40d 轮5（米娅对账实锤 DNS 间歇断）：内嵌 DNS 127.0.0.11 偶发抽风，钉固定公共 DNS 根治
+    dns:
+      - 223.5.5.5    # 阿里公共 DNS（国内直连稳）
+      - 119.29.29.29  # 腾讯公共 DNS 备胎
     ports:
       - "127.0.0.1:9099:9000"   # R80：runner 执行服务仅宿主回环发布（X-Token 鉴权照旧）；09-17 让位 OWUI 9090
     volumes:
