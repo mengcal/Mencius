@@ -250,13 +250,15 @@ def _board_context(state) -> list:
     return [SystemMessage(head)] + body
 
 
-def _seat_out(seat: str, msgs) -> AIMessage:
+def _seat_out(seat: str, msgs, model_seat: str = "") -> AIMessage:
     """位上发言统一收口：异常/空→占位打标（不算观点，不进挑刺与归纳——hy3 P1-2/P1-3）；
     截断残文仍算观点（有货的半句好过没有）。r39（Eve 新炮6）：占位是平台生成的，
-    name 用 rt_system 不冒充座位，哈希链角色语义诚实。"""
+    name 用 rt_system 不冒充座位，哈希链角色语义诚实。
+    r40d 轮5实测：model_seat=模型配置键（挑刺轮 cross_A/cross_B 显示名→读 A/B 本尊配置，
+    配置面只有 A/B/host 三键——此前把显示名当配置键=挑刺位永远占位）。"""
     why = ""
     try:
-        t, _complete = _ask(_seat_model(seat), msgs)
+        t, _complete = _ask(_seat_model(model_seat or seat), msgs)
     except Exception as e:
         t, why = "", f"（{type(e).__name__}: {str(e)[:120]}）"
     if t:
@@ -280,9 +282,12 @@ def _cross_one(state, seat: str, other_name: str, other_txt: str) -> AIMessage:
     if not other_txt:  # 对方本轮没真实观点，没得可挑——不硬编
         return placeholder_msg("rt_system",
                                f"（{other_name}本轮无观点可挑，{seat} 位挑刺轮跳过。）")
+    # r40d 轮5实测修复（roundtable B位占位案）：挑刺=同一位朋友换任务，模型读基础键
+    # "A"/"B"（配置面只有 A/B/host）；显示名经 _seat_out 的 rt_{seat} 前缀仍带 cross 区分。
     return _seat_out(f"cross_{seat}", _board_context(state)
                      + [HumanMessage(PROMPT_CROSS.format(who=seat)
-                                     + f"\n\n【{other_name}刚才的观点】\n{other_txt}")])
+                                     + f"\n\n【{other_name}刚才的观点】\n{other_txt}")],
+                     model_seat=seat)
 
 
 def cross(state) -> dict:
