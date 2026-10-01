@@ -31,10 +31,10 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
         return _json.dumps({"cmd": cmd, "timeout": timeout}).encode()
 
     def execute(self, cmd: str, *, timeout: int | None = None) -> _ExecResp:
-        return self._call(cmd, timeout or 120)
+        return self._call(cmd, timeout or 300)  # r40d：默认 120→300（米娅反馈：产物残缺她照报"跑完"；帽 600 不变）
 
     async def aexecute(self, cmd: str, *, timeout: int | None = None) -> _ExecResp:
-        return await self._acall(cmd, timeout or 120)
+        return await self._acall(cmd, timeout or 300)  # r40d：与同步版同口径
 
     def _route(self):
         """r36k（09-28 爸令完整分区）：execute 落哪个域跟着**对话的工作区**走——

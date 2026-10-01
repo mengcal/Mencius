@@ -78,8 +78,9 @@ def dispatch_external(post: str, task: str) -> str:  # r58 对外派活一期（
     if post not in posts:
         return f"岗位 {post!r} 未登记。现有：{list(posts) or '（空——让爸爸在设置登记）'}"
     import approvals as _ap
-    _ap.external_dispatch(post, task)
-    return (f"已派给外部岗 {post}（落待办账，等岗取单）。"
+    did = _ap.external_dispatch(post, task)
+    # r40d（米娅运营反馈②）：回执带单号——核验靠时间戳对账=她的血泪，落单号三账串链可查
+    return (f"已派给外部岗 {post}，单号 {did}（落待办账，等岗取单）。"
             "产出回传后必须先 list_external_results 抽检核验再呈报爸爸。")
 
 
@@ -206,8 +207,10 @@ def edit_memory(action: str, section: str = "", content: str = "", project: str 
                 return f"【{t}】\n{body.strip()[:2000]}"
         return f"没有找到小节「{section}」。现有小节：\n" + "\n".join("## " + t for t, _ in sections)
     if action == "append":
-        if not section or not content.strip():
-            return "需要 section 和 content"
+        # r40d（米娅运营反馈⑨）：section 缺省落「工作记录」节，不再要求双给反复补参
+        if not content.strip():
+            return "需要 content"
+        section = (section or "").strip() or "工作记录"
         new_lines = [l.strip() for l in content.strip().splitlines() if l.strip()]
         for i, (t, body) in enumerate(sections):
             if section in t:

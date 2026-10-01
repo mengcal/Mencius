@@ -39,7 +39,7 @@ SETTINGS = Path(_setenv or r"D:\m\workspace\settings.json")
 AUDIT = Path(r"D:\m\guard\host_runner_audit.jsonl")  # 09-18 hy4 复测③：离开米娅可写的数据区（防删改审计）
 BASH = r"C:\Git\bin\bash.exe"
 MAX_TIMEOUT = 600
-MAX_OUT = 200_000
+MAX_OUT = 1_000_000  # r40d（米娅运营反馈：截我输出=限我视野，宿主全量 diff/长 build log 静默丢尾）200KB→1MB
 def _env_key() -> str:
     try:
         for line in ENV_FILE.read_text(encoding="utf-8").splitlines():

@@ -21,7 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = os.environ.get("SANDBOX_TOKEN", "")
 DATA_DIR = os.environ.get("SANDBOX_DATA_DIR", "/data/mia_home")
-MAX_OUT = 100_000
+MAX_OUT = 500_000  # r40d：100KB→500KB（容器域同款视野提额；截断标记 truncated 照给）
 MAX_TIMEOUT = 600  # R79⑨：单命令上限 10 分钟（客户端传大值也不能把 runner 线程占死）
 AUDIT_LOG = os.environ.get("RUNNER_AUDIT_LOG", "/var/log/runner_audit.jsonl")
 
