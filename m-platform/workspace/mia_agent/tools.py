@@ -565,8 +565,11 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
         return "⛔ N8N_API_KEY 未配置——喊爸爸在设置里补。"
     act = str(action or "").strip().lower()
     wid = str(workflow_id or "").strip()
-    if wid and not _re.fullmatch(r"[0-9]{1,15}", wid):
-        return "⛔ workflow_id 只收数字（n8n 的 id 规则），别的形状不收。"
+    # r40d 米娅轮5报修：旧校验只收数字（n8n 老版 id 规则），新版 n8n 是字母数字 nanoid
+    # （实锤 Y6rGU83tDfFLP5uw）——放宽为 [A-Za-z0-9_-]{1,64}：注入防护本意保留（无 /?# 等
+    # URL 结构字符），只把"数字"这条过时限制摘掉。
+    if wid and not _re.fullmatch(r"[A-Za-z0-9_-]{1,64}", wid):
+        return "⛔ workflow_id 形状不合法（只收字母数字/_/-，最长 64）——先用 list 查真实 id。"
     # r39v：固定 n8n 基座 + 工作流七动作全表 + 凭据/用户/钥匙管理面（米娅全权）
     _paths = {
         "list": "/workflows",
@@ -606,7 +609,7 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
     if act not in _paths:
         return f"action {act!r} 不支持（source 直连模式除外）"
     if act in ("get", "update", "activate", "deactivate", "run", "credentials_get", "credentials_delete", "apikeys_delete") and not wid:
-        return f"需要 workflow_id 或对象 id（数字）——先用 list 查。"
+        return f"需要 workflow_id 或对象 id——先用 list 查。"
     _HOST = "http://n8n:5678/api/v1"  # 唯一合法目标：compose 内网 n8n 服务（容器名固定）
     url = _HOST + _paths[act]
     if not url.startswith(_HOST):  # 出站前边界自证：协议+host 锁死
