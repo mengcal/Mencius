@@ -81,8 +81,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
 
     _PROXY = None  # 模块级单例（Eve 新炮1：档位读取入口统一+省实例化）
 
-    # r40a（10-01 爸令同权减锁）：D2 压力降档整链退役（符号表见 _assert_d2_retired）；
-    # desk_pressure_* settings 键已死，配置收口时清。_GATE_LOCK 继续护余下持久状态临界区。
+    # r40a（10-01 爸令同权减锁）：D2 压力降档整链退役；desk_pressure_* settings 键已死，配置收口时清。_GATE_LOCK 继续护余下持久状态临界区。
     _GATE_LOCK = threading.RLock()
 
     # v0.3 件二（plan-d2-v03 §件二，十六轮裁决②改址）：force 审计链的最后一道死信——
@@ -785,19 +784,7 @@ def assert_gate_order(middlewares) -> None:
     """接线断言（Lyra P0 修法②配套）：**仅验 ConfirmGateC1 存在于主图 middleware 列表**
     （fail-closed：漏装=启动炸，不许静默）。不验顺序（语义即存在性保险丝）。
     子层三处（部门/主管/总管图）断言已由 cow_graphs.assert_dept_gates 实现（09-16 fix4），
-    与本件同惯用法各管各面。r40a 起附带 D2 退役断言（见下）。"""
+    与本件同惯用法各管各面。"""
     names = [type(m).__name__ for m in middlewares]
     if "ConfirmGateC1" not in names:
         raise ValueError("C1 接线断言失败：主图 middleware 缺 ConfirmGateC1（fail-closed）")
-    _assert_d2_retired()
-
-
-def _assert_d2_retired() -> None:
-    """r40a 退役回归断言（r36-G 冻结链同款拆法）：D2 压力降档符号必须不存在——
-    防有人把"连败自动降档"链悄悄装回来（同权令：西莉亚没有的，米娅也没有）。"""
-    for _sym in ("_PRESSURE_PIN", "_fail_streak", "_pressure_notice",
-                 "_pin_alive", "_pin_ttl", "_pressure_n", "_pressure_fire",
-                 "_pressure_release", "_note_fail", "_safe_note", "_attach_pressure"):
-        if hasattr(ConfirmGateC1, _sym):
-            raise AssertionError(
-                f"D2 压力降档符号复活：ConfirmGateC1.{_sym}（违 r40a 同权减锁令，10-01 爸爸终版）")
