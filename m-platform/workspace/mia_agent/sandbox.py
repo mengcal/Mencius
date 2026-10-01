@@ -7,7 +7,6 @@
 被引用：mia_agent/graph.py（create_deep_agent 的 backend，原 L1026；_compaction_middleware 的 backend，原 L951）。
 """
 import os  # SandboxedShellBackend 用 os.environ 读 SANDBOX_TOKEN（原 L70）
-from pathlib import Path  # r40c：_sync_root 需 Path（FilesystemBackend 的根字段=self.cwd）
 from deepagents.backends import LocalShellBackend  # 原 L68
 from deepagents.backends.protocol import ExecuteResponse as _ExecResp  # 原 L69
 
@@ -16,33 +15,15 @@ from deepagents.backends.protocol import ExecuteResponse as _ExecResp  # 原 L69
 # 这里把 execute 经内网 POST 到 m-sandbox 容器的执行服务——沙箱只挂数据区，没有 settings.json/源码/档位，
 # 米娅的 shell 物理上碰不到平台的"锁和脑"（对标 ZCode：执行面与守卫面分离）。
 class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
-    """execute → 沙箱执行服务（固定内网地址，带 X-Token）；其余继承本地实现（已锁 mia_home）。"""
+    """execute → 沙箱执行服务（固定内网地址，带 X-Token）；其余继承本地实现（已锁 mia_home）。
+    r40c4（10-01 CB 二轮 G01 实锤后撤回 r40c 的"文件工具根随域"）：文件工具=workplatform
+    容器进程的器官，根恒=mia_home——宿主盘只有 execute（host_runner）够得到，这是物理墙
+    不是限制（爸 09-27 沙箱实测"档位不越物理墙"同款）；宿主域对话操作宿主文件走 execute。"""
     _URL = os.environ.get("SANDBOX_EXEC_URL") or "http://sandbox:9000/exec"  # compose 固定内网地址（管理员侧配置=env，不由任何输入拼装）
 
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
         self._tok = os.environ.get("SANDBOX_TOKEN", "")
-        self._root_container = Path(self.cwd)  # r40c：容器域根（FilesystemBackend 把构造 root_dir 存为 self.cwd）
-
-    # r40c 同权（10-01 爸爸令）：文件工具根随对话域——container=mia_home（容器世界的全部），
-    # host=宿主盘根（宿主域 execute 本就全盘，文件工具对齐，不再同一她两副面孔）。
-    # _resolve_path 是全部文件操作的路径解析单点（官方 FilesystemBackend），在此同步即全覆盖。
-    # 竞态防：backend=全平台单实例而 cwd 是实例属性，两对话并发解析时 A 的切根会污染 B——
-    # 解析全程持锁原子化（微秒级，无性能伤）；resolve 返回绝对 Path 后 IO 不再依赖 cwd。
-    _ROOT_LOCK = __import__("threading").Lock()
-
-    def _sync_root(self) -> None:
-        try:
-            from langgraph.config import get_config
-            ws = str(((get_config() or {}).get("configurable", {}) or {}).get("workspace") or "container")
-        except Exception:
-            ws = "container"
-        self.cwd = self._root_container if ws != "host" else Path("D:/")
-
-    def _resolve_path(self, key):
-        with self._ROOT_LOCK:
-            self._sync_root()
-            return super()._resolve_path(key)
 
     @staticmethod
     def _payload(cmd: str, timeout: int) -> bytes:

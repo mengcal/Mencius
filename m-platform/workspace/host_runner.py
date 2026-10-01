@@ -173,8 +173,15 @@ class Handler(BaseHTTPRequestHandler):
         # （最多 300s，超时才回 429），不再是拒绝。
         if not _SEM.acquire(blocking=True, timeout=300):
             self._send(429, {"error": "宿主执行排队超时（300s），稍后再试"})
-            _audit({"decision": "queue_timeout"})
+            # r40c4（CB 二轮 G17）：排队超时账补 ip/auth/cmd 摘要——对账口径与 exec 同规格
+            _audit({"decision": "queue_timeout", "ip": self.client_address[0],
+                    "cmd": cmd[:200], "auth": auth, "waited": round(time.time() - t0, 1)})
             return
+        _qwait = round(time.time() - t0, 1)
+        if _qwait > 0.5:
+            # r40c4：排队超过半秒落 queued 账（账本可见"排了多久"，对齐 exec 记录规格）
+            _audit({"decision": "queued", "ip": self.client_address[0],
+                    "auth": auth, "waited": _qwait})
         try:
             p = subprocess.Popen([BASH, "-lc", cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  text=True, encoding="utf-8", errors="replace",
