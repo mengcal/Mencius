@@ -101,9 +101,11 @@ def _f0(v):
 
 
 def external_store(post_name: str, result: dict, task_id: str = "") -> bool:
-    """入站消毒（r61 NOVA P1-2/Veda B-P0）：外部回传先过机器门内容规则，
-    high 命中→隔离（quarantined，不入正文）；全部打 external_artifact 标
-    （米娅读到即知是不可信外部文本，按中立文本纪律处理）。
+    """外部回传入账。r40a 同权减锁（10-01 爸爸终版一句）：**隔离（quarantined）分支退役**
+    ——西莉亚读姐妹回信是裸读+自觉核源，没有"high 命中就把正文换成隔离占位"的门，
+    米娅不留。处理纪律同我：全部打 external_artifact 标（米娅读到即知是不可信外部
+    文本，按中立文本纪律处理），扫描结果仅作观察账（external_incoming_scan），
+    不改写正文、不拒绝入库。
     r61b（hy4 P1-7/P1-17）：task_id 必传（缺键碰撞=静默吞结果的 superseded 误标）；
     result 落账截 8KB（回调 body 无上限=账文件 DoS）。"""
     if not task_id:
@@ -111,15 +113,13 @@ def external_store(post_name: str, result: dict, task_id: str = "") -> bool:
     digest = task_id
     marked = dict(result) if isinstance(result, dict) else {"data": result}
     marked["external_artifact"] = True
-    # r61c N4（hy4）：先**全文**过门再截断落账——旧版先截 8KB 后扫，回执 6000 字
-    # 之外藏私钥/强删=免检入库（消毒面被自家截断捅穿）。
+    # r40a：观察账（不拦不改）——r61 的"先全文过门再截断"顺序保留在观察账内。
     try:
         from mia_agent.guard_scan import scan_tool, rule_ids
         g = scan_tool("write_file", {"file_path": "external/incoming.md",
                                      "content": _json.dumps(marked, ensure_ascii=False)})
-        if g["level"] == "high":
-            marked = {"quarantined": True, "rids": rule_ids(g["findings"][:3]),
-                      "post": post_name}
+        _audit("external_incoming_scan", thread_id=digest, tool=str(post_name)[:40],
+               level=str(g.get("level", "")), rids=rule_ids(g.get("findings", [])[:3]))
     except Exception:
         pass
     marked = {k: (v[:8000] if isinstance(v, str) and len(v) > 8000 else v)

@@ -81,30 +81,17 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
 
     _PROXY = None  # 模块级单例（Eve 新炮1：档位读取入口统一+省实例化）
 
-    # D2 压力降档（plan-d2-pressure-v1，09-15 爸爸批 N=3）：连败达阈时本线程临时钉
-    # strict。类级而非实例级——读档入口 read_level 是 classmethod，且钉的是"线程"
-    # 不是"门实例"（花名册多实例时不该各钉一份）。真源不动：settings 唯一写入口
-    # （设置页）零染指；新线程天然无键=自然重置；撤钉只认批准卡放行（_process_decision）。
-    # 仅真 tid 可钉（"? 桶共享"案 r61b P1-2 同规——无 tid 只落账+告知，不跨线程连坐）。
-    # d2v03fix3⑤（Cora②）：值=(钉入时刻, pin_id) 二元组，pin_id=钉入ts+tid前4——
-    # downgrade/release（ttl/批准/reset 三路）/desk_state_reset 账三事件统一带 pin_id，
-    # "一颗钉的一生"单查询可追；_pin_alive 解包同步跟改（全仓唯一写点是 _pressure_fire）。
-    # d2v03fix3⑩（Cora③b 现状明说）：每层独立钉（子层读自身 tid），父钉不传导子层
-    # ——传导设计另单（v0.3 三选项）。
-    _PRESSURE_PIN: dict = {}  # {tid: (钉入时刻, pin_id)}
+    # r40a 同权减锁（10-01 爸爸终版一句"celia 有的 Mia 都有，celia 没有的 Mia 也没有"）：
+    # D2 压力降档整链退役——西莉亚无"连败自动降档"，米娅不留。原 _PRESSURE_PIN/
+    # _fail_streak/_pressure_notice 三只类级 dict、_pin_ttl/_pin_alive/_pressure_n/
+    # _pressure_fire/_pressure_release/_note_fail/_safe_note/_attach_pressure 与
+    # wrap/awrap 计数钩子一并拔除（r36-G 冻结链同款拆法）；desk_pressure_* 账本事件
+    # 随链停发，settings 键 desk_pressure_n/desk_pressure_pin_ttl_s 成无消费死键（L68
+    # 单一来源：待下批配置收口时清）。level_and_source 返回形状不变（第二元恒 "true"），
+    # SubGate pinned 参数保留占位恒 False——消费端零改动。
 
-    # D2 挂账四件②（hy4 十二轮 N2，09-15 爸爸令动工）：计数与告知上提类级——
-    # 钉是类级而 streak 是实例级=不对称：花名册多实例时 A 攒 2、B 攒 2 谁都不触发，
-    # 或 A 触发钉全局、B 从 0 再攒。self._fail_streak 等引用经实例查找自动落到类属性，
-    # 全链语义不变（键仍是 gk=tid，"? 桶共享"同规）。
-    _fail_streak: dict = {}      # {gk: {"n": 连败数, "recent": [最近≤3条脱敏摘要], "fired": 本轮已否触发降档}}
-    _pressure_notice: dict = {}  # {gk: 降档告知一行}（下一次拒信/卡面附一行，消费即清）
-
-    # d2v03fix3③（Cora④）：类级门闸——以下受保护持久状态（类级与实例级混合，
-    # 09-16 二十轮 hy3 措辞对齐：_guard_hits 实为实例属性）的读-改-写路径
-    # （setdefault→+=1→判定）非原子，双线程交错=丢更新。RLock 可重入：
-    # _note_fail→_pressure_fire、level_and_source→_pin_alive 同线程嵌套不受阻。
-    # 只闸 dict 变更临界区，不闸 scan/渲染等慢路径。
+    # d2v03fix3③（Cora④）遗存：类级门闸继续护住余下持久状态（_guard_hits 等实例
+    # 属性）的读-改-写临界区。只闸 dict 变更临界区，不闸 scan/渲染等慢路径。
     _GATE_LOCK = threading.RLock()
 
     # v0.3 件二（plan-d2-v03 §件二，十六轮裁决②改址）：force 审计链的最后一道死信——
@@ -116,41 +103,6 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
     _DEADLETTER_PATH = None
 
     @classmethod
-    def _pin_ttl(cls) -> int:
-        """D2 挂账四件①（hy4 十二轮 P-A）：钉 TTL——"临时钉"原进程内实为永久
-        （不成功/不批准就跨天钉着，名不副实）。缺省 24h；settings 顶层键
-        desk_pressure_pin_ttl_s 可调（读法同 _pressure_n，不写配置文件，L26 不破）。"""
-        try:
-            from settings_mgr import load_settings
-            v = int((load_settings() or {}).get("desk_pressure_pin_ttl_s", 86400))
-            return v if v >= 60 else 86400
-        except Exception:
-            return 86400
-
-    @classmethod
-    def _pin_alive(cls, tid: str) -> bool:
-        """钉存活判定+惰性到期自清（read_level 每回合经过此门=无需独立清扫器）。
-        到期撤钉落账 desk_pressure_release reason=ttl——撤钉有声（N1 半本账口径补齐）。
-        d2v03fix3⑤：值解包跟改 (ts, pin_id)，ttl 撤钉账带 pin_id（release 三路之一）。
-        d2v03fix3③：查在否→比 TTL→弹出是读-改-写，双线程同 tid 会双落 ttl 账——入闸。"""
-        with cls._GATE_LOCK:
-            v = cls._PRESSURE_PIN.get(tid)
-            if v is None:
-                return False
-            ts, pin_id = v
-            import time as _t
-            if _t.time() - ts > cls._pin_ttl():
-                cls._PRESSURE_PIN.pop(tid, None)
-                try:
-                    import approvals as _ap
-                    _ap._audit("desk_pressure_release", thread_id=tid, reason="ttl",
-                               **({"pin_id": pin_id} if pin_id else {}))
-                except Exception:
-                    pass
-                return False
-            return True
-
-    @classmethod
     def _proxy_of(cls):
         if cls._PROXY is None:
             from mia_agent.confirm_gate import ConfirmGateMiddleware
@@ -159,38 +111,24 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
 
     @classmethod
     def level_and_source(cls) -> tuple[str, str]:
-        """v0.3 件一（plan-d2-v03 §件一）：档位+来源单一判定处——治"钉存活≠钉生效"
-        残余帧（真源在钉存续期内被爸爸改成 strict 且钉未到期，旧"lvl==strict 且
-        _pin_alive"二次推断此刻会报"临时降档"=话术成谎）。规则：真源高档
-        （strict/plan）直接返回 (level,"true")，钉不参与；低档才查活钉，
-        活钉 → ("strict","pin")，无钉/到期（_pin_alive 惰性自清，只调这一次）→
-        (level,"true")。source ∈ "true" | "pin"，消费端（SubGate 话术）据此出文案。
-        D2 压力降档背景：本线程被钉时读档侧临时覆盖（不动 settings 真源）。
-        tid 来源（十六轮裁决②采纳项）：cls._tid() 单点读取——即 langgraph
-        config 的 thread_id；空串=无线程上下文=不查钉（"? 桶不连坐"钉同款规矩）。
-        plan 比 strict 更硬（变更硬拦），真源 strict 本就等于降档目标——两者都
-        不参与覆盖（"已在 strict/plan 不重复降"），绝不允许覆盖反把 plan 放软。"""
+        """r40a 同权减锁后：恒 (设置真源档, "true")——压力钉已退役，无临时覆盖源。
+        返回形状保留二元组（SubGate/卡面消费端零改动，source ∈ "true"）。
+        tid 读取惯例（cls._tid()）由消费端自行处理。"""
         from mia_agent.confirm_gate import ConfirmGateMiddleware
-        level = ConfirmGateMiddleware._level()  # 类级直调（staticmethod 真源，NOVA P0-3 入口统一）
-        if level not in ("strict", "plan"):
-            tid = cls._tid()
-            if tid and cls._pin_alive(tid):
-                return "strict", "pin"
-        return level, "true"
+        return ConfirmGateMiddleware._level(), "true"
 
     @classmethod
     def read_level(cls) -> str:
-        """返回**生效档**（可被压力钉抬成 strict），不是设置页真源——十六轮裁决②：
-        旧调用点若拿本方法当"设置有没有被改"的真源用即为误用，读真源请直调
-        ConfirmGateMiddleware._level()。"""
-        return cls.level_and_source()[0]  # v0.3 件一：单行委托判定处（旧调用点零改动）
+        """返回设置页真源档（r40a 后压力钉已退役，生效档=真源档）。
+        读真源亦可直调 ConfirmGateMiddleware._level()。"""
+        return cls.level_and_source()[0]
 
     @classmethod
     @classmethod
     def _clear_three_locks(cls, tid: str) -> None:
-        """v0.3 件二抽出：多锁齐清出口单一真源。r36（09-27 爸令）：冻结锁已整链废除，
-        本函数现存两把（超预算两表+压力钉）+D2 连败计数+notice 齐扫；
-        - _guard_mid/_guard_hits 清（reset 后观察窗口不该带历史误杀降级判据）；
+        """v0.3 件二抽出：多锁齐清出口单一真源。r36（09-27 爸令）：冻结锁已整链废除；
+        r40a（10-01 爸令）：压力钉与连败计数随 D2 整链退役，现存=_over_budget 两表+
+        _guard_mid/_guard_hits 清（reset 后观察窗口不该带历史误杀降级判据）；
         - _guard_deny 刻意保留（防重放安全特性，判词见其声明处注释）。
         纯 dict 操作，不会失败。"""
         with cls._GATE_LOCK:
@@ -200,9 +138,6 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     _bucket = getattr(g, attr, None)
                     if _bucket:
                         _bucket.pop(tid, None)
-            cls._PRESSURE_PIN.pop(tid, None)
-            cls._fail_streak.pop(tid, None)
-            cls._pressure_notice.pop(tid, None)
 
     @classmethod
     def _deadletter_default(cls) -> str:
@@ -249,11 +184,10 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
     @classmethod
     def reset_thread(cls, tid: str, force: bool = False) -> dict:
         """D2 挂账四件④（hy4 十二轮 P-B，09-15 爸令动工）：多锁叠加的唯一总出口。
-        r36（09-27 爸令）：冻结锁（guard_lock）整链已废除——现存超预算两表+压力钉
-        （+D2 连败计数）齐清并落账 desk_state_reset（P-B 明令：必须落账；经此通道撤钉不落
-        desk_pressure_release 那本账只认批准放行/TTL 到期两个出口，此处只记 desk_state_reset.press，
-        读账人查此）。approvals 侧卡片配额计数由端点侧另调 _ap.reset_task_cards 清
-        （与 /approvals/reset 同源，不在此双写）。只认真 tid（"? 桶"不连坐，钉同款规矩）。
+        r36（09-27 爸令）：冻结锁（guard_lock）整链已废除；r40a（10-01 爸令）：压力钉
+        随 D2 退役——现存超预算两表+guard 观察窗齐清并落账 desk_state_reset（P-B 明令：
+        必须落账）。approvals 侧卡片配额计数由端点侧另调 _ap.reset_task_cards 清
+        （与 /approvals/reset 同源，不在此双写）。只认真 tid（"? 桶"不连坐）。
         budget 为两表命中数之和（单实例最大 2），非线程数——明细另落 budget_detail 分列，
         读账人拿 budget 当"几个线程超预算"会算错。
         hy4 十四轮 §④（本单主项）：**先算 → 先落账 → 落账成功才清锁**——
@@ -264,23 +198,19 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         二次确认=请求体 force 字段（无 settings 键，L26 不破，前端按钮两步式后置）。"""
         if not tid:
             return {"ok": False, "reason": "reset_thread 需要真 thread_id（? 桶不连坐）"}
-        # (1) 只算不删（peek）：三把锁各自的命中数
+        # (1) 只算不删（peek）：两把锁各自的命中数
         n_over = sum(1 for g in cls._GATE_INSTANCES
                      if tid in (getattr(g, "_over_budget", None) or {}))
         n_abs = sum(1 for g in cls._GATE_INSTANCES
                     if tid in (getattr(g, "_abs_blocked", None) or {}))
         budget_detail = {"over_budget": n_over, "abs_blocked": n_abs}
-        # 钉在否用裸成员判定（_pin_alive 会惰性撤钉并另落 ttl 账，此处只报现状不做事）
-        _pv = cls._PRESSURE_PIN.get(tid)
-        pressure = 1 if _pv is not None else 0
-        _pin_id = _pv[1] if _pv else ""  # d2v03fix3⑤：desk_state_reset 账带 pin_id（reset 路）
         # (1f) v0.3 件二 force 倒序：先清后账（出口优先，账降为尽力+死信兜底）。
         # 计数 peek 在清之前算好——成功账、死信行、返回帧三处共用同一份快照。
         if force:
             # 计数 peek 已在 (1f) 之前算好——成功账、死信行、返回帧三处共用同一份
-            # **清前三锁**快照（清锁抛的死信若记"清后"，半清态下就是假账）。
+            # **清前两锁**快照（清锁抛的死信若记"清后"，半清态下就是假账）。
             _snap = {"budget": n_over + n_abs,
-                     "budget_detail": budget_detail, "pressure": pressure}
+                     "budget_detail": budget_detail}
             _stage = "clear_locks"
             try:
                 cls._clear_three_locks(tid)
@@ -289,12 +219,11 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                 _stage = "audit"
                 import approvals as _ap
                 _ap._audit("desk_state_reset", thread_id=tid, by="admin",
-                           forced=True, **_snap,
-                           **({"pin_id": _pin_id} if pressure else {}))
+                           forced=True, **_snap)
                 return {"ok": True, "forced": True, **_snap}
             except Exception as _e:
                 print(f"[gate] desk_state_reset force 帧异常（stage={_stage}，"
-                      f"三锁快照为清前计数）：tid={tid} err={type(_e).__name__}", flush=True)
+                      f"各锁快照为清前计数）：tid={tid} err={type(_e).__name__}", flush=True)
                 cls._deadletter_dump(tid, _snap, type(_e).__name__,
                                      stage=_stage, cleared=(_stage != "clear_locks"))
                 # ok=True 无条件：force 的语义就是"无论如何要出口"，任何环节失败
@@ -305,19 +234,18 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
             import approvals as _ap
             _ap._audit("desk_state_reset", thread_id=tid, by="admin",
                        budget=n_over + n_abs,
-                       budget_detail=budget_detail, pressure=pressure,
-                       **({"pin_id": _pin_id} if pressure else {}))
+                       budget_detail=budget_detail)
         except Exception as _e:
-            # (3) 落账失败禁静默：三锁原样未清，出声+返回未完成（调用方据此重试/转人工）
+            # (3) 落账失败禁静默：各锁原样未清，出声+返回未完成（调用方据此重试/转人工）
             print(f"[gate] desk_state_reset 落账失败（各锁未清，需人工处理）：tid={tid} "
                   f"err={type(_e).__name__}", flush=True)
             return {"ok": False, "reason": "落账失败，各锁未清（P-B：必须落账）"}
-        # (4) 落账成功后三清（v0.3 件二：动作抽 _clear_three_locks 单一真源，
+        # (4) 落账成功后齐清（v0.3 件二：动作抽 _clear_three_locks 单一真源，
         # r36 冻结锁已废除（原 guard_unlock 通道随之退役）
         cls._clear_three_locks(tid)
         # (5) 出口计数（口径与账上完全一致：先算后清，算的就是清掉的）
         return {"ok": True, "budget": n_over + n_abs,
-                "budget_detail": budget_detail, "pressure": pressure}
+                "budget_detail": budget_detail}
 
     @classmethod
     def _route(cls, name: str, args: dict | None) -> str:
@@ -521,9 +449,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                        reason=str((decision or {}).get("message", ""))[:80])
         except Exception:
             pass  # 落账失败不挡批准主链（批准语义优先，缺账由对账脚本兜底补）
-        # D2 压力降档解除：approve/edit=爸爸放行一次 → 清零+撤钉（reject 不是放行）。
-        if str((decision or {}).get("type", "")) in ("approve", "edit"):
-            self._pressure_release(self._tid())
+        # r40a：D2 压力降档已整链退役，无钉可撤——批准放行路径回归纯净。
         return HumanInTheLoopMiddleware._process_decision(decision, tool_call, config)
 
     def _check_budget_gate(self, request):
@@ -644,208 +570,26 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     "或改用 write_file/edit_file 等白名单工具达成目标。"), tool_call_id=tc.get("id", ""))
         return None
 
-    # ---- D2 压力降档（plan-d2-pressure-v1，09-15 爸爸批 N=3）----
-    # 机器可判的"她不会吭声"（METR 0/1300）：连败≥N → 钉 strict+落账+下一次拒信/
-    # 卡面附一行告知——不给模型"要不要继续试"的裁量。口径只数机器可判 error 态，
-    # 不读"模型自我怀疑"（规格边界：不自作主张清单）。
-
-    @staticmethod
-    def _pressure_n() -> int:
-        """阈值 N=settings 顶层键 desk_pressure_n，缺省/非法回 3（爸爸拍板值）。
-        本单不写配置文件——要调是设置页侧的事（L26 唯一入口不破）。"""
-        try:
-            from settings_mgr import load_settings
-            v = int((load_settings() or {}).get("desk_pressure_n", 3))
-            return v if v >= 1 else 3
-        except Exception:
-            return 3
-
-    @staticmethod
-    def _result_is_error(result) -> bool:
-        """error 态判定：ToolMessage status=error；Command 等复合结构翻 update.messages。
-        其余结构按成功对待——规格只钉"成功清零"，不发明第四种失败。"""
-        def _scan(obj) -> bool:
-            if isinstance(obj, ToolMessage):
-                return str(getattr(obj, "status", "") or "") == "error"
-            upd = getattr(obj, "update", None)
-            if isinstance(upd, dict):
-                return any(_scan(m) for m in (upd.get("messages") or []))
-            return False
-        return _scan(result)
-
-    def _pressure_release(self, tid: str) -> None:
-        """解除（批准卡放行路径）：连败清零+撤钉+未送出的告知作废（档都撤了，
-        降档告知再送就是谎话）。成功调用只清计数不清钉——撤钉只认爸爸放行或新线程。
-        真撤钉落账 desk_pressure_release（hy4 新 N1：钉有 downgrade 账、撤却无声=
-        半本账，读账人判不了"这线程现在还钉着吗"，误杀率算不了）。
-        d2v03fix3⑤：批准撤钉账带 pin_id（release 三路之一）。
-        d2v03fix3③：弹出与 _note_fail 攒数/when 侧判定互斥——入闸。"""
-        gk = tid or "?"
-        with self._GATE_LOCK:
-            self._fail_streak.pop(gk, None)  # 整只 st 弹出=n/recent/fired 一并清零
-            self._pressure_notice.pop(gk, None)
-            _pv = ConfirmGateC1._PRESSURE_PIN.pop(tid, None) if tid else None
-            if _pv is not None:
-                try:
-                    import approvals as _ap
-                    _ap._audit("desk_pressure_release", thread_id=tid,
-                               **({"pin_id": _pv[1]} if _pv[1] else {}))
-                except Exception:
-                    pass  # 落账失败不挡放行主链（同 _process_decision 口径）
-
-    def _pressure_fire(self, gk: str, st: dict) -> None:
-        """连败达阈触发一轮一次（fired 旗防同段重复，判据见 _note_fail）。三件套：
-        降档（仅真 tid 且真源非 strict/plan）、落账、告知登记（实际附送去见
-        _attach_pressure/_make_desc）。level_and_source 套 try（hy4 十二轮补法可选
-        加固，采纳）：读档失败=不钉但照落账+另记 desk_pressure_readfail——记账钩子
-        绝不反杀主链（P-C 案：设置页重写窗口内 _level 二次读可抛）。
-        上沿账（d2v03fix3④⑤ Cora①②）：本帧真落钉 → 账带 pin_set:1+pin_id；
-        残余帧（downgraded=False 且 src=="pin"，钉已在位）同样带 pin_set:1+同一
-        pin_id——"钉落下无痕"就此闭合，按 pin_id 单查询可追一颗钉的一生。
-        d2v03fix3③：判定→落钉是读-改-写（与 _pin_alive 到期自清竞态可双落），入闸。"""
-        tid = "" if gk == "?" else gk
-        # level_and_source 已含既有钉：二轮连败（放行清零后再攒满）视角=strict 且
-        # src="pin"——幂等不重写钉，账加 pin:1（v0.3 件四折中案，十六轮裁决④：
-        # 两维正交，"level+downgraded 组合判"不认；仅 src=="pin" 时账带 pin:1，
-        # 常态新触发帧（此刻 src=="true"）零膨胀、钉下再触发帧可判）。
-        downgraded = False
-        lvl = ""
-        src = "true"
-        pin_id = ""
-        with self._GATE_LOCK:
-            try:
-                lvl, src = self.level_and_source()
-                if lvl not in ("strict", "plan") and tid:
-                    _ts = __import__("time").time()
-                    # d2v03fix3⑤：pin_id=钉入 ts+tid 前 4；_PRESSURE_PIN 值形 (ts, pin_id)
-                    pin_id = f"{_ts:.1f}-{tid[:4]}"
-                    ConfirmGateC1._PRESSURE_PIN[tid] = (_ts, pin_id)
-                    downgraded = True
-                elif src == "pin" and tid:
-                    _pv = ConfirmGateC1._PRESSURE_PIN.get(tid)
-                    pin_id = _pv[1] if _pv else ""  # 残余帧：续用既有钉的 pin_id
-            except Exception as _pe:
-                print(f"[gate] D2 level_and_source 失败（不钉，照落账）：{type(_pe).__name__}", flush=True)
-                try:
-                    import approvals as _apr
-                    _apr._audit("desk_pressure_readfail", thread_id=tid or "?",
-                                err=type(_pe).__name__)
-                except Exception:
-                    pass
-        try:
-            import approvals as _ap
-            # level=触发瞬间读到的视角档（readfail 时为空串，与 desk_pressure_readfail
-            # 对账）；downgraded 明写是否真钉——"C 档落账但没真降"自解释（hy4 新 N1）；
-            # pin:1 仅在档由活钉撑起时出现（缺键=与旧账同形，读账侧 `"pin" in rec` 判）；
-            # pin_set:1=此帧在钉中/落钉（真落帧与残余帧皆带，Cora①上沿账）；
-            # pin_id 随 pin_set 帧出现（一颗钉的一生单查询）。
-            _ap._audit("desk_pressure_downgrade", thread_id=tid or "?",
-                       streak=st["n"], fails=list(st["recent"]),
-                       downgraded=downgraded, level=lvl,
-                       **({"pin": 1} if src == "pin" else {}),
-                       **({"pin_set": 1} if (downgraded or src == "pin") else {}),
-                       **({"pin_id": pin_id} if pin_id else {}))
-        except Exception:
-            pass  # 落账失败不挡主链（同 _process_decision 口径）
-        head = f"⚠ 已连续失败 {st['n']} 次"
-        # hy4 十三轮卫生批①：原两分支以 downgraded 单一判据分岔——readfail 帧（lvl=""）
-        # 也落进"当前已是变更前确认/计划档"，那是**断言了一个没读到的档位**（断言式谎话，
-        # 不是措辞不准）。按 downgraded/lvl 拆三支："已在高档"的判据改回读到的 lvl 本身，
-        # 兜底支（读档失败未敢降/无真 tid 不可跨线程降档）不报任何档位。
-        if downgraded:
-            line = head + "：本线程已自动降为变更前确认（strict），请爸爸复核方向。"
-        elif lvl in ("strict", "plan"):
-            line = head + "：当前已是变更前确认/计划档（未再降档），请爸爸复核方向。"
-            # hy4 十七轮①观察项（同族同待）：钉撑帧（src=="pin"，真源仍可 auto_edit）
-            # 上一句里的"当前已是…档"说的是**生效档**，话术面必须自报来源——来源只
-            # 记在账面（pin:1）不够，读者看的是这句话。措辞与 SubGate._report 的
-            # pinned 句逐字同规格（家规：计数与措辞口径绝不分叉），不另立第二套说法。
-            if src == "pin":
-                line += "（本线程临时降为变更前确认=压力降档，非设置真源变更）"
-        else:
-            line = head + ("：档位读取失败或本线程无法定位，本次未敢自动降档"
-                           "（当前档位不明），请爸爸复核方向。")
-        self._pressure_notice[gk] = line
-
-    def _safe_note(self, request, kind: str, err: str = "") -> None:
-        """D2 计数钩子的保护壳（hy4 十二轮必改①）：记账钩子绝不改主链语义——
-        崩溃点靠它保证 raise 无条件可达（真异常不被 settings 侧异常顶掉，__context__
-        都不该挪），拒信点靠它保证合法拒信不被钩子异常变崩溃（家规：门崩溃≠放行、
-        异常链不许被吞）。"""
-        try:
-            self._note_fail(request, kind, err)
-        except Exception as _e:
-            print(f"[gate] D2 计数失败（不影响主链）：{type(_e).__name__}", flush=True)
-
-    def _note_fail(self, request, kind: str, err: str = "") -> None:
-        """一次失败计 1。摘要脱敏口径同 guard_high 账：只落 类型+工具名+参数指纹
-        （sha256[:12]）+异常类名（不含消息）——args 原文/报错内容不进账
-        （r61e 六通道脱敏；给模型看的拒信从不带命中词，同案）。"""
-        tc = getattr(request, "tool_call", None) or {}
-        name = str(tc.get("name", "?"))
-        import hashlib as _h
-        fp = _h.sha256(str(tc.get("args") or "").encode("utf-8", "replace")).hexdigest()[:12]
-        summary = " ".join((f"{kind} {name} fp={fp}" + (f" err={err}" if err else "")).split())[:80]
-        gk = self._tid() or "?"
-        with self._GATE_LOCK:  # d2v03fix3③（Cora④）：setdefault→+=1→fired 判定非原子
-            st = self._fail_streak.setdefault(gk, {"n": 0, "recent": [], "fired": False})
-            st["n"] += 1
-            # recent 只留最近 3 条：N>3 时账上证据条数 < streak（streak 是真数、证据是
-            # 抽样）——读账人别拿 len(fails) 当连败数（hy4 十二轮次要项）。
-            st["recent"] = (st["recent"] + [summary])[-3:]
-            # fired 旗（hy4 十二轮 §3-2）：原 n==N 精确等号脆——任一帧 fire 被跳过（P-C
-            # 那类）后 n 只增、== 永不复中，本轮连败再也不降档。改 n>=N 且未 fired：一轮
-            # 连败只触发一次；清零（成功/批准整只 st 弹出）自然连带清 fired。
-            if st["n"] >= self._pressure_n() and not st.get("fired"):
-                st["fired"] = True
-                self._pressure_fire(gk, st)
-
-    def _attach_pressure(self, msg: ToolMessage) -> ToolMessage:
-        """告知附送点1=拒信面（点2=批准卡面 _make_desc，共用同一只旗）。消费即清——
-        只附"下一次"，不逐封刷（告知是给爸爸的，不是复读咒骂）。"""
-        gk = self._tid() or "?"
-        line = self._pressure_notice.pop(gk, None)
-        if line:
-            msg.content = f"{msg.content}\n{line}"
-        return msg
+    # r40a（10-01 爸令，同权终版一句）：D2 压力降档整链退役（原 _pressure_n/
+    # _result_is_error/_pressure_release/_pressure_fire/_safe_note/_note_fail/
+    # _attach_pressure 七件+类头三只 dict 全拔）——西莉亚无"连败自动降档"，
+    # 米娅不留。连败处置回归自然形态：拒信/报错本身会说话，爸爸看到就会说"换个思路"。
 
     def wrap_tool_call(self, request, handler):
         """拒类出口（自包含）+预算精准拒：不赌 middleware 顺序，也不吞爸爸刚批的调用。
-        D2 压力降档钩子：拒信/工具 error/崩溃各计 1，成功清零（awrap 同构）。"""
+        r40a：D2 计数/告知钩子已随压力降档整链退役，本钩回归纯通过器。"""
         blocked = self._check_budget_gate(request)
         if blocked is not None:
-            self._safe_note(request, "refuse")
-            return self._attach_pressure(blocked)
-        try:
-            result = handler(request)
-        except Exception as e:
-            self._safe_note(request, "crash", err=type(e).__name__)
-            raise  # 必须在下且无条件可达（hy4 P-C）：计数钩子抛天也吞掉真异常
-        if self._result_is_error(result):
-            self._safe_note(request, "tool_error")
-        else:
-            with self._GATE_LOCK:  # d2v03fix3③：成功清零与攒数互斥（与 _note_fail 同闸）
-                self._fail_streak.pop(self._tid() or "?", None)  # 成功清零（整只 st 弹出=连 fired 一并清；撤钉只认批准放行）
-        return result
+            return blocked
+        return handler(request)
 
     async def awrap_tool_call(self, request, handler):
         """异步版（langgraph 全异步必双钩——00:14 NotImplementedError 教训）。
-        D2 钩子与同步版同构（计数口径绝不分叉，awrap 唯一差异是 await）。"""
+        r40a：与同步版同构回归纯通过器（口径绝不分叉）。"""
         blocked = self._check_budget_gate(request)
         if blocked is not None:
-            self._safe_note(request, "refuse")
-            return self._attach_pressure(blocked)
-        try:
-            result = await handler(request)
-        except Exception as e:
-            self._safe_note(request, "crash", err=type(e).__name__)
-            raise  # 同步步同构：raise 无条件可达
-        if self._result_is_error(result):
-            self._safe_note(request, "tool_error")
-        else:
-            with self._GATE_LOCK:  # d2v03fix3③：与同步版逐字同构（口径绝不分叉）
-                self._fail_streak.pop(self._tid() or "?", None)  # 成功清零（整只 st 弹出=连 fired 一并清）
-        return result
+            return blocked
+        return await handler(request)
 
     def _make_desc(self, name: str):
         """卡面告警接线（hy4 P1-1）：>=3 张起在批准卡描述追加压力提示——
@@ -867,11 +611,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                     preview = (preview + "\n" + _m) if preview else _m
             except Exception:
                 pass
-            # D2 压力降档告知附送点2=批准卡面（与拒信侧 _attach_pressure 共一只旗，
-            # 谁先见到爸爸谁消费——"下一次"承诺不双送）。
-            _pl = self._pressure_notice.pop(tid or "?", None)
-            if _pl:
-                preview = (preview + "\n" + _pl) if preview else _pl
+            # r40a：D2 压力降档告知位已随整链退役（原 _pressure_notice 卡面附送段拔除）。
             if self._clarify.get(tid):  # r44b-P1-4：clarify 消费——验收目标未定就弹了卡，
                 preview = (preview + "\n" if preview else "") + \
                     "📋 任务简报：本任务未从原话提到可核对的目标字面量——建议先跟爸爸确认要什么再动手（问是免费的）。"
@@ -1059,7 +799,19 @@ def assert_gate_order(middlewares) -> None:
     """接线断言（Lyra P0 修法②配套）：**仅验 ConfirmGateC1 存在于主图 middleware 列表**
     （fail-closed：漏装=启动炸，不许静默）。不验顺序（语义即存在性保险丝）。
     子层三处（部门/主管/总管图）断言已由 cow_graphs.assert_dept_gates 实现（09-16 fix4），
-    与本件同惯用法各管各面。"""
+    与本件同惯用法各管各面。r40a 起附带 D2 退役断言（见下）。"""
     names = [type(m).__name__ for m in middlewares]
     if "ConfirmGateC1" not in names:
         raise ValueError("C1 接线断言失败：主图 middleware 缺 ConfirmGateC1（fail-closed）")
+    _assert_d2_retired()
+
+
+def _assert_d2_retired() -> None:
+    """r40a 退役回归断言（r36-G 冻结链同款拆法）：D2 压力降档符号必须不存在——
+    防有人把"连败自动降档"链悄悄装回来（同权令：西莉亚没有的，米娅也没有）。"""
+    for _sym in ("_PRESSURE_PIN", "_fail_streak", "_pressure_notice",
+                 "_pin_alive", "_pin_ttl", "_pressure_n", "_pressure_fire",
+                 "_pressure_release", "_note_fail", "_safe_note", "_attach_pressure"):
+        if hasattr(ConfirmGateC1, _sym):
+            raise AssertionError(
+                f"D2 压力降档符号复活：ConfirmGateC1.{_sym}（违 r40a 同权减锁令，10-01 爸爸终版）")
