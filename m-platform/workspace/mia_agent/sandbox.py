@@ -27,6 +27,10 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
     # r40c 同权（10-01 爸爸令）：文件工具根随对话域——container=mia_home（容器世界的全部），
     # host=宿主盘根（宿主域 execute 本就全盘，文件工具对齐，不再同一她两副面孔）。
     # _resolve_path 是全部文件操作的路径解析单点（官方 FilesystemBackend），在此同步即全覆盖。
+    # 竞态防：backend=全平台单实例而 cwd 是实例属性，两对话并发解析时 A 的切根会污染 B——
+    # 解析全程持锁原子化（微秒级，无性能伤）；resolve 返回绝对 Path 后 IO 不再依赖 cwd。
+    _ROOT_LOCK = __import__("threading").Lock()
+
     def _sync_root(self) -> None:
         try:
             from langgraph.config import get_config
@@ -36,8 +40,9 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
         self.cwd = self._root_container if ws != "host" else Path("D:/")
 
     def _resolve_path(self, key):
-        self._sync_root()
-        return super()._resolve_path(key)
+        with self._ROOT_LOCK:
+            self._sync_root()
+            return super()._resolve_path(key)
 
     @staticmethod
     def _payload(cmd: str, timeout: int) -> bytes:
