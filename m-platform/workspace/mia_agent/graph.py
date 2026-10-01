@@ -107,6 +107,18 @@ try:
                                + (" " + detail if detail else "")
                                + " 不要连续重查——把 task_id 交给管理员（爸爸/celia（西莉亚））挖日志定因，"
                                "或改派前台会话验证。连查打转会撞递归上限（09-29 实案）。")
+        elif result.get("status") == "success":
+            # r40d（米娅运营反馈⑥）：任务"执行完成"≠"产出成功"——result 文本含失败特征时
+            # 打透明警示字段（status 保持官方值不动，官方下游语义零破坏；dept_watch/米娅
+            # 验收侧读 result_has_error 判真假完工）。宁误报不漏报=警示字段不是判定。
+            try:
+                import re as _re
+                _rtext = str(result.get("result") or result.get("output") or "")
+                if _rtext and _re.search(r"失败|错误|未配置|异常|无法|不支持|encountered an error", _rtext):
+                    result["result_has_error"] = True
+                    result["result_note"] = "产出文本含失败特征（警示字段，status 语义未动）——下游判定请读本字段"
+            except Exception:
+                pass
         elif result.get("status") == "running":
             # r39t 静默信号（米娅验收单⑤）：Eve 洞1——超时+步数零增量才报疑似静默
             #（纯年龄会误伤正常慢步骤，误报多了米娅学会无视=设计白做）。

@@ -13,6 +13,7 @@ mia_agent/ 包内，工作区根 = 包目录上一级 = mia_agent.graph.BASE（B
 被引用：mia_agent/graph.py（tools 列表，原 L1024-1025）、cow_graphs.py（经 agent_multimodel
 兼容桩取 search_knowledge_base）。
 """
+import threading  # r40d：manage_departments 读-改-写互斥（4 并发 add_worker 只落 2 的真凶）
 from langchain_core.tools import tool as _tool  # 原 L175
 
 from mia_agent.store import _STORE  # edit_memory 的 PG 镜像用（原为同文件模块级全局，见原 L544）
@@ -276,8 +277,20 @@ def edit_memory(action: str, section: str = "", content: str = "", project: str 
     return f"✅ 记忆已更新（{action}）：{section or '全文'}。已自动备份上一版到 {mem.name}.bak"
 
 
+_DEPT_LOCK = threading.Lock()  # r40d：部门配置读-改-写全序列互斥（进程内全部调用点共用）
+
+
 @_tool
-def manage_departments(action: str, department: str = "", name: str = "", desc: str = "", content: str = "", temperature: str = "") -> str:  # 原 L556-702
+def manage_departments(action: str, department: str = "", name: str = "", desc: str = "", content: str = "", temperature: str = "") -> str:
+    """米娅的人事权（R64，爸爸 2026-09-01 授予）：随时增删牛马、任命主管、给主管配牛马。
+    改 departments_config.json + 清部门图缓存，下次派活自动按新编制执行（零重启）。
+    r40d（米娅运营反馈③）：本工具全程持锁——4 并发 add_worker 只落 2 的真凶=读-改-写
+    无锁互踩，机制自己扛，不再依赖调用方自觉串行。参数语义见实现（_manage_departments_impl）。"""
+    with _DEPT_LOCK:
+        return _manage_departments_impl(action, department, name, desc, content, temperature)
+
+
+def _manage_departments_impl(action: str, department: str = "", name: str = "", desc: str = "", content: str = "", temperature: str = "") -> str:  # 原 L556-702
     """米娅的人事权（R64，爸爸 2026-09-01 授予）：随时增删牛马、任命主管、给主管配牛马。
     改 departments_config.json + 清部门图缓存，下次派活自动按新编制执行（零重启）。
     action:
