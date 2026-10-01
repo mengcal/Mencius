@@ -106,7 +106,10 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
         try:
             import httpx
             headers, used_ticket = self._headers(url, tok)
-            with httpx.Client(timeout=timeout + 15) as c:
+            # r40c2（qodercn 二轮抓的组合边缘）：runner 排队上限 300s+执行 timeout——
+            # 客户端超时必须罩住"排队+执行"全程，否则排队久时客户端先超时、命令仍在
+            # 队列里稍后执行=幽灵执行（结果丢失还误报"执行器不可达"）。
+            with httpx.Client(timeout=timeout + 330) as c:
                 r = c.post(url, content=self._payload(cmd, timeout), headers=headers)
                 if r.status_code == 401 and used_ticket:
                     self._TICKET["v"], self._TICKET["exp"] = "", 0.0  # runner 可能重启清了票，换新票重试一次
@@ -126,7 +129,8 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
         try:
             import httpx
             headers, used_ticket = self._headers(url, tok)
-            async with httpx.AsyncClient(timeout=timeout + 15) as c:
+            # r40c2：与同步版同口径——客户端超时罩住排队 300s+执行全程（防幽灵执行）
+            async with httpx.AsyncClient(timeout=timeout + 330) as c:
                 r = await c.post(url, content=self._payload(cmd, timeout), headers=headers)
                 if r.status_code == 401 and used_ticket:
                     self._TICKET["v"], self._TICKET["exp"] = "", 0.0
