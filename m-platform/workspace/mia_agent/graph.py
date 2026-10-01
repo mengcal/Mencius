@@ -119,6 +119,13 @@ try:
                     result["result_note"] = "产出文本含失败特征（警示字段，status 语义未动）——下游判定请读本字段"
             except Exception:
                 pass
+        elif result.get("status") == "cancelled":
+            # r40d（米娅 M1.1 开工撞雷：cancelled 双语义）——cancelled 是 **run 层**状态
+            # （新消息打断整个 run），不代表任务未创建：start_async_task 的 Command update
+            # 在打断前已提交=任务实际存在，盲重发=双派。加自证字段让读侧先查实际态。
+            result["cancelled_run_note"] = ("cancelled 是 run 层状态（本 run 被新消息打断），"
+                                            "不代表任务未创建——先 check_async_task 查该任务实际态，"
+                                            "再决定是否重发（盲重发=双派）。")
         elif result.get("status") == "running":
             # r39t 静默信号（米娅验收单⑤）：Eve 洞1——超时+步数零增量才报疑似静默
             #（纯年龄会误伤正常慢步骤，误报多了米娅学会无视=设计白做）。
