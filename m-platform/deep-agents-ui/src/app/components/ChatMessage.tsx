@@ -290,11 +290,11 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                     </div>
                   </div>
                 ) : isUser && /^\s*【(部门自动汇报|部门自动汇总|小全调度·自动汇报)】/.test(messageContent) ? (
-                  // r40d（米娅轮1对账：系统注入与人工消息无视觉分级）——部门唤醒等系统注入
-                  // 一律折叠为灰条，不占人工气泡；人工消息回归纯净。
+                  // r40d（米娅轮1对账：系统注入与人工消息无视觉分级）——牛马/部门自动汇报
+                  // 一律折叠为灰条，不占人工气泡；名分按爸 16:07 令="牛马汇报"不是"系统注入"。
                   <details className="w-full text-xs text-muted-foreground">
                     <summary className="cursor-pointer select-none">
-                      🤖 系统注入（自动汇报，点击展开）
+                      📣 牛马汇报（自动，点击展开）
                     </summary>
                     <pre className="mt-1 whitespace-pre-wrap break-words rounded bg-gray-900 p-2 text-[0.6875rem] text-gray-300">
                       {messageContent}
