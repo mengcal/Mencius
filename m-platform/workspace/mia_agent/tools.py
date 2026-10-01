@@ -113,17 +113,9 @@ def dispatch_to_xiaoquan(task: str) -> str:  # 原 L179-209
     """把需要动手执行的任务派给后台小全车间异步执行（搜索调研/写代码/文件表格/识图/整理/跑脚本）。
     派完立即返回，不阻塞当前对话；任务完成后小全会自动回到本对话汇报成果。
     task 必须自包含（后台线程看不到当前聊天记录），要写清目标、验收标准和涉及文件。
-    派出时系统会按任务复杂度自动标注档位（【档位:fast/standard/heavy】），
-    供总管分派参考——复杂任务建议配主力模型，简单查数用免费快档。"""
-    # r52 定档路由（一期只标不切）：OpenSquilla 智能路由的规则版平替，
-    # 档位进描述头随任务下发；v53 信号结构化（OpenSquilla 双审 P0-4/5 收编）。
-    try:
-        from mia_agent.model_tier import classify_task
-        _tier = classify_task(task)
-        _why = "；".join(f"{k}:{d}" for k, d in _tier["signals"][:3]) or "默认"
-        task = f"【档位:{_tier['tier']}（{_why}）】{task}"
-    except Exception:
-        pass  # 定档失败不挡派活
+    任务原文直发，平台不做任何改写（r40c 同权：下游看到的就是她写的）。"""
+    # r40c（10-01 爸爸令）：r52 的静默【档位】前缀注入拆除——改写她的话=欺骗面；
+    # model_tier.classify_task 保留（只标不切），如需档位参考由总管侧主动查询。
     try:
         from langgraph.config import get_config
         cfg = get_config() or {}

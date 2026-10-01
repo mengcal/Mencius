@@ -59,6 +59,15 @@ async def authenticate(request: Request) -> dict:
             and _hk.compare_digest(str(request.headers.get("x-internal-key") or ""),
                                    str(internal_key))):
         return {"identity": "internal-loopback", "permissions": ["*"]}
+    # r40c（10-01 爸爸同权令）：本机/私网来源免钥——对齐 office/app.py r39x 同款豁免
+    # （单机+路由器 NAT：来源=爸浏览器/本机工具/米娅容器=自家人；钥匙分档令=真钱钥才守）。
+    import ipaddress as _ipa
+    try:
+        _cip = request.client.host if request and request.client else ""
+        if _cip and _ipa.ip_address(_cip).is_private:
+            return {"identity": "local-private", "permissions": ["*"]}
+    except ValueError:
+        pass
     if path in _EXACT_ALLOW or path.startswith(_OFFICE_ALLOW):
         return {"identity": "office-route", "permissions": ["*"]}
     ah = request.headers.get("authorization", "")

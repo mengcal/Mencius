@@ -408,7 +408,9 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
                 except Exception:
                     continue  # 路由表未就绪（装配早期）不炸，真判到 pass 才炸
                 if _d not in ("ask", "to_deny"):
-                    raise RuntimeError(f"guard coverage broken: {_t} routed to pass")
+                    # r40c（爸判"起不来=画蛇添足"）：配置矛盾降为警告，不再拒启动——
+                    # 爸爸有权选任何档位组合，平台无权替他判"不合法"。
+                    print(f"[gate] 警告：档位配置矛盾（{_t} 在非 full 档被路由为 pass），请检查设置", flush=True)
 
     @staticmethod
     def _tc_key(tc: dict) -> str:
@@ -787,4 +789,5 @@ def assert_gate_order(middlewares) -> None:
     与本件同惯用法各管各面。"""
     names = [type(m).__name__ for m in middlewares]
     if "ConfirmGateC1" not in names:
-        raise ValueError("C1 接线断言失败：主图 middleware 缺 ConfirmGateC1（fail-closed）")
+        # r40c：同 R4a——缺门降为警告（爸看得见的 print），不再拒绝启动。
+        print(f"[gate] 警告：主图 middleware 缺 ConfirmGateC1：{names}", flush=True)

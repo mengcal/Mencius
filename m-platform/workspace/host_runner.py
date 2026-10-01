@@ -169,9 +169,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": "empty cmd"})
             return
         t0 = time.time()
-        if not _SEM.acquire(blocking=False):
-            self._send(429, {"error": "宿主执行并发已满（2），稍后再试"})
-            _audit({"decision": "denied_concurrency"})
+        # r40c（爸 10:5x 令：并行不可就排队，一个做完进行下一个）：并发满=排队等待
+        # （最多 300s，超时才回 429），不再是拒绝。
+        if not _SEM.acquire(blocking=True, timeout=300):
+            self._send(429, {"error": "宿主执行排队超时（300s），稍后再试"})
+            _audit({"decision": "queue_timeout"})
             return
         try:
             p = subprocess.Popen([BASH, "-lc", cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,

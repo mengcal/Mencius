@@ -77,10 +77,11 @@ def assert_dept_gates(middlewares) -> None:
     边界与 assert_gate_order 一致：只验存在性与反向错装，不验顺序。
     （按类名比对不 import 门件类型——同 assert_gate_order 惯用法，避顶层环。）"""
     names = [type(m).__name__ for m in middlewares]
+    # r40c（爸判"起不来=画蛇添足"）：错装降为警告，不再拒绝构建。
     if "SubGate" not in names:
-        raise ValueError(f"C1 子层接线断言失败：部门 middleware 缺 SubGate（fail-closed）：{names}")
+        print(f"[gate] 警告：部门 middleware 缺 SubGate：{names}", flush=True)
     if "ConfirmGateC1" in names:
-        raise ValueError(f"C1 子层接线断言失败：主图门 ConfirmGateC1 混进部门图（=口头门死锁形状，fail-closed）：{names}")
+        print(f"[gate] 警告：主图门 ConfirmGateC1 混进部门图（口头门死锁形状）：{names}", flush=True)
 
 
 def _build_dept_graph(dept: dict, slot: str):

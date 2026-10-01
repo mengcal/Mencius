@@ -7,6 +7,7 @@
 被引用：mia_agent/graph.py（create_deep_agent 的 backend，原 L1026；_compaction_middleware 的 backend，原 L951）。
 """
 import os  # SandboxedShellBackend 用 os.environ 读 SANDBOX_TOKEN（原 L70）
+from pathlib import Path  # r40c：_sync_root 需 Path（FilesystemBackend 的根字段=self.cwd）
 from deepagents.backends import LocalShellBackend  # 原 L68
 from deepagents.backends.protocol import ExecuteResponse as _ExecResp  # 原 L69
 
@@ -21,6 +22,22 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
         self._tok = os.environ.get("SANDBOX_TOKEN", "")
+        self._root_container = Path(self.cwd)  # r40c：容器域根（FilesystemBackend 把构造 root_dir 存为 self.cwd）
+
+    # r40c 同权（10-01 爸爸令）：文件工具根随对话域——container=mia_home（容器世界的全部），
+    # host=宿主盘根（宿主域 execute 本就全盘，文件工具对齐，不再同一她两副面孔）。
+    # _resolve_path 是全部文件操作的路径解析单点（官方 FilesystemBackend），在此同步即全覆盖。
+    def _sync_root(self) -> None:
+        try:
+            from langgraph.config import get_config
+            ws = str(((get_config() or {}).get("configurable", {}) or {}).get("workspace") or "container")
+        except Exception:
+            ws = "container"
+        self.cwd = self._root_container if ws != "host" else Path("D:/")
+
+    def _resolve_path(self, key):
+        self._sync_root()
+        return super()._resolve_path(key)
 
     @staticmethod
     def _payload(cmd: str, timeout: int) -> bytes:
