@@ -125,12 +125,17 @@ def send_once(token, msg):
     """发一条并打印米娅的回复（send 命令与交互模式共用）。
     r39z：workspace 随 run 走官方 configurable 通道（对齐前端 page.tsx 同一条政令
     r36k）——环境变量 MIA_CLI_WS 选域，缺省 container 与前端默认一致；
-    宿主域（MIA_CLI_WS=host）经 host_runner 落宿主 Git Bash，档位门照过不误。"""
+    宿主域（MIA_CLI_WS=host）经 host_runner 落宿主 Git Bash，档位门照过不误。
+    r40d 轮1（爸 15:30 令"给你自己注册个 ID"）：CLI 消息带〔celia〕署名头——
+    账面与爸的消息一眼区分（签名=信封不是改话，正文原样随其后）；
+    MIA_CLI_SIGN 置空可关。"""
     tid = get_thread(token)
     ws = (os.environ.get("MIA_CLI_WS") or "container").strip() or "container"
+    sign = os.environ.get("MIA_CLI_SIGN", "〔celia〕")
+    body = (sign + " " + msg) if sign else msg
     state = _req("/threads/" + tid + "/runs/wait", token,
                  data={"assistant_id": ASSISTANT,
-                       "input": {"messages": [{"role": "user", "content": msg}]},
+                       "input": {"messages": [{"role": "user", "content": body}]},
                        "config": {"configurable": {"workspace": ws}}},
                  timeout=600)
     reply = extract_reply(state)

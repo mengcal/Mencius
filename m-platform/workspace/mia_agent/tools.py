@@ -97,21 +97,25 @@ def list_external_posts() -> str:
 
 @_tool
 def list_all_tasks() -> str:
-    """查派活总账（最近 10 笔后台任务，新→旧）。r40d 轮2（米娅对账⑤）：官方
-    list_async_tasks 只看主对话本地账、远程部门任务不进它（名字骗人）——本工具补上
-    全局索引。账是索引不是真值：各任务实际态仍用 check_async_task 查。"""
+    """查平台线程全景（最近 10 个，新→旧）。r40d 三修（爸 15:30 令"别手搓扭曲官方原件"）：
+    旧版自建 async_ledger 账本=重复造轮子，改走**官方 /threads/search**（PG 真值、跨重启、
+    含部门线程 graph_id/状态/更新时间）。各任务产出仍用 check_async_task 查。"""
     try:
-        from settings_mgr import workspace_root as _wr
-        led = _wr() / "mia_home" / "runtime" / "async_ledger.jsonl"
-        if not led.exists():
-            return "派活总账为空（本进程启动以来未派后台任务）。本地主对话任务另用官方 list_async_tasks 查。"
-        rows = [__import__("json").loads(x) for x in led.read_text(encoding="utf-8").splitlines() if x.strip()]
-        out = [f"{r.get('ts', '')}  线程 {str(r.get('tid', ''))[:12]}…  {r.get('desc', '')[:70]}"
-               for r in rows[-10:][::-1]]
-        return (f"派活总账（最近 {len(out)} 笔，新→旧；实际态用 check_async_task 查）：\n"
+        import httpx
+        r = httpx.post("http://127.0.0.1:8000/threads/search",
+                       json={"limit": 10, "sort_by": "updated_at", "sort_order": "desc"}, timeout=10)
+        r.raise_for_status()
+        ths = r.json()
+        if not ths:
+            return "平台线程全景：空（无任何线程）。"
+        out = []
+        for th in ths:
+            ua = str(th.get("updated_at", ""))[:16].replace("T", " ")
+            out.append(f"{ua}  {str(th.get('thread_id', ''))[:12]}…  状态={th.get('status', '?')}")
+        return ("平台线程全景（官方 threads/search，新→旧；实际任务产出用 check_async_task 查）：\n"
                 + "\n".join(out))
     except Exception as e:
-        return f"派活总账读取失败：{e}"
+        return f"线程全景查询失败：{e}"
 
 
 @_tool
