@@ -102,7 +102,7 @@ def list_all_tasks() -> str:
     全局索引。账是索引不是真值：各任务实际态仍用 check_async_task 查。"""
     try:
         from settings_mgr import workspace_root as _wr
-        led = _wr() / "runtime" / "async_ledger.jsonl"
+        led = _wr() / "mia_home" / "runtime" / "async_ledger.jsonl"
         if not led.exists():
             return "派活总账为空（本进程启动以来未派后台任务）。本地主对话任务另用官方 list_async_tasks 查。"
         rows = [__import__("json").loads(x) for x in led.read_text(encoding="utf-8").splitlines() if x.strip()]

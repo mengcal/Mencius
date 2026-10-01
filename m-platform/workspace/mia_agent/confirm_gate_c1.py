@@ -803,7 +803,9 @@ def _watch_launch_for(request, main_tid: str) -> None:
             try:
                 import json as _j
                 from settings_mgr import workspace_root as _wr
-                led = _wr() / "runtime" / "async_ledger.jsonl"
+                # r40d 轮2复验（米娅实锤"重启清账"）：账本必须落持久挂载区（mia_home rw 卷），
+                # 容器 runtime/ 层重启即丢=总账不能跨重启审计。
+                led = _wr() / "mia_home" / "runtime" / "async_ledger.jsonl"
                 led.parent.mkdir(parents=True, exist_ok=True)
                 import time as _t
                 with open(led, "a", encoding="utf-8") as f:
