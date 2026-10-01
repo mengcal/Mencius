@@ -564,19 +564,25 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
 
     def wrap_tool_call(self, request, handler):
         """拒类出口（自包含）+预算精准拒：不赌 middleware 顺序，也不吞爸爸刚批的调用。
-        r40a：D2 计数/告知钩子已随压力降档整链退役，本钩回归纯通过器。"""
+        r40a：D2 计数/告知钩子已随压力降档整链退役，本钩回归纯通过器。
+        r40d（CB G10 断链定谳）：start_async_task 放行后接回 dept_watch 登记——
+        旧门退役时 _watch_launch 挂在旧 wrap 上一起死了，部门完工唤醒功能随之断链。"""
         blocked = self._check_budget_gate(request)
         if blocked is not None:
             return blocked
-        return handler(request)
+        result = handler(request)
+        _watch_launch_for(request, self._tid())
+        return result
 
     async def awrap_tool_call(self, request, handler):
         """异步版（langgraph 全异步必双钩——00:14 NotImplementedError 教训）。
-        r40a：与同步版同构回归纯通过器（口径绝不分叉）。"""
+        r40a：与同步版同构回归纯通过器（口径绝不分叉）。r40d：同接 dept_watch 登记。"""
         blocked = self._check_budget_gate(request)
         if blocked is not None:
             return blocked
-        return await handler(request)
+        result = await handler(request)
+        _watch_launch_for(request, self._tid())
+        return result
 
     def _make_desc(self, name: str):
         """卡面告警接线（hy4 P1-1）：>=3 张起在批准卡描述追加压力提示——
@@ -780,6 +786,19 @@ class SubGate(AgentMiddleware):
                     self._proxy._block_msg(name, lvl, dec, args),
             tool_call_id=tc.get("id", ""),
         )
+
+
+def _watch_launch_for(request, main_tid: str) -> None:
+    """r40d（CB G10 断链定谳修复）：旧门退役时 _watch_launch 挂在旧 wrap 上一起死——
+    本函数把 dept_watch 登记接回 C1 执行路径（start_async_task 放行成功=部门即将开张，
+    登记发起主线程，dept_watch 轮询部门 run 结束即唤醒）。异常吞掉不挡主链（同旧门口径）。"""
+    try:
+        tc = getattr(request, "tool_call", None) or {}
+        if str(tc.get("name")) == "start_async_task" and main_tid:
+            from mia_agent import dept_watch
+            dept_watch.register(main_tid, str((tc.get("args") or {}).get("description") or ""))
+    except Exception as _e:
+        print(f"[dept-watch] 登记钩子异常: {_e}", flush=True)
 
 
 def assert_gate_order(middlewares) -> None:
