@@ -24,7 +24,12 @@ BASE = Path(__file__).resolve().parent
 
 STOP_WORDS = ("差不多了", "理一理", "收个尾", "出包袱皮")
 # r39（Lyra 新炮2）：喊停词必须落在句尾——"这个想法差不多了，但还有个问题"不得误触发归纳
-_STOP_RE = re.compile("|".join(re.escape(w) + r"\s*[。！？!?.～~]*$" for w in STOP_WORDS))
+# r40d 轮5实测（西莉亚口语"出个包袱皮"不触发）：基础词×语气后缀结构化生成白名单
+# （手写枚举漏"了吧"叠加；正则插字花活也翻过车——生成式白名单=可控可测可穷举）。
+_BASE_STOPS = ("差不多", "理一理", "理一下", "收个尾", "收尾", "出包袱皮", "出个包袱皮")
+_STOP_SUFFIXES = ("", "吧", "了", "了吧")
+STOP_PATTERNS = tuple(b + sfx for b in _BASE_STOPS for sfx in _STOP_SUFFIXES)
+_STOP_RE = re.compile("|".join(re.escape(p) + r"\s*[。！？!?.～~]*$" for p in STOP_PATTERNS))
 
 PROMPT_A = (
     "你是围炉夜话的两个朋友之一（A 位）。爸爸在说他脑子里模糊的想法，你的本分：\n"
