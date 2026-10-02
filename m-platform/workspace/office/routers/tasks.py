@@ -140,7 +140,7 @@ async def tasks_dispatch(req: dict = Body(...), request: Request = None):
         return {"error": "需要 task"}
     # R80 续（NOVA/Eve/hy3 三方同指）：/tasks/dispatch 无门=同网容器可白嫖派活+main_thread 回注。
     # 双钥匙门（≤15 行）：Bearer 管理员密钥（浏览器/管理端）**或** X-Internal-Key=WEBHOOK_TOKEN
-    # （进程内 dispatch_to_xiaoquan 工具自带）二认一；都验不过 401。沙箱没钥匙也没 env=死路。
+    # （进程内 start_async_task 等派活链与 office 同源注入）二认一；都验不过 401。沙箱没钥匙也没 env=死路。
     import hmac as _h2
     from ..core import _presented_token
     # r34（CB 5.1 P1）：凭证呈现统一走 _presented_token（Bearer/x-token 头优先，

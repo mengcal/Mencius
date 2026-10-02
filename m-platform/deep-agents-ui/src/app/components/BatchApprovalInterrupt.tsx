@@ -37,10 +37,10 @@ interface BatchApprovalInterruptProps {
 
 // r37（CB 六门槛）：高危名单单源化——后端 /approvals/high-risk 下发
 // （_NEEDS_EXTERNAL ∪ MCP 工具真名；MCP 真名不带 mcp__ 前缀，旧 startsWith 判据是死代码已删）。
-// 拉取失败回退内置 13 项（与后端当前值一致），成功后以后端为准。
+// 拉取失败回退内置 12 项（与后端当前值一致），成功后以后端为准。
 const HIGH_RISK_FALLBACK = new Set([
   "execute", "delete", "email", "manage_departments", "start_async_task",
-  "dispatch_to_xiaoquan", "task", "update_async_task", "cancel_async_task",
+  "task", "update_async_task", "cancel_async_task",
   "write_file", "edit_file", "edit_memory", "lark_send",
 ]);
 let HIGH_RISK = new Set(HIGH_RISK_FALLBACK);
