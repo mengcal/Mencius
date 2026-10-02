@@ -189,7 +189,15 @@ async def external_claim(name: str, request: Request):
     if not _ap.external_claim(name, tid):
         _audit("external_claim", False, name=name, why="not-claimable", tid=tid)
         return {"ok": False, "error": "该单不可领（已被领/已完成/退单超限）"}
-    return {"ok": True, "claimed": tid}
+    # bug#2（10-02 米娅合流实捉）：claim 响应原本不带 nonce——米娅小弟领单拿不到码，
+    # 回传自然带不了 → callback nonce 校验必拒。平台侧补吐（nonce 仍是派活时那枚，账尾取回）。
+    _nonce = ""
+    try:
+        _ctx = _ap.external_task_ctx(name, tid)
+        _nonce = str(_ctx.get("nonce") or "")
+    except Exception:
+        pass
+    return {"ok": True, "claimed": tid, "nonce": _nonce}
 
 
 def _callback_source(request) -> tuple:
