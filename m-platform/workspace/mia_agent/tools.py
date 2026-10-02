@@ -13,6 +13,7 @@ mia_agent/ 包内，工作区根 = 包目录上一级 = mia_agent.graph.BASE（B
 被引用：mia_agent/graph.py（tools 列表，原 L1024-1025）、cow_graphs.py（经 agent_multimodel
 兼容桩取 search_knowledge_base）。
 """
+import re  # bug#1（10-02 心跳捉虫）：manage_departments 的 dept_N 分支用裸 re.match 但模块级从未 import——r40d 拆分时代潜伏，米娅走到该分支即 NameError
 import threading  # r40d：manage_departments 读-改-写互斥（4 并发 add_worker 只落 2 的真凶）
 from langchain_core.tools import tool as _tool  # 原 L175
 
