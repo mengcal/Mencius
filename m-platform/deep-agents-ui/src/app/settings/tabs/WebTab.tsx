@@ -35,11 +35,11 @@ export default function WebTab() {
         <div><label className="mb-1 block text-sm text-foreground">Searxng 搜索语言（例如：all, en, es, de, fr 等）</label>
           <input className={inputC} defaultValue={val('search.searxngLang', 'all')} onChange={(e) => set('search.searxngLang', e.target.value)} /></div>
       </Section>
-      {/* 09-17 深夜 schema 收口：公网引擎端点可配（留空=后端默认表；只许 https，非法值后端轻闸门回落） */}
+      {/* 09-17 深夜 schema 收口：公网引擎端点可配（留空=后端默认表；只许 https，非法值后端轻闸门回落）
+          10-02：秘塔端点行退役——端点直写后端字面量（Mimosa SSRF 字面量要求），密钥仍走下方搜索密钥区 */}
       <Section title="公网搜索引擎端点">
         {([['search.bochaUrl', '博查 Bocha', 'https://api.bochaai.com/v1/web-search'],
-           ['search.tavilyUrl', 'Tavily', 'https://api.tavily.com/search'],
-           ['search.metasoUrl', '秘塔 Metaso', 'https://metaso.cn/api/mcp']] as const).map(([k, label, dflt]) => (
+           ['search.tavilyUrl', 'Tavily', 'https://api.tavily.com/search']] as const).map(([k, label, dflt]) => (
           <div key={k}><label className="mb-1 block text-sm text-foreground">{label} 端点</label>
             <input className={inputC} defaultValue={val(k, '')} placeholder={'留空=默认 ' + dflt} onChange={(e) => set(k, e.target.value)} /></div>
         ))}

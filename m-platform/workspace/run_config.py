@@ -14,7 +14,7 @@ from langchain_core.messages import ToolMessage
 
 SEARCH_TOOLS = {
     "web_search", "web_search_metaso", "web_search_bocha",
-    "web_search_tavily",  # r35（Qoder P2-1 余党）：searxng/bing 工具名从未注册进任何图，死项随实现退役
+    "web_search_tavily", "web_read_metaso",  # 10-02 +reader；r35：searxng/bing 工具名从未注册进任何图，死项随实现退役
 }
 
 

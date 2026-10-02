@@ -33,7 +33,7 @@ SCHEMA = {
     "search.searxngUrl":           {"default": "http://searxng:8080/search", "type": "str", "ui": "联网搜索", "note": "容器内网地址（scheme 轻闸门）"},
     "search.bochaUrl":             {"default": "https://api.bochaai.com/v1/web-search", "type": "str", "ui": "联网搜索", "note": "公网引擎 https-only"},
     "search.tavilyUrl":            {"default": "https://api.tavily.com/search", "type": "str", "ui": "联网搜索", "note": "同上"},
-    "search.metasoUrl":            {"default": "https://metaso.cn/api/mcp", "type": "str", "ui": "联网搜索", "note": "同上"},
+    # 10-02：search.metasoUrl 键退役——秘塔端点直写字面量（Mimosa SSRF 字面量要求），官方端点唯一稳定
     # —— 图像 ——
     "images.sdUrl":                {"default": "http://host.docker.internal:7860", "type": "str", "ui": "图片", "note": "容器视角（09-17 修正语义）"},
     # —— 工作区分区（r36 09-27 爸令：容器与宿主机明确分开，如 ZCode 的工作区概念） ——

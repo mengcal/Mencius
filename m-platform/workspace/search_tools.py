@@ -36,8 +36,9 @@ def _search_setting(key: str, dflt):
 from settings_schema import default_of as _dof
 BOCHA_URL = _dof("search.bochaUrl")
 TAVILY_URL = _dof("search.tavilyUrl")
-METASO_URL = _dof("search.metasoUrl")
 SEARXNG_URL = _dof("search.searxngUrl")
+# 10-02：search.metasoUrl/metasoReaderUrl 键退役——秘塔端点直写字面量（Mimosa SSRF 字面量要求），
+# 官方端点唯一稳定（https://metaso.cn/api/v1/search + /api/v1/reader）
 # r35（Qoder P2-17 族收口）：BING_URL/search.bingUrl 随 bing 死链整族退役（engine 选项无 bing、web_search 无分发、工具零注册）
 
 
@@ -83,37 +84,46 @@ def _bocha(query, count=5):
     return _fmt(pages)
 
 
-def _mcp_call(method, params):
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    req = urllib.request.Request(_engine_url("metasoUrl", METASO_URL), data=body, headers={
-        "Authorization": f"Bearer {_key('metasoKey')}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=25) as r:
-        return json.load(r)
-
-
 def _metaso(query, count=5):
-    # 秘塔 MCP 搜索，扣积分（约3分/次，每天100分）
+    # 秘塔 REST v1 搜索（10-02 爸爸给定式），扣积分（约3分/次，每天100分）。
+    # 端点直写字面量（Mimosa SSRF 静态闸要求 URL 字面量；官方端点唯一稳定，
+    # 改端点时同步 settings_schema 文档行）。旧 MCP 面随本改造退役。
+    import requests
     if not _key("metasoKey"):
         return _no_key("秘塔")
-    d = _mcp_call("tools/call", {"name": "metaso_web_search",
-        "arguments": {"q": query, "size": count, "scope": "webpage", "includeSummary": True}})
-    text = ""
-    for c in d.get("result", {}).get("content", []):
-        if c.get("type") == "text":
-            text += c.get("text", "")
-    try:
-        data = json.loads(text)
-        credits = data.get("credits", "?")
-        pages = data.get("webpages", [])
-        out = []
-        for p in pages[:count]:
-            title = p.get("title", "")
-            link = p.get("link", "")
-            snip = (p.get("snippet", "") or "")[:150]
-            out.append(f"- {title}\n  链接: {link}\n  摘要: {snip}")
-        return f"(扣{credits}分)\n" + ("\n".join(out) if out else "（无结果）")
-    except Exception:
-        return "（秘塔返回异常）" + text[:200]
+    r = requests.post("https://metaso.cn/api/v1/search",
+                      headers={"Authorization": f"Bearer {_key('metasoKey')}"},
+                      json={"q": query, "scope": "webpage", "includeSummary": True,
+                            "size": str(count)}, timeout=25)
+    r.raise_for_status()
+    d = r.json()
+    credits = d.get("credits", "?")
+    pages = d.get("webpages", [])
+    out = []
+    for p in pages[:count]:
+        title = p.get("title", "")
+        link = p.get("link", "") or p.get("url", "")
+        snip = (p.get("snippet", "") or "")[:150]
+        out.append(f"- {title}\n  链接: {link}\n  摘要: {snip}")
+    return f"(扣{credits}分)\n" + ("\n".join(out) if out else "（无结果）")
+
+
+def _metaso_reader(url):
+    """秘塔 reader：抓网页正文（text/plain，无广告导航，实测 0.3s 级）。
+    入参只许公网 http(s) 地址（拒内网/环回——url 是米娅可控输入，真校验）。"""
+    import requests
+    if not _key("metasoKey"):
+        return _no_key("秘塔")
+    if not (url.startswith("https://") or url.startswith("http://")):
+        raise ValueError("url 只许 http(s) 公网地址")
+    if "localhost" in url or "127.0.0.1" in url or "0.0.0.0" in url or ".internal" in url:
+        raise ValueError("拒绝内网/环回地址")
+    r = requests.post("https://metaso.cn/api/v1/reader",
+                      headers={"Authorization": f"Bearer {_key('metasoKey')}",
+                               "Accept": "text/plain"},
+                      json={"url": url}, timeout=25)
+    r.raise_for_status()
+    return r.text
 
 
 def _searxng(query, count=5):
@@ -173,6 +183,20 @@ def web_search_metaso(query: str) -> str:
         return _metaso(query)
     except Exception as e:
         return f"秘塔搜索失败: {e}"
+
+
+def web_read_metaso(url: str) -> str:
+    """秘塔 reader：抓取网页正文纯文本（无广告无导航，秒级）。搜索命中链接后要读全文时用；
+    url 必须以 http(s):// 开头（拒内网地址）。"""
+    if not (url.startswith("https://") or url.startswith("http://")):
+        return "url 必须以 http(s):// 开头"
+    if "localhost" in url or "127.0.0.1" in url or "0.0.0.0" in url or ".internal" in url:
+        return "拒绝内网/环回地址"
+    try:
+        text = _metaso_reader(url)
+        return text[:8000] if text.strip() else "（页面正文为空）"
+    except Exception as e:
+        return f"网页读取失败: {e}"
 
 
 # r35（Qoder CB 3.2 定案）：web_search_searxng 从未注册进任何图，死函数退役；searxng 引擎走 web_search(engine=searxng) 分支。

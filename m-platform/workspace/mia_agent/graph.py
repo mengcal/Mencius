@@ -173,7 +173,7 @@ from mia_agent.tools import (_load_mcp_tools, edit_memory, email,  # 原 L171-21
                              sd_generate, n8n)  # r58 对外派活一期; 09-16 +SD 本机出图; r39i +n8n 编排桥; r40d +派活总账
 
 # ── 包外：搜索/中间件（原 L125-127）──
-from search_tools import web_search, web_search_bocha, web_search_tavily, web_search_metaso  # 原 L125
+from search_tools import web_search, web_search_bocha, web_search_tavily, web_search_metaso, web_read_metaso  # 原 L125; 10-02 +reader 网页正文抓取
 from scribe_hook import ScribeMiddleware  # 原 L126
 from run_config import RunConfigMiddleware  # 原 L127
 
@@ -329,7 +329,7 @@ agent = create_deep_agent(  # 原 L1011-1034
            lark_send,  # r41 飞书桥（外发批准门内）
            dispatch_external, list_external_posts, list_external_results,  # r58 对外派活一期
            sd_generate,  # 09-16 本机 SD 出图（零成本不外网，无需批准门）
-           *_mcp_tools, web_search, web_search_metaso, web_search_bocha, web_search_tavily],
+           *_mcp_tools, web_search, web_search_metaso, web_search_bocha, web_search_tavily, web_read_metaso],
     backend=SandboxedShellBackend(root_dir=str(BASE / _WS_ROOT)),
     state_schema=MiaState,
     middleware=_middleware,  # 09-15 夜：装配件提为具名变量交保险丝验身（内容与顺序逐字未动）

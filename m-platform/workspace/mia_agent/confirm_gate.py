@@ -23,6 +23,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
     # 也被当变更拦、且口头分支拦截不带 fp，链就僵在"请示看进度"上。
     _READONLY = {"ls", "read_file", "glob", "grep", "search_knowledge_base",
                  "web_search", "web_search_metaso", "web_search_bocha", "web_search_tavily",
+                 "web_read_metaso",
                  "check_async_task", "list_async_tasks"}
     # auto_edit 档额外放行的"墙内可逆写"（编辑记忆/写工作文件），执行/发信/编制/派活/删除不放。
     _SOFTWRITE = {"write_file", "edit_file", "edit_memory"}
