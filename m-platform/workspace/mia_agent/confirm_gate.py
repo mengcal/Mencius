@@ -223,7 +223,7 @@ class ConfirmGateMiddleware(AgentMiddleware):  # 原 L222-459
     # 两套门并存打架：按钮拒"缺指纹"、口头重试因 LLM 重生成参数必漂）。统一 fp+按钮+审计。
     # 子层（sub_mode 工人岗）不受影响：251 行直放行，物理墙（root_dir+沙箱）是它们的笼子。
     _NEEDS_EXTERNAL = {"execute", "delete", "email", "manage_departments",
-                       "start_async_task", "dispatch_to_xiaoquan", "task",
+                       "start_async_task", "task",
                        # r25（hy4 A1.4/A3.1 P2）：改/停运行中异步任务=扩大批准面，补进外部批准名单
                        "update_async_task", "cancel_async_task",
                        "write_file", "edit_file", "edit_memory",

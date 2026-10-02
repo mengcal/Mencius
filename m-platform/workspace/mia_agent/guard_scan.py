@@ -301,7 +301,7 @@ def scan_tool(tool: str, args: dict) -> dict:
     # 派活工具（start_async_task/dispatch_*）任务文本也扫——Cora P4 校正（10-01）：原注
     # "r61：Veda/NOVA 出站注入面"过时（r61 拒派调用点已撤净）；此通道现仅为 ask 档（strict/
     # plan）弹卡时的机器意见来源，full 档 pass 路不再扫派活文本（r39y2 同权令口径）。
-    elif tool in ("dispatch_to_xiaoquan", "dispatch_external", "start_async_task"):
+    elif tool in ("dispatch_external", "start_async_task"):
         blob = str(a.get("task") or a.get("description") or "")
         for rx, lvl, why in compiled:
             if rx.search(blob):

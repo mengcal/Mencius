@@ -3,12 +3,27 @@
 > 2026-09-15 全码盘点生成（general-purpose 八区逐文件过目 + 知夏抽验四条重疑点属实）。范围=D:\m\workspace 全仓+guard+pkg+前端。只读盘点，未改一码。
 > **用法**：换会话后的第一读物；每次大改后由 Celia 派单增量更新本文件。行数为盘点当日值。
 
+## r36–r37 大改账（09-27/28，爸令连发）
+
+| 批 | 内容 | 关键文件 |
+|---|---|---|
+| r36-G | **机器安全门连击冻结整链废除**（爸：还规定我工作多久）——guard_scan 单次 high 拒+落账保留，退避梯/永久锁/guard_unlock 全拔；r61h_gates 测试随对象退役 | confirm_gate_c1 / misc / test_c1_unit(32项含退役断言) |
+| r36j-r36k | **工作区分区上线**：对话头部"容器/宿主机"下拉，workspace 走 run configurable → sandbox._route 选域；档位管问不问、域管在哪干，两轴正交；host_runner=宿主域正身后端（档位后门已废） | sandbox / useChat / ChatInterface / misc |
+| r36l/m | 英文残留六处清+下拉配色（inputC [color-scheme:dark] 一处修全站） | ChatInterface / ThreadList / page |
+| r36n | **模型参数实数化**（爸令别写默认放数字）：温度 1.0/输出 131072 显式传=显示值即生效值；九行未接线假参数连根拔 | models / settings_schema / GeneralTab→ModelsTab |
+| r36o/p | 正名联动（用户可见面"知夏"→Celia 清零）+ mail_service 库层自洽 + verify_r61 六件退役 + **mia_home 6.9MB 源码副本连根拔** | 多文件 |
+| r36s/t | 每模型输出上限回归 **model_overrides 单源**（三层：代码显式>按模型>全局兜底 32768）；魔搭 qwen-flash 单独给满 131072（键名=网关别名 qwen-flash） | settings.json / providers |
+| r36u | 未知模型兜底拔除（爸：M 平台不存在未知模型）；ModelConfigRow 补上下文字段；牛马温度岗位级字段（米娅设爸看） | misc / ModelConfigRow / cow_graphs |
+| r36w/x | CB 六门槛修复：英文终清+配色根治+FUTURE_ROWS 退役+**对话 Ctrl+V 粘贴截图** | 多文件 / ChatInterface |
+| **r37** | **工作区贯通完成**：settings_mgr.workspace_root() 单源，34 处硬编码收编——containerRoot 改一处全站生效；**高危清单单源下发**（/approvals/high-risk，含 MCP 真名） | settings_mgr / 18 文件 / BatchApprovalInterrupt |
+
+
 ## 一、七条链速览（先读这个）
 
 | 链 | 核心件 | 一句话 |
 |---|---|---|
 | **闸门链** | `mia_agent/confirm_gate_c1.py`(现役主门,1070行) → `confirm_gate.py`(档位/名单单源) → `guard_scan.py`(机器安全门,37 条规则=high 22/mid 15，09-28 若若指出旧称~149格系我虚标、ast 实测纠偏) → `approvals.py`(爸爸批准登记处,指纹绑定消费即焚) → 前端 `BatchApprovalInterrupt.tsx`+`ToolCallBox.tsx` | 一切工具调用过 C1 四档门（plan/strict/auto_edit/full——r35 Qoder P2-37 纠正：supreme 是历史定调用语、非档位值，照旧文设档会被 fail-closed 回落 strict）；high 机器拒、ask 弹卡给爸爸、D2 连败自动降档（TTL 24h） |
-| **派单汇报链** | `tools.py`(dispatch_to_xiaoquan/dispatch_external) → `cow_graphs.py`(部门图工厂,SubGate 全拦) → `dept_watch.py`(完工/受阻轮询唤醒,15s扫描) → `office/routers/tasks.py`(TASKS账本+webhook) → `useTaskAnnouncer.ts`(前端播报) | 米娅只分派；部门 run 结束由 dept_watch 注入【部门自动汇报】唤醒主线程转呈；对外岗走 external.py pending/claim/callback 状态机 |
+| **派单汇报链** | `tools.py`(start_async_task/dispatch_external) → `cow_graphs.py`(部门图工厂,SubGate 全拦) → `dept_watch.py`(完工/受阻轮询唤醒,15s扫描) → `office/routers/tasks.py`(TASKS账本+webhook) → `useTaskAnnouncer.ts`(前端播报) | 米娅只分派；dispatch_to_xiaoquan 已退役（10-02 收口：函数/注册/门名单/文档全清）；部门 run 结束由 dept_watch 注入【部门自动汇报】唤醒主线程转呈；对外岗走 external.py pending/claim/callback 状态机 |
 | **模型档位链** | `model_tier.py`(派活定档,一期只标不切) → `models.py`/`providers.py`(make_model 工厂) → `run_config.py`(每轮换主脑/联网开关) → `vision.py`(识图三级优先) | 模型/服务商/密钥一律配置化（08-29 铁律），设置页唯一真源 |
 | **守卫审计链** | `guard/m_guard.py`(SYSTEM 进程,DPAPI,618行) → `internal_key.py`(进程身份钥匙) → `skills_lock.py`(技能哈希锁) → `auth.py`(原生 API 纵深) → `sandbox.py`↔`sandbox_runner.py`(执行面隔离对锁) | 密钥验证外置于米娅进程；三本账：token_audit / approvals_log / runner_audit |
 | **账本** | `approvals.py` / `token_admin.py` / `tasks.py` / `usage.jsonl` / `flow_obs.jsonl` | 一切经手必落账，`core._rotate_log` 三代滚动 |

@@ -513,7 +513,7 @@ class ConfirmGateC1(HumanInTheLoopMiddleware):
         # 与投 .ssh/ 同罪）；edit_memory 的 content 走写侧内容规则（无路径目标，
         # file_pattern ".*" 的通用规则照常命中——私钥字面量 high）。
         # r39y2 同权令补完（10-01 CB 复验 F 项实锤：与 approvals 侧撤派活扫描口径不一致，
-        # full 档派活文本仍在此被 guard_scan high 拦）——派活三手（dispatch_to_xiaoquan/
+        # full 档派活文本仍在此被 guard_scan high 拦）——派活三手（当时的 dispatch_to_xiaoquan[10-02 已退役]/
         # dispatch_external/start_async_task）移出名单：西莉亚派活/起子代理无扫描门，米娅不留。
         # 写面/命令面五件保留=西莉亚侧 Mimosa 同款扫描在场，同权名单内。
         # mcp__* 动态名本轮不扩（待政令）。

@@ -167,7 +167,7 @@ from mia_agent.flow_observer import observer as _flow_observer  # r41：流程�
 from mia_agent.store import MiaState, _STORE  # 原 L120-122/L165-168/L804-854
 from mia_agent.models import boss_model  # r34：_interrupt_on 空壳已拆
 from mia_agent.plan_check import PlanCheckMiddleware  # r45 层2 验收导航/clarify/同型连撞
-from mia_agent.tools import (_load_mcp_tools, dispatch_to_xiaoquan, edit_memory, email,  # 原 L171-210/L466-802
+from mia_agent.tools import (_load_mcp_tools, edit_memory, email,  # 原 L171-210/L466-802; 10-02 -dispatch_to_xiaoquan 退役收口
                              list_async_tasks, list_all_tasks, lark_send, manage_departments, search_knowledge_base,
                              dispatch_external, list_external_posts, list_external_results,
                              sd_generate, n8n)  # r58 对外派活一期; 09-16 +SD 本机出图; r39i +n8n 编排桥; r40d +派活总账
@@ -325,7 +325,7 @@ agent = create_deep_agent(  # 原 L1011-1034
     # R59：AsyncSubAgent 对象直接放进官方 subagents 参数（0.5.0 起同步/异步合并为单一参数，
     # deepagents 内部自动分流：同步→SubAgentMiddleware，异步→AsyncSubAgentMiddleware 五工具）
     subagents=_async_subagents,
-    tools=[dispatch_to_xiaoquan, list_async_tasks, list_all_tasks, search_knowledge_base, edit_memory, manage_departments, email, n8n,  # R72 +邮箱托管; r48 M2 真工具; r39i +n8n 编排桥; r40d +派活总账
+    tools=[list_async_tasks, list_all_tasks, search_knowledge_base, edit_memory, manage_departments, email, n8n,  # R72 +邮箱托管; r48 M2 真工具; r39i +n8n 编排桥; r40d +派活总账; 10-02 -dispatch_to_xiaoquan 退役收口
            lark_send,  # r41 飞书桥（外发批准门内）
            dispatch_external, list_external_posts, list_external_results,  # r58 对外派活一期
            sd_generate,  # 09-16 本机 SD 出图（零成本不外网，无需批准门）

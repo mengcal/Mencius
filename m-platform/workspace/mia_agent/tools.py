@@ -99,13 +99,13 @@ def list_external_posts() -> str:
 def list_all_tasks() -> str:
     """查平台线程全景（最近 10 个，新→旧）。r40d 三修（爸 15:30 令"别手搓扭曲官方原件"）：
     旧版自建 async_ledger 账本=重复造轮子，改走**官方 /threads/search**（PG 真值、跨重启、
-    含部门线程 graph_id/状态/更新时间）。各任务产出仍用 check_async_task 查。"""
+    含部门线程 graph_id/状态/更新时间）。各任务产出仍用 check_async_task 查。
+    10-02 体检修正：裸 httpx 手搓 URL 回潮（无配置口），改走 dept_watch 同款官方 SDK 客户端。"""
     try:
-        import httpx
-        r = httpx.post("http://127.0.0.1:8000/threads/search",
-                       json={"limit": 10, "sort_by": "updated_at", "sort_order": "desc"}, timeout=10)
-        r.raise_for_status()
-        ths = r.json()
+        import os as _os
+        from langgraph_sdk import get_sync_client
+        client = get_sync_client(url=_os.environ.get("MIA_SELF_SDK_URL", "http://127.0.0.1:8000"))
+        ths = client.threads.search(limit=10, sort_by="updated_at", sort_order="desc")
         if not ths:
             return "平台线程全景：空（无任何线程）。"
         out = []
@@ -136,45 +136,6 @@ def list_external_results(limit: int = 5) -> str:
         out.append(f"【{rec.get('tool') or '未知岗'} @ {ts_s} 单号 {rec.get('tid') or '（无号）'}】"
                    + __import__("json").dumps(rec.get("result"), ensure_ascii=False)[:600])
     return "\n".join(out)
-
-
-@_tool
-def dispatch_to_xiaoquan(task: str) -> str:  # 原 L179-209
-    """把需要动手执行的任务派给后台小全车间异步执行（搜索调研/写代码/文件表格/识图/整理/跑脚本）。
-    派完立即返回，不阻塞当前对话；任务完成后小全会自动回到本对话汇报成果。
-    task 必须自包含（后台线程看不到当前聊天记录），要写清目标、验收标准和涉及文件。
-    任务原文直发，平台不做任何改写（r40c 同权：下游看到的就是她写的）。"""
-    # r40c（10-01 爸爸令）：r52 的静默【档位】前缀注入拆除——改写她的话=欺骗面；
-    # model_tier.classify_task 保留（只标不切），如需档位参考由总管侧主动查询。
-    try:
-        from langgraph.config import get_config
-        cfg = get_config() or {}
-        conf = cfg.get("configurable") or {}
-        main_thread = conf.get("thread_id", "")
-        if conf.get("xiaoquan_background"):
-            return "你已在后台线程里。直接动手完成手头任务并给出结果，不要再派活（会无限套娃）。"
-    except Exception:
-        main_thread = ""
-    import json as _json
-    import os as _os
-    import urllib.request as _ureq
-    body = _json.dumps({"task": task, "main_thread": main_thread}).encode()
-    # R80 续：dispatch 双钥匙门——进程内工具带 X-Internal-Key（WEBHOOK_TOKEN env，与 office 同源），
-    # 沙箱/外部没这把 env=401（浏览器走 Bearer 管理员密钥）
-    # 09-17 硬编码收口批②：地址走 env（对齐 dept_watch MIA_SELF_SDK_URL 先例），默认=宿主回环 127.0.0.1:8000（r35 Qoder P3-23：注释与实码对齐，旧注释误写"容器内服务名"）
-    req = _ureq.Request(_os.environ.get("MIA_SELF_SDK_URL", "http://127.0.0.1:8000").rstrip("/") + "/tasks/dispatch",  # r34（CB 4.1）：workplatform:8000 是 R80 断网名，统一回环默认
-                        data=body,
-                        headers={"Content-Type": "application/json",
-                                 "X-Internal-Key": _os.environ.get("WEBHOOK_TOKEN", "")})
-    try:
-        with _ureq.urlopen(req, timeout=15) as r:
-            out = _json.load(r)
-    except Exception as e:
-        return f"派发失败：{e}"
-    if out.get("ok"):
-        return (f"已派给小全车间（单号 {out.get('id')}，队列 {out.get('queue','')}），"
-                f"后台执行中，完成后自动回来汇报。现在可以继续陪爸爸聊天。")
-    return f"派发失败：{out.get('error')}"
 
 
 @_tool
