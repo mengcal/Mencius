@@ -15,10 +15,8 @@ services:
     environment:
       # R10.5c（爸爸抓的时区 bug）：容器默认 UTC，审计/账本时间戳比北京慢 8 小时——统一本地时区
       - TZ=Asia/Shanghai
-      # R10.6 守卫外置：管理员钥匙真源=m-guard（宿主 SYSTEM/用户 DPAPI，只答验证不外发明文）
-      - M_GUARD_URL=http://host.docker.internal:9101
-      # R10.8 (NOVA Red A/Eve P1-1): communication key — all containers can reach 9101 via host.docker.internal, sandbox squeezing chain cut off with the key
-      - M_GUARD_KEY=${M_GUARD_KEY}
+      # 10-03 守卫（m-guard）退役（爸爸裁决：本地软件登录页只是习惯无安全价值，OWUI/ZCode/DSH 均无此物）
+      # ——M_GUARD_URL/M_GUARD_KEY env 撤：settings_mgr 走"本地裸跑兼容"旧文件逻辑（.settings_secrets）
       - DATABASE_URI=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/m
       - REDIS_URI=redis://redis:6379
       # 密钥一律从同目录 .env 读取（compose 自动加载），文件里不再写死任何密钥

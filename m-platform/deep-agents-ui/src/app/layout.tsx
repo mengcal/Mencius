@@ -22,9 +22,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <NuqsAdapter>
-          {/* R10.8e（爸爸："401 死锁，找回入口在进不去的设置页里"）：
-              全局登录闸门——所有页面（含 /settings）401 时弹登录层，凭证有效才放行 */}
-          <AuthGate>{children}</AuthGate>
+          {/* 10-03 登录页退役（爸爸裁决：本地软件登录页只是习惯无安全价值，OWUI/ZCode/DSH 均无此物）：
+              AuthGate 全局闸门拆除——打开即用。AuthPage.tsx 文件暂留（authLogout 仍被引用），下次清理。 */}
+          {children}
         </NuqsAdapter>
         <Toaster />
       </body>
