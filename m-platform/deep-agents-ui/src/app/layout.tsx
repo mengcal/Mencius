@@ -22,9 +22,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <NuqsAdapter>
-          {/* 10-03 登录页退役（爸爸裁决：本地软件登录页只是习惯无安全价值，OWUI/ZCode/DSH 均无此物）：
-              AuthGate 全局闸门拆除——打开即用。AuthPage.tsx 文件暂留（authLogout 仍被引用），下次清理。 */}
-          {children}
+          {/* 10-03 爸爸终审澄清：登录页保留（习惯性功能）；退役的是守卫服务——
+              /auth/login 已本地化（密码 hash 存 .settings_secrets，不再依赖 m-guard） */}
+          <AuthGate>{children}</AuthGate>
         </NuqsAdapter>
         <Toaster />
       </body>

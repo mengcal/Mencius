@@ -268,10 +268,36 @@ async def auth_set_password(req: dict = Body(...), request: Request = None):
 
 @router.post("/auth/login")
 async def auth_login(req: dict = Body(...), request: Request = None):
-    """密码找回登录：验证通过即种 Cookie 并返回密钥（仅此一次显示）。"""
+    """密码找回登录：验证通过即种 Cookie 并返回密钥（仅此一次显示）。
+    10-03 守卫退役后本地化：密码 hash 存 .settings_secrets 的 general.password_hash
+    （sha256("mencia-salt:"+密码)），token=general.apiToken——不再依赖 m-guard。"""
     guard = M_GUARD_URL
     if not guard:
-        return _JSONResp({"ok": False, "error": "服务暂时不可用，请稍后再试"}, status_code=503)  # r32 F9：黑话原文"本地裸跑模式不支持（未配置守卫）"不进浏览器
+        # 10-03 本地验证分支（守卫退役后主路径）
+        if not _boot_rate_ok("login"):
+            _token_audit("login_rate_limited", False, ip=(request.client.host if request and request.client else "?"))
+            return _JSONResp({"error": "尝试过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
+        from settings_mgr import load_settings as _ls, get_plain_key as _gpk
+        from settings_schema import default_of as _dof
+        import hashlib as _hl, hmac as _hm
+        _want_name = str((_ls().get("general", {}) or {}).get("admin_name") or _dof("general.admin_name")).strip()
+        _want_hash = _gpk("general.password_hash").strip()
+        _got_name = str(req.get("username") or "").strip()
+        _got_pw = str(req.get("password") or "")
+        _name_ok = _got_name == _want_name
+        _pw_ok = bool(_want_hash) and _hm.compare_digest(
+            _want_hash, _hl.sha256(("mencia-salt:" + _got_pw).encode()).hexdigest())
+        if not (_name_ok and _pw_ok):
+            _token_audit("login_local_fail", False, ip=(request.client.host if request and request.client else "?"))
+            return _JSONResp({"ok": False, "error": "登录名或密码不正确"}, status_code=200)
+        _token = _gpk("general.apiToken").strip()
+        if not _token:
+            return _JSONResp({"ok": False, "error": "服务暂时不可用，请稍后再试"}, status_code=503)
+        _token_audit("login_local", True, ip=(request.client.host if request and request.client else "?"))
+        resp = _JSONResp({"ok": True, "note": "登录成功（Cookie 已种入）"})
+        resp.set_cookie("m_admin_token", _token, httponly=True, samesite="strict",
+                        max_age=30 * 24 * 3600, path="/")
+        return resp
     if not _boot_rate_ok("login"):
         _token_audit("login_rate_limited", False, ip=(request.client.host if request and request.client else "?"))  # r32c #17a
         return _JSONResp({"error": "尝试过于频繁（60 秒内最多 10 次），稍后再试"}, status_code=429)
