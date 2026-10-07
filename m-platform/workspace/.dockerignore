@@ -1,0 +1,10 @@
+# 构建上下文排除（2026-10-06 升级批创建）
+# dot-openclaw = OpenClaw 邮件活目录 junction（指向 C 盘真身，禁删）——build 上下文处理不了它，报 invalid file request
+mia_home/mail-bridge/dot-openclaw
+# 大目录（容器用不到，677MB 上下文传输提速）
+node_modules
+**/node_modules
+.venv
+venv
+**/__pycache__
+.git

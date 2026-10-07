@@ -42,3 +42,11 @@ Thumbs.db
 # ---- 评审随附信件（发包用，永不入库）----
 00-*.txt
 01-预检*.md
+
+# ---- 10-07 同步审计补码（运行时配置与本地杂物，公开仓不收）----
+# settings.json 虽为打码值，但属运行时配置含供应商结构，公开仓只收代码不收配置
+settings.json
+settings.json.*
+skills_manifest.json
+.qoder-credits/
+本机Ollama

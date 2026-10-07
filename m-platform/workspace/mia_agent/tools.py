@@ -639,8 +639,43 @@ def _load_mcp_tools():  # 原 L706-727
         tools = _asyncio.run(client.get_tools())
         print(f"[mcp] MCP 工具加载成功：{len(tools)} 个", flush=True)
     except Exception as e:
-        print(f"[mcp] MCP 工具加载失败（忽略）：{e}", flush=True)
+        # bug#2（10-02 实案）：TaskGroup 多子异常时 str(e) 只有"unhandled errors in a TaskGroup"，
+        # 真因（哪个 server/哪层握手）全在 sub-exception 里——必须打完整 traceback 才有账可查
+        import traceback as _tb
+        print(f"[mcp] MCP 工具加载失败（忽略，不挡启动）：{type(e).__name__}: {e}", flush=True)
+        print(_tb.format_exc(), flush=True)
     return tools
+
+
+@_tool
+def yuanqi_web_search(query: str) -> str:
+    """联网搜索（腾讯元器"搜索先锋"，R10.591）。查询互联网实时信息，返回带来源链接的结构化结果。
+    适用：新闻/政策/价格/天气等需要实时网络信息的查询。每次消耗约450 token（全家共享每月100万额度）。"""
+    import os as _os
+    import httpx as _httpx
+    key = _os.environ.get("YUANQI_API_KEY", "")
+    aid = _os.environ.get("YUANQI_APP_ID", "")
+    if not key or not aid:
+        return "元器搜索未配置（缺 YUANQI_API_KEY/YUANQI_APP_ID 环境变量，凭据见 D:\\glm\\secrets\\yuanqi-search-pioneer.txt）"
+    try:
+        r = _httpx.post(
+            "https://yuanqi.tencent.com/openapi/v1/agent/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "X-Source": "openapi"},
+            json={"assistant_id": aid, "user_id": "mia-agent", "stream": False,
+                  "messages": [{"role": "user", "content": [{"type": "text", "text": "搜索：" + query}]}]},
+            timeout=60)
+        r.raise_for_status()
+        d = r.json()
+        choice = (d.get("choices") or [{}])[0]
+        content = (choice.get("message") or {}).get("content", "")
+        if choice.get("finish_reason") not in ("stop", None):
+            # 对账轮3处置#1（米娅 L5750 案）：content_filter 静默失败曾被当成"没结果"——
+            # 失败必须一眼可判+给换源动作，不许只吐一句 finish_reason 让使用者误判"今天没新闻"
+            return (f"元器搜索失败（finish_reason={choice.get('finish_reason')}）：本次未返回任何结果，"
+                    f"不要凭记忆补结论，请改用 web_search_metaso / web_search 重查。")
+        return content or "未检索到相关结果（元器索引对当天时效内容可能滞后，结论请用 web_search_metaso 交叉核验）"
+    except Exception as e:
+        return f"搜索失败：{type(e).__name__}: {e}"
 
 
 @_tool

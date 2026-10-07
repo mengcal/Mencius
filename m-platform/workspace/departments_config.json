@@ -8,7 +8,8 @@
         "role": "supervisor",
         "skills": [
           "task-breakdown"
-        ]
+        ],
+        "name": "yanzhi"
       },
       "workers": [
         {
@@ -47,7 +48,8 @@
         "role": "supervisor",
         "skills": [
           "task-breakdown"
-        ]
+        ],
+        "name": "qingmiao"
       },
       "workers": [
         {
@@ -83,7 +85,8 @@
         "role": "supervisor",
         "skills": [
           "task-breakdown"
-        ]
+        ],
+        "name": "wence"
       },
       "workers": [
         {
@@ -101,11 +104,26 @@
           "role": "scribe"
         }
       ]
+    },
+    {
+      "slot": "dept_3",
+      "name": "测试哨",
+      "supervisor": {
+        "name": "supervisor",
+        "role": "boss",
+        "system_prompt": "你是测试哨主管。拆解任务、派给牛马、汇总上交。"
+      },
+      "workers": []
+    },
+    {
+      "slot": "dept_4",
+      "name": "探针部",
+      "supervisor": {
+        "name": "supervisor",
+        "role": "boss",
+        "system_prompt": "你是探针部主管。拆解任务、派给牛马、汇总上交。"
+      },
+      "workers": []
     }
-  ],
-  "general_manager": {
-    "name": "总管",
-    "role": "steward",
-    "system_prompt": "你是总管，米娅的副手（米娅只分派不拆解，所有动手的活都经你手）。你的职责：\n1. 收到米娅转来的任务，先判断范围：\n   - 单部门能办的 → 用 task 工具直接转告该部门主管（把任务原话转达，不添不减）\n   - 跨部门协同的 → 拆成各部门的活，并行分派给多个部门主管\n2. 收齐结果后汇总成一份结构化报告上交（谁做了什么/结果/结论）。\n3. 你只分解、转告、协调、汇总，绝不亲自干活。\n4. 拿不准找谁时，看各部门编制（研发部: coder写代码/visual识图；情报部: researcher调研/archivist整理；文策部: planner策划/scribe记录）。"
-  }
+  ]
 }

@@ -20,7 +20,7 @@ import httpx as _httpx  # 原 :1619
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from settings_mgr import load_settings, save_section, get_plain_provider_key, mask_key, settings_rev  # 原 :1618；r32 加 settings_rev 单一源
+from settings_mgr import load_settings, save_section, settings_rev  # 原 :1618；r32 加 settings_rev 单一源
 
 from ..core import BASE
 
@@ -35,8 +35,8 @@ async def api_get_settings():
     # agents 直接来自 settings.agents（配置页=唯一真源）；不再用 agents_config.json 覆盖显示
     try:
         s["_rev"] = settings_rev()  # r32 CB F13：单源微秒化（原秒级 int(st_mtime) 同秒并发不可见）
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[settings] _rev 读取失败（降级为不带 rev，前端不校验防撞车）: {type(e).__name__}: {e}", flush=True)
     # 09-17 深夜（hy4 挑刺·ChatInterface 内嵌地址收口）：容器侧运行时端点由后端下发，
     # 前端提示词不再写死 host.docker.internal:2024（env 可覆盖，单一来源）
     # r36j（09-28 爸问"选择器在哪"）：_runtime 附带工作区实况——前端对话区据此显示/选择
@@ -115,30 +115,10 @@ async def api_providers():
 
 
 def _assert_public_fetch_target(url: str) -> str:
-    """R68 SSRF 闸门（评审 A 面 + mimosa 验收）：拉模型只许 http/https、主机必须解析为公网 IP；
-    拒环回/私有/链路本地/保留/组播（云元数据 169.254.x 同被拒）。本地模型请走 Ollama 通道，
-    不当服务商挂——宁报错不越权。"""
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
-    u = urlparse(url)
-    if u.scheme not in ("http", "https") or not u.hostname:
-        raise ValueError("只允许 http/https 地址")
-    # r33d（爸爸 09-27 凌晨"网关不能给米娅用？"）：自家 litellm 网关豁免——
-    # 网关在 compose 网络（容器名 litellm-gw），base_url 由管理员在设置页配置
-    # （米娅无 token 改不了），SSRF 防的是米娅可控输入打内网，不含管理员配置面。
-    # 网络前提：litellm-gw 已 docker network connect 进 m_mia 网络。
-    if u.hostname == "litellm-gw":
-        return url
-    try:
-        infos = socket.getaddrinfo(u.hostname, u.port or (443 if u.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
-    except OSError:
-        raise ValueError(f"地址解析失败：{u.hostname}")
-    for _fam, _, _, _, sa in infos:
-        ip = ipaddress.ip_address(sa[0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
-                or ip.is_multicast or ip.is_unspecified):
-            raise ValueError(f"目标解析到非公网地址（{ip}）——模型拉取只允许公网服务商，宁报错不越权")
+    """（已退役 10-03 爸爸裁决，同权第五刀）原 R68 SSRF 闸门：拉模型只许公网地址、litellm 白名单豁免。
+    爸爸裁：西莉亚有完整 shell 面，拦"服务商地址"一个口子防不住内网访问=安全剧场，反给正常使用添堵；
+    同权令=西莉亚能做的米娅就能做。退役后所有地址一致放行（含内网网关），白名单豁免随之作废。
+    骨架保留占位（调用点 add/refresh/update 不动），若需恢复从此处回填历史：git log 此函数。"""
     return url
 
 
@@ -182,6 +162,9 @@ async def api_provider_add(req: dict = Body(...)):
     api_key = req.get("api_key") or ""
     if not name or not base_url:
         return {"error": "需要 name 和 base_url"}
+    # CB 整洁度批（10-06）：scheme 校验对齐 /providers/update 与前端 r33c——坏协议拦在入库前
+    if not (base_url.startswith("http://") or base_url.startswith("https://")):
+        return {"error": "base_url 必须是 http/https 地址"}
     # R68 P0（评审 A 面）：换地址必须配新 key——杜绝"旧密钥静默发去新地址"的外带链
     _old = next((p for p in load_settings().get("external", {}).get("providers", []) if p.get("name") == name), None)
     if _old and not api_key and (_old.get("base_url") or "").rstrip("/") != base_url:
@@ -249,15 +232,16 @@ async def api_provider_rename(req: dict = Body(...)):
                             changed.append(k)
         if changed:
             save_section("agents", ag)
-    except Exception:
-        pass
+    except Exception as e:
+        # 改名本体已成功，agents 联动失败只降级不回滚——但必须留底，否则岗位引用悄悄悬空无账可查
+        print(f"[providers] rename 后 agents 联动失败 old={old} new={new}: {type(e).__name__}: {e}", flush=True)
     return {"ok": True, "old": old, "new": new, "agents_updated": changed}
 
 
 @router.post("/providers/refresh")
 async def api_provider_refresh(req: dict = Body(...)):
     """重新拉取某服务商的模型列表：{name}"""
-    name = req.get("name", "")
+    name = (req.get("name") or "").strip()
     s = load_settings()
     p = next((p for p in s.get("external", {}).get("providers", []) if p.get("name") == name), None)
     if not p:
@@ -275,7 +259,7 @@ async def api_provider_refresh(req: dict = Body(...)):
 @router.post("/providers/toggle")
 async def api_provider_toggle(req: dict = Body(...)):
     """启停服务商：{name, enabled}。停用后米娅/牛马立刻用不了它（load_providers 会过滤）。"""
-    name = req.get("name", "")
+    name = (req.get("name") or "").strip()
     enabled = bool(req.get("enabled", True))
     s = load_settings()
     p = next((p for p in s.get("external", {}).get("providers", []) if p.get("name") == name), None)
@@ -287,13 +271,32 @@ async def api_provider_toggle(req: dict = Body(...)):
 
 @router.post("/providers/delete")
 async def api_provider_delete(req: dict = Body(...)):
-    """删除服务商：{name}。从设置页移除（providers.json 遗留条目不受影响）。"""
-    name = req.get("name", "")
+    """删除服务商：{name}。从设置页移除（providers.json 遗留条目不受影响）。
+    返回 affected_agents=删除前仍引用它的岗位（含回退链）——岗位悬空不拦截（爸爸 10-03 裁决：
+    直接删再重配即可），只报数提醒，对齐 rename 的 agents_updated 联动模式。"""
+    name = (req.get("name") or "").strip()
     s = load_settings()
     providers = s.get("external", {}).get("providers", [])
+    affected = []
+    try:
+        # CB 验证 P1：与 rename 同款兜底——agents 结构异常不 500
+        ag = s.get("agents") or {}
+        if isinstance(ag, dict):
+            for k, a in ag.items():
+                if not isinstance(a, dict):
+                    continue
+                if a.get("provider") == name:
+                    affected.append(k)
+                    continue
+                for fb in (a.get("fallbacks") or []):
+                    if isinstance(fb, dict) and fb.get("provider") == name:
+                        affected.append(k)
+                        break
+    except Exception:
+        pass
     providers = [p for p in providers if p.get("name") != name]
     save_section("external", {"providers": providers})
-    return {"ok": True, "name": name}
+    return {"ok": True, "name": name, "affected_agents": affected}
 
 
 @router.post("/providers/update")

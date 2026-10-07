@@ -17,9 +17,15 @@ RUN set -ex && \
                 'name = "workspace"' \
                 'version = "0.1"' \
                 'dependencies = [' \
-                '  "deepagents==0.7.19",' \
+                '  "deepagents==0.7.22",' \
                 '  "langgraph-sdk==0.4.4",' \
+                '  "langchain==1.4.3",' \
+                '  "langchain-core==1.6.6",' \
+                '  "langgraph==1.2.13",' \
                 '  "langchain-openai",' \
+                '  "opentelemetry-api==1.42.1",' \
+                '  "opentelemetry-sdk==1.42.1",' \
+                '  "opentelemetry-exporter-otlp-proto-http==1.42.1",' \
                 '  "langgraph-checkpoint-postgres",' \
                 '  "httpx",' \
                 '  "fastapi",' \
