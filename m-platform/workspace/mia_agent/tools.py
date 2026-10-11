@@ -779,32 +779,77 @@ def lark_send(text: str, to: str = "") -> str:
 
 
 # ── 09-16 本机 SD WebUI 接入（爸爸点名：米娅工具清单漏了这项）──────────────────
+def _comfyui_txt2img(base: str, payload: dict) -> bytes | None:
+    """ComfyUI 后端（10-11，R5-M-01 后续）：官方 prompt-API。
+    流程=取可用 checkpoint（object_info 动态列表，不烤模型名）→建最小 txt2img 图→
+    /prompt 提交→轮询 /history→/view 取图。同步阻塞，最长约 5 分钟。"""
+    import httpx as _httpx
+    import time as _time
+    import random as _random
+    base = base.rstrip("/")
+    info = _httpx.get(base + "/object_info/CheckpointLoaderSimple", timeout=15).json()
+    ckpts = info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
+    if not ckpts:
+        raise RuntimeError("ComfyUI 里没有任何 checkpoint 模型")
+    ckpt = ckpts[0]
+    seed = payload["seed"] if payload["seed"] >= 0 else _random.randint(0, 2**31 - 1)
+    wf = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": payload["prompt"], "clip": ["1", 1]}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": payload["negative_prompt"], "clip": ["1", 1]}},
+        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": payload["width"], "height": payload["height"], "batch_size": 1}},
+        "5": {"class_type": "KSampler", "inputs": {"seed": seed, "steps": payload["steps"], "cfg": 7.0,
+                                                   "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0,
+                                                   "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0]}},
+        "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+        "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "mia"}},
+    }
+    r = _httpx.post(base + "/prompt", json={"prompt": wf, "client_id": "mia-" + str(_random.randint(100000, 999999))}, timeout=30)
+    if r.status_code != 200:
+        raise RuntimeError(f"ComfyUI /prompt HTTP {r.status_code}: {r.text[:120]}")
+    pid = r.json()["prompt_id"]
+    for _ in range(100):
+        _time.sleep(3)
+        h = _httpx.get(base + f"/history/{pid}", timeout=15).json()
+        if pid in h:
+            for node in (h[pid].get("outputs") or {}).values():
+                for im in node.get("images", []):
+                    if im.get("type") == "output":
+                        v = _httpx.get(base + "/view", params={"filename": im["filename"],
+                                                               "subfolder": im.get("subfolder", ""),
+                                                               "type": "output"}, timeout=60)
+                        return v.content
+    raise RuntimeError("ComfyUI 5 分钟没出图（history 无输出）")
+
+
 @_tool
 def sd_generate(prompt: str, negative_prompt: str = "", steps: int = 18,
                 width: int = 512, height: int = 512, seed: int = -1) -> str:
-    """用爸爸电脑上的 Stable Diffusion 生成一张图（本机服务，零成本，不外网）。
+    """用爸爸电脑上的本机生图服务生成一张图（零成本，不外网）。
+    后端两选一（配置页 图像 项 images.backend）：comfyui（默认，GPU 容器，按需启动）/ sdwebui。
     图片存到 mia_home/sd_out/ 目录（平台数据区内，配置页可见路径）。
-    若返回"SD 服务没在跑"：请爸爸先启动本机 SD WebUI 再重试。
+    若返回"服务没在跑"：comfyui 后端请喊 cecia 拉起容器；sdwebui 后端请爸爸先启动 SD WebUI。
     steps 12-28 合适；宽高以 512 为基数（768/1024 更慢）；
     seed=-1 随机，填数字可复现同一张图。"""
     import base64 as _b64
     import httpx as _httpx
     import time as _time
     from pathlib import Path as _P
-    # 09-17 批②：SD 地址改读配置页 images.sdUrl（该项早已存在，此前是工具没读它）；
-    # 未配置回退 env，再回退默认本机——主机仍固定，无 SSRF 面。
+    # 09-17 批②：地址读配置页 → env → schema 默认（r35：默认值三家里只留 schema）
+    # 10-11：加 images.backend 开关（comfyui 默认）+ images.comfyuiUrl（R5-M-01 后续）
     import os as _os
     try:
         from settings_mgr import load_settings
-        # r35（Qoder P2-15）：默认值三家里只留 schema（settings_schema.py images.sdUrl）——
-        # 配置页值 → env MIA_SD_URL → schema 默认，同一函数不再写两遍字面量
         from settings_schema import default_of as _dof
-        _sd_base = ((load_settings().get("images", {}) or {}).get("sdUrl", "")
-                    or _os.environ.get("MIA_SD_URL", "") or _dof("images.sdUrl"))
+        _img = (load_settings().get("images", {}) or {})
+        _backend = (_img.get("backend", "") or _os.environ.get("MIA_IMAGE_BACKEND", "") or _dof("images.backend")).lower()
+        _sd_base = (_img.get("sdUrl", "") or _os.environ.get("MIA_SD_URL", "") or _dof("images.sdUrl"))
+        _cf_base = (_img.get("comfyuiUrl", "") or _os.environ.get("MIA_COMFYUI_URL", "") or _dof("images.comfyuiUrl"))
     except Exception:
         from settings_schema import default_of as _dof
+        _backend = (_os.environ.get("MIA_IMAGE_BACKEND", "") or _dof("images.backend")).lower()
         _sd_base = _os.environ.get("MIA_SD_URL", "") or _dof("images.sdUrl")
-    url = _sd_base.rstrip("/") + "/sdapi/v1/txt2img"
+        _cf_base = _os.environ.get("MIA_COMFYUI_URL", "") or _dof("images.comfyuiUrl")
     payload = {"prompt": prompt[:2000],
                "negative_prompt": (negative_prompt or "lowres, bad anatomy, watermark")[:1000],
                "steps": max(4, min(60, int(steps))),
@@ -812,17 +857,29 @@ def sd_generate(prompt: str, negative_prompt: str = "", steps: int = 18,
                "height": max(64, min(1024, int(height) // 64 * 64)),
                "seed": int(seed)}
     try:
-        r = _httpx.post(url, json=payload, timeout=300)
+        if _backend == "comfyui":
+            png = _comfyui_txt2img(_cf_base, payload)
+            out_dir = __import__("settings_mgr").workspace_root() / "sd_out"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            fp = out_dir / (_time.strftime("%Y%m%d-%H%M%S") + f"_comfy_seed{payload['seed']}.png")
+            fp.write_bytes(png)
+            return (f"图已生成（ComfyUI 后端）：mia_home/sd_out/{fp.name}（设置页→文档/图片区可见）\n"
+                    f"提示词: {payload['prompt'][:80]} | {payload['width']}x{payload['height']} steps{payload['steps']}")
+        url = _sd_base.rstrip("/") + "/sdapi/v1/txt2img"
+        try:
+            r = _httpx.post(url, json=payload, timeout=300)
+        except Exception as e:
+            return f"SD 服务没在跑或连不上：{str(e)[:120]}\n请爸爸先启动本机的 SD WebUI 服务再重试（地址可在配置页 图像 项改）。"
+        if r.status_code != 200:
+            return f"SD API 出错 HTTP {r.status_code}：{r.text[:150]}"
+        imgs = (r.json() or {}).get("images") or []
+        if not imgs:
+            return "SD 没返回图片"
+        out_dir = __import__("settings_mgr").workspace_root() / "sd_out"  # r37 贯通
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fp = out_dir / (_time.strftime("%Y%m%d-%H%M%S") + f"_seed{payload['seed']}.png")
+        fp.write_bytes(_b64.b64decode(imgs[0]))
+        return (f"图已生成：mia_home/sd_out/{fp.name}（设置页→文档/图片区可见）\n"
+                f"提示词: {payload['prompt'][:80]} | {payload['width']}x{payload['height']} steps{payload['steps']}")
     except Exception as e:
-        return f"SD 服务没在跑或连不上：{str(e)[:120]}\n请爸爸先启动本机的 SD WebUI 服务再重试（地址可在配置页 图像 项改）。"
-    if r.status_code != 200:
-        return f"SD API 出错 HTTP {r.status_code}：{r.text[:150]}"
-    imgs = (r.json() or {}).get("images") or []
-    if not imgs:
-        return "SD 没返回图片"
-    out_dir = __import__("settings_mgr").workspace_root() / "sd_out"  # r37 贯通
-    out_dir.mkdir(parents=True, exist_ok=True)
-    fp = out_dir / (_time.strftime("%Y%m%d-%H%M%S") + f"_seed{payload['seed']}.png")
-    fp.write_bytes(_b64.b64decode(imgs[0]))
-    return (f"图已生成：mia_home/sd_out/{fp.name}（设置页→文档/图片区可见）\n"
-            f"提示词: {payload['prompt'][:80]} | {payload['width']}x{payload['height']} steps{payload['steps']}")
+        return f"生图失败（backend={_backend}）：{str(e)[:150]}\ncomfyui 后端没在跑就喊 cecia 拉起容器。"

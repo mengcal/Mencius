@@ -7,7 +7,7 @@
 
 设计要点：
 - 人事权在米娅：manage_departments 工具增删牛马/任命主管，改完即时生效（工厂+缓存，零重启）
-- 固定 4 个槽位（dept_0..dept_3），未配置的槽位生成占位图（保证注册不失败）
+- 固定 3 个槽位（dept_0..dept_2，对应研发/情报/文策；dept_3/dept_4 试验槽 10-11 已拆），未配置的槽位生成占位图（保证注册不失败）
 - 部门主管图自带 RunConfigMiddleware（用量记录进观测台）
 """
 import json
@@ -279,7 +279,6 @@ def _make_entry_graph(slot: str):
 dept_0 = _make_entry_graph("dept_0")
 dept_1 = _make_entry_graph("dept_1")
 dept_2 = _make_entry_graph("dept_2")
-dept_3 = _make_entry_graph("dept_3")
 
 
 # ===== R64 总管层（爸爸的军事层级：米娅→总管→部门主管→牛马）=====

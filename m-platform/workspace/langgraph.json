@@ -9,7 +9,6 @@
     "dept_0": "./cow_graphs.py:dept_0",
     "dept_1": "./cow_graphs.py:dept_1",
     "dept_2": "./cow_graphs.py:dept_2",
-    "dept_3": "./cow_graphs.py:dept_3",
     "gm": "./cow_graphs.py:gm"
   },
   "env": ".env",

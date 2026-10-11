@@ -1,4 +1,5 @@
 FROM langchain/langgraph-api:3.11
+# 10-11 二试 0.16.0：首轮"门失效"实为旧考卷（m-gates 断言停在 r39x 之前），考卷已重写；本轮绿则留、红则回 bak-20261011 底座。
 
 # ── 国内镜像源（修复 pypi 超时）──
 ENV UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
@@ -17,11 +18,11 @@ RUN set -ex && \
                 'name = "workspace"' \
                 'version = "0.1"' \
                 'dependencies = [' \
-                '  "deepagents==0.7.22",' \
-                '  "langgraph-sdk==0.4.4",' \
-                '  "langchain==1.4.3",' \
-                '  "langchain-core==1.6.6",' \
-                '  "langgraph==1.2.13",' \
+                '  "deepagents==0.7.23",' \
+                '  "langgraph-sdk==0.4.6",' \
+                '  "langchain==1.4.4",' \
+                '  "langchain-core==1.6.9",' \
+                '  "langgraph==1.2.14",' \
                 '  "langchain-openai",' \
                 '  "opentelemetry-api==1.42.1",' \
                 '  "opentelemetry-sdk==1.42.1",' \

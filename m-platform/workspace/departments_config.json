@@ -104,26 +104,6 @@
           "role": "scribe"
         }
       ]
-    },
-    {
-      "slot": "dept_3",
-      "name": "测试哨",
-      "supervisor": {
-        "name": "supervisor",
-        "role": "boss",
-        "system_prompt": "你是测试哨主管。拆解任务、派给牛马、汇总上交。"
-      },
-      "workers": []
-    },
-    {
-      "slot": "dept_4",
-      "name": "探针部",
-      "supervisor": {
-        "name": "supervisor",
-        "role": "boss",
-        "system_prompt": "你是探针部主管。拆解任务、派给牛马、汇总上交。"
-      },
-      "workers": []
     }
   ]
 }

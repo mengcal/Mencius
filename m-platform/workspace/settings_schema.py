@@ -35,7 +35,9 @@ SCHEMA = {
     "search.tavilyUrl":            {"default": "https://api.tavily.com/search", "type": "str", "ui": "联网搜索", "note": "同上"},
     # 10-02：search.metasoUrl 键退役——秘塔端点直写字面量（Mimosa SSRF 字面量要求），官方端点唯一稳定
     # —— 图像 ——
-    "images.sdUrl":                {"default": "http://host.docker.internal:7860", "type": "str", "ui": "图片", "note": "容器视角（09-17 修正语义）"},
+    "images.sdUrl":                {"default": "http://host.docker.internal:7860", "type": "str", "ui": "图片", "note": "容器视角（09-17 修正语义）；backend=sdwebui 时的地址"},
+    "images.backend":              {"default": "comfyui", "type": "str", "ui": "图片", "note": "sdwebui|comfyui（10-11 加 ComfyUI 后端：容器 comfyui:8188，GPU 直通，按需启动）"},
+    "images.comfyuiUrl":           {"default": "http://comfyui:8188", "type": "str", "ui": "图片", "note": "ComfyUI 地址（容器视角，backend=comfyui 时消费）"},
     # —— 工作区分区（r36 09-27 爸令：容器与宿主机明确分开，如 ZCode 的工作区概念） ——
     "workspace.containerRoot":       {"default": "mia_home", "type": "str", "ui": "管理", "note": "容器工作区根（相对 workspace 的目录）——米娅与牛马的文件/执行域边界；改后重启容器生效"},
     "workspace.hostNote":            {"default": "", "type": "str", "ui": "管理", "note": "宿主执行域（完全访问档经 host_runner 到达，起点由宿主 .env 的 MIA_HOST_RUNNER_CWD 控制，默认 D:\\m）——此键仅存说明，不控制行为"},
