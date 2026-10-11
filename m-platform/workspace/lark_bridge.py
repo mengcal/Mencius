@@ -25,7 +25,6 @@ APP_ID = os.environ.get("LARK_BRIDGE_APP_ID", "")
 APP_SECRET = os.environ.get("LARK_BRIDGE_APP_SECRET", "")
 ALLOW = [s.strip() for s in os.environ.get("LARK_BRIDGE_ALLOW", "").split(",") if s.strip()]
 SECRETS = os.environ.get("MIA_SECRETS_PATH", r"D:\m\secrets\.settings_secrets")
-HOSTCOPY = os.environ.get("MIA_HOSTCOPY_TOKEN", r"D:\m\guard\hostcopy.token")
 MAX_INPUT = 2000   # 入站文本上限（#12 token 爆炸面）
 MAX_REPLY = 3800
 _SEM = threading.Semaphore(2)     # 并发闸（#6）
@@ -35,16 +34,11 @@ _api_client = None                # 独立 API client（#3）
 
 
 def admin_token() -> str:
-    """平台管理员令牌：env → 守卫明文副本 → .settings_secrets（legacy）。"""
+    """平台管理员令牌：env → .settings_secrets。
+    10-11 守卫退役：原"守卫明文副本 hostcopy.token"中间层随之移除（D:\m\guard 已删）。"""
     v = os.environ.get("MIA_OFFICE_TOKEN", "")
     if v:
         return v
-    try:
-        t = open(HOSTCOPY, encoding="utf-8").read().strip()
-        if t:
-            return t
-    except OSError:
-        pass
     try:
         with open(SECRETS, encoding="utf-8") as f:
             m = re.search(r'general\.apiToken"?\s*[:=]\s*"([a-f0-9]{16,})"', f.read())

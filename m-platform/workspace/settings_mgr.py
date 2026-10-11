@@ -325,111 +325,34 @@ def get_plain_key(path: str) -> str:
 
 
 # ── R75 统一 token（管理员密钥）：只存 .settings_secrets，源码/设置页明文都不落 ──
-# R10.6（爸爸拍板"一次做成 ZCode 式守卫外置"）：M_GUARD_URL 配置时，密钥真源=m-guard 守卫服务
-# （宿主 SYSTEM 常驻进程，DPAPI 加密存储，只答"验证通过/不通过"永不外发明文——ssh-agent 模式）。
-# 本进程不再持有明文钥匙：米娅终态有宿主全权也改不了判定、偷不到钥匙。
-# env 未配 M_GUARD_URL=本地裸跑兼容（旧文件逻辑）。
+# 10-11 守卫族全删（爸令"个人平台你守卫什么"，详 eng-log R10.661）：原 R10.6 的
+# M_GUARD_URL 外置判定/白名单/_guard_post 整族退役——密钥单源=.settings_secrets，
+# 判定=本地 hmac 常数时间比对（token_ok）。守卫服务 m-guard 已于 09-24~10-11 退役。
 TOKEN_SECRET_PATH = "general.apiToken"
-M_GUARD_URL = os.environ.get("M_GUARD_URL", "").strip().rstrip("/")
-# r27 评审 P1（Cora/Eve 独立同锤，修法采 NOVA fail-closed 版）：守卫地址白名单【唯一真源】
-# 在此——token_admin 不再自带一份（两处实现分叉=NOVA P1-② 假成功链的根）。
-# 场景：.env/compose 的 M_GUARD_URL 被改成外域（配置劫持）→ 扇出点会把管理员
-# 密钥明文 POST 给假守卫。空=本地裸跑（放行旧语义）；设了但白名单外=非法，
-# 保持非空+标记短路全部扇出 fail-closed——绝不置空降级本地（Cora 368 推演：
-# 置空=注册窗口误开+双源分裂抢注，比原洞更糟）。
-_GUARD_HOSTS_ALLOWED = {"127.0.0.1", "localhost", "host.docker.internal"}
-
-
-def _guard_url_ok(raw: str) -> bool:
-    from urllib.parse import urlparse
-    p = urlparse(raw)
-    # r27 Veda P2：端口也锁——白名单内主机配成非守卫端口（如平台自身 2024）同样拒，
-    # 防 X-Guard-Key 打向非守卫服务。期望端口=M_GUARD_PORT env（默认 9101，与守卫监听同源）。
-    want_port = int(os.environ.get("M_GUARD_PORT", "9101") or 9101)
-    return (p.scheme == "http" and (p.hostname or "") in _GUARD_HOSTS_ALLOWED
-            and (p.port or 80) == want_port)
-
-
-GUARD_URL_ILLEGAL = bool(M_GUARD_URL) and not _guard_url_ok(M_GUARD_URL)
-if GUARD_URL_ILLEGAL:
-    print("[settings_mgr] FATAL: M_GUARD_URL 指向白名单外（疑似配置劫持）——守卫扇出全部 fail-closed，立即核对 .env/compose", flush=True)
-
-
-def _guard_post(path: str, payload: dict, timeout: float = 5.0) -> dict:
-    if GUARD_URL_ILLEGAL:
-        raise RuntimeError("guard 地址被白名单拒绝（fail-closed，疑配置劫持）——拒绝外发任何凭据")
-    import json as _j
-    import urllib.request as _u
-    import os as _os
-    req = _u.Request(f"{M_GUARD_URL}{path}", data=_j.dumps(payload).encode("utf-8"),
-                     headers={"Content-Type": "application/json",
-                              "X-Guard-Key": _os.environ.get("M_GUARD_KEY", "")}, method="POST")
-    with _u.urlopen(req, timeout=timeout) as r:
-        return _j.loads(r.read())
 
 
 def get_api_token() -> str:
-    if M_GUARD_URL:
-        return ""  # guard 模式：本进程不持有明文（比较一律走 token_ok→guard）
     return secret_get(TOKEN_SECRET_PATH)
 
 
 def api_token_configured() -> bool:
-    if M_GUARD_URL:
-        if GUARD_URL_ILLEGAL:
-            # r27 NOVA/Cora fail-closed 知夏定夺：非法态保守当"已配置"——
-            # 代价=新部署配置手误时登录页挡住注册页（loud log 可查）；
-            # 反面（误判未配置→重开注册窗口）=抢注竞态，不可接受。
-            return True
-        try:
-            import json as _j
-            import urllib.request as _u
-            with _u.urlopen(f"{M_GUARD_URL}/status", timeout=5.0) as r:
-                return bool(_j.loads(r.read()).get("configured"))
-        except Exception:
-            return False  # guard 不可达=fail-closed（宁拒勿裸）
     return bool(secret_get(TOKEN_SECRET_PATH))
 
 
 def set_api_token(value: str) -> None:
-    if M_GUARD_URL:
-        # r27 NOVA P1-②：guard 模式的本函数曾被 token_admin 本地分支误调=no-op 假成功。
-        # 改抛异常：任何"guard 模式下还想本地写 token"的路径都是 bug，必须炸出来。
-        raise RuntimeError("guard 模式禁止本地写 token（fail-closed）——检查调用方分支")
     # 凭据只入 secrets（不进 settings.json、不进源码）；空串=清除（回到未配置=放行，供爸爸重置）
     secret_set(TOKEN_SECRET_PATH, value)
 
 
-_VERIFY_CACHE: dict = {}  # R10.8h（NOVA P2⑤）：token_ok 结果 30s TTL 缓存——三处扇出每请求
-_VERIFY_TTL = 30.0        # 一跳 guard，高负载会自我 DoS。单管理员场景缓存单条即可。
-                          # rotate/clear 使旧钥匙失效后，最迟 30s 自然过期（窗口可接受，注明）。
-                          # R10.11（Eve P3）：rotate/clear 成功路径改为主动调 clear_verify_cache()，窗口压到 0。
-
-
 def clear_verify_cache() -> None:
-    """R10.11（Eve P3）：rotate/clear 成功后由调用方主动清验证缓存——撤销即时生效。"""
-    _VERIFY_CACHE.clear()
+    """10-11 守卫退役后=无操作占位：rotate/clear 成功路径的历史调用点保留，
+    本地 hmac 比对即时生效本就无需缓存失效。"""
+    return None
 
 
 def token_ok(presented: str) -> bool:
-    """常数时间比对，防时序侧信道。未配置 token 时不在此处判定（由调用方决定放行策略）。
-    R10.2（hy4 ③-10）：先 encode 成 bytes 再比，非 ASCII 头不再炸 500。
-    R10.6：guard 模式下判定在守卫进程内——本函数变成"问守卫"，明文不进本进程。"""
-    if M_GUARD_URL:
-        import time as _t
-        c = _VERIFY_CACHE
-        if (c.get("tok") == str(presented or "") and c.get("t")
-                and _t.time() - c["t"] < _VERIFY_TTL):
-            return c["ok"]
-        try:
-            ok = bool(_guard_post("/verify", {"token": str(presented or "")}).get("ok"))
-        except Exception:
-            return False  # guard 不可达=fail-closed
-        c.clear()
-        c["tok"] = str(presented or "")
-        c["ok"] = ok
-        c["t"] = _t.time()
-        return ok
+    """本地常数时间比对，防时序侧信道。未配置 token 时不在此处判定（由调用方决定放行策略）。
+    R10.2（hy4 ③-10）：先 encode 成 bytes 再比，非 ASCII 头不再炸 500。"""
     import hmac
     cur = secret_get(TOKEN_SECRET_PATH)
     if not cur:
