@@ -580,8 +580,8 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
         return f"需要 workflow_id 或对象 id——先用 list 查。"
     _HOST = "http://n8n:5678/api/v1"  # 唯一合法目标：compose 内网 n8n 服务（容器名固定）
     url = _HOST + _paths[act]
-    if not url.startswith(_HOST):  # 出站前边界自证：协议+host 锁死
-        return "⛔ 内部守卫：目标越界。"
+    # 10-11 体系审计判删②：出站自证 startswith(_HOST) 永真（_HOST 是字面量、url 恒由它拼出）
+    # =防御性代码活化石，删除零行为变化。
 
     class _NoRedirect(_ur.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -712,15 +712,11 @@ def search_knowledge_base(query: str, k: int = 5) -> str:  # 原 L731-763
     except Exception:
         from settings_mgr import DEFAULT_EMBED_MODEL
         model = DEFAULT_EMBED_MODEL
-    # 嵌入：本机 Ollama（09-17 批②：地址走 env MIA_OLLAMA_URL，SSRF 面不变=仍是固定常量级主机）
+    # 嵌入：本机 Ollama（09-17 批②：地址走 env MIA_OLLAMA_URL）。
+    # 10-11 体系审计判删③：本机白名单（r35 补平的那份）退役——校验对象是管理员自己
+    # 写的 .env 值，换机/改 env 即误咬知识库检索（爸 09-30/10-11 判词：没屁用的去掉）。
     import os as _os
     _ollama = _os.environ.get("MIA_OLLAMA_URL", "http://host.docker.internal:11434").rstrip("/")
-    # r35（Qoder P2-16）：兄弟模块 rag.py:285 对同一 env 键做本机白名单校验，这里没做——
-    # "固定常量级"论断在 env 可被 compose/.env 改写的前提下不成立，补平。
-    from urllib.parse import urlparse as _up
-    _u = _up(_ollama)
-    if _u.scheme != "http" or _u.hostname not in ("host.docker.internal", "localhost", "127.0.0.1"):
-        return "嵌入服务地址非法：MIA_OLLAMA_URL 只许本机 http 地址（host.docker.internal/localhost/127.0.0.1）"
     try:
         r = _httpx.post(_ollama + "/api/embed",
                         json={"model": model, "input": query[:4000]}, timeout=30)

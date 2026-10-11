@@ -276,14 +276,11 @@ async def rag_rebuild():
         conn = _rag_pg()
         if not conn:
             return {"error": "PG 不可用，重建中止（先查 postgres 容器）"}
-        # 09-17 批②：Ollama 基址走 env（与 tools.py 同键）；env 亦按外部输入校验——
-        # 只许 http 协议+本机主机名（SSRF 边界），非法值直接中止不静默回落。
+        # 09-17 批②：Ollama 基址走 env（与 tools.py 同键）。
+        # 10-11 体系审计判删③：本机白名单校验的是管理员自己写的 .env 值（非外部输入），
+        # 换机/改 env 即"嵌入服务地址非法"误咬知识库检索——按爸 09-30/10-11 判词退役。
         import os as _os
-        from urllib.parse import urlparse
         _ollama = _os.environ.get("MIA_OLLAMA_URL", "http://host.docker.internal:11434").rstrip("/")
-        _u = urlparse(_ollama)
-        if _u.scheme != "http" or _u.hostname not in ("host.docker.internal", "localhost", "127.0.0.1"):
-            return {"error": "MIA_OLLAMA_URL 非法：只许本机 http 地址（host.docker.internal/localhost/127.0.0.1）"}
         n = 0
         try:
             import httpx

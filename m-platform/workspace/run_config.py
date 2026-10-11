@@ -10,12 +10,6 @@
 不改米娅提示词，什么都不选 = 完全默认行为。
 """
 from langchain.agents.middleware.types import AgentMiddleware
-from langchain_core.messages import ToolMessage
-
-SEARCH_TOOLS = {
-    "web_search", "web_search_metaso", "web_search_bocha",
-    "web_search_tavily", "web_read_metaso",  # 10-02 +reader；r35：searxng/bing 工具名从未注册进任何图，死项随实现退役
-}
 
 
 def _cfg(request) -> dict:
@@ -211,23 +205,6 @@ class RunConfigMiddleware(AgentMiddleware):
             print(f"[fallback] ⚠ 回退链读取失败：{e}", flush=True)
         return models
 
-    # ---- 工具调用：联网关了就挡回搜索工具 ----
-    def wrap_tool_call(self, request, handler):
-        cfg = _cfg(request)
-        name = (request.tool_call or {}).get("name", "")
-        if cfg.get("web_search", True) is False and name in SEARCH_TOOLS:
-            return ToolMessage(
-                content="（联网搜索当前被本条消息关闭。如需搜索请正常发消息重试——联网默认开启，按钮已退役。）",
-                tool_call_id=(request.tool_call or {}).get("id", ""),
-            )
-        return handler(request)
-
-    async def awrap_tool_call(self, request, handler):
-        cfg = _cfg(request)
-        name = (request.tool_call or {}).get("name", "")
-        if cfg.get("web_search", True) is False and name in SEARCH_TOOLS:
-            return ToolMessage(
-                content="（联网搜索当前被本条消息关闭。如需搜索请正常发消息重试——联网默认开启，按钮已退役。）",
-                tool_call_id=(request.tool_call or {}).get("id", ""),
-            )
-        return await handler(request)
+    # 10-11 死码清除（体系审计判删⑥）：web_search=false 挡回双方法删除——
+    # 挡回的 UI 开关 r25 已退役，cfg 该分支永不触发；SEARCH_TOOLS 常量随之消失。
+    # 若将来要"按消息关联网"，按 langgraph 官方 middleware 钩子重写，别复活这段。

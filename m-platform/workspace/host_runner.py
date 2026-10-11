@@ -51,14 +51,6 @@ def _env_key() -> str:
     return ""
 
 
-def _stage() -> str:
-    try:
-        s = json.loads(SETTINGS.read_text(encoding="utf-8"))
-        return str((s.get("general", {}) or {}).get("confirmLevel", "") or "")
-    except Exception:
-        return ""
-
-
 def _audit(rec: dict) -> None:
     rec["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     try:

@@ -27,7 +27,6 @@ def _ws_root() -> str:
     except Exception:
         return "mia_home"
 _DEPT_CONFIG = BASE / "departments_config.json"
-_MAX_SLOTS = 4
 
 
 def _load_departments():
@@ -95,7 +94,7 @@ def _build_dept_graph(dept: dict, slot: str):
     sup_kwargs = {}  # R77：thinking 不再是"跟着模型/部门文件走"——真源=settings.agents[role].thinking（_role_model 内部按岗位取）
 
     subagents = []
-    from agent_multimodel import ConfirmGateMiddleware, search_knowledge_base  # 同进程（langgraph server 全图单进程），函数内引避免顶层环
+    from agent_multimodel import search_knowledge_base  # 同进程（langgraph server 全图单进程），函数内引避免顶层环；10-11 清死导入（ConfirmGateMiddleware 此作用域零引用）
     from mia_agent.confirm_gate_c1 import SubGate  # r41（C1）：子层全拦件
     from search_tools import web_search
     for w in workers:
@@ -325,7 +324,7 @@ def _get_gm_graph():
     ))
     # R66 接线时揪出 R64 潜伏 NameError：本函数此前没有 import RunConfigMiddleware，gm 真被派活即崩（注册≠可用，验证盲区）
     from run_config import RunConfigMiddleware
-    from agent_multimodel import ConfirmGateMiddleware, SandboxedShellBackend  # R79①：总管图 execute 也进沙箱
+    from agent_multimodel import SandboxedShellBackend  # R79①：总管图 execute 也进沙箱；10-11 清死导入（ConfirmGateMiddleware 此作用域零引用）
     from mia_agent.confirm_gate_c1 import SubGate  # r41（C1）：总管子层全拦件
     # 09-16 fix4 裁决2（工兵越墙见闻②）：总管图第三处同形状同风险，补接子层断言（fail-closed）
     _gm_mw = [RunConfigMiddleware(), SubGate(dept="general_manager")]

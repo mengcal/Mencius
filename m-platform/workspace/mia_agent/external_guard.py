@@ -42,9 +42,7 @@ def validate_url(url: str, allowed_ports: tuple) -> dict:
     try:
         import socket
         if re.fullmatch(r"[\d.]+|([0-9a-fA-F:]+)", host):
-            infos = [(None, None, None, None, (host, 0, 0, 0)) if ":" not in host
-                     else (None, None, None, None, (host, 0, 0, 0))]
-            ips = [host]
+            ips = [host]  # 10-11 清死赋值：字面 IP 分支的 infos 算了没用（下游只吃 ips）
         else:
             infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
             ips = list({i[4][0] for i in infos})
