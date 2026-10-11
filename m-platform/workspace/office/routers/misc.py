@@ -510,13 +510,15 @@ async def api_reset_thread(req: dict = Body(...), request: Request = None):
     _flag = {"forced": True} if r.get("forced") else {}  # v0.3 件二：force 帧账注（普通帧账形零变化）
     # hy4 十五轮③(a) 账注：budget=两表命中数之和非线程数，多实例按实例累加
     _token_audit("approval_reset_thread", True, tid=tid[:8],
-                 budget=r["budget"], pressure=r["pressure"],
+                 budget=r["budget"], pressure=r.get("pressure"),
                  cards=cards, **_flag)
     # hy4 十四轮 §⑤连带：budget 是两表命中数之和（单实例最多 2），明细 budget_detail
     # 原样透传给前端（token 账参数不变——账口径漂移比少一个字段更坏）。
+    # 10-11 修（任务4档案 N1-2）：r40a 压力链退役后 reset_thread 返回帧已无 "pressure" 键，
+    # 硬取键=成功路径必 500——改 .get 容缺，帧里没有就不再透出。
     return {"ok": True, "budget": r["budget"],
             "budget_detail": r.get("budget_detail"),
-            "pressure": r["pressure"], "cards": cards, **_flag}
+            "pressure": r.get("pressure"), "cards": cards, **_flag}
 
 
 # ── R2.1（2026-08-29 知夏）：旧配置系统已删除 ──

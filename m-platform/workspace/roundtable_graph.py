@@ -357,6 +357,7 @@ def host(state) -> dict:
     note_name, _, note_warn = _hearth_note(_last_human(state))
     ctx = _board_context(state)
     truncated = False
+    m = None  # 10-11 修（任务4档案 N1-3）：配置异常时 m 未绑定，验收重跑引用它会 NameError 被吞=重跑静默失效
     try:
         m = _seat_model("host", max_tokens=4000)  # 主持长结论留足输出预算（09-11 截断实锤）
         verdict, truncated = _ask(m, ctx + [HumanMessage(
@@ -375,7 +376,7 @@ def host(state) -> dict:
     # 机械验收：plan=步骤数/完成标志（原规矩）；review=三选一+三段非空（r39 Lyra 新炮4）
     check = _validate_plan if cmd == "plan" else _validate_review
     issues = check(verdict) if not silent else []
-    if issues:  # 机械不过关→重跑一次主持位
+    if issues and m:  # 机械不过关→重跑一次主持位（10-11 修：m=None 时跳过重跑，原样 NameError 被吞）
         base_prompt = PROMPT_HOST_PLAN if cmd == "plan" else PROMPT_HOST_REVIEW
         try:
             retry, _ = _ask(m, ctx + [HumanMessage(

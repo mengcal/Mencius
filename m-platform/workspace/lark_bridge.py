@@ -29,7 +29,7 @@ HOSTCOPY = os.environ.get("MIA_HOSTCOPY_TOKEN", r"D:\m\guard\hostcopy.token")
 MAX_INPUT = 2000   # 入站文本上限（#12 token 爆炸面）
 MAX_REPLY = 3800
 _SEM = threading.Semaphore(2)     # 并发闸（#6）
-_SEEN = set()                     # message_id 去重（#5）
+_SEEN = {}                        # message_id 去重（#5）；10-11 修：原 set() 被 _SEEN[mid]=True 当 dict 用，首条消息必 TypeError 被吞（任务4档案 N1-1）
 _SEEN_LOCK = threading.Lock()
 _api_client = None                # 独立 API client（#3）
 

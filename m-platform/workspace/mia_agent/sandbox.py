@@ -75,11 +75,17 @@ class SandboxedShellBackend(LocalShellBackend):  # 原 L76-117
         return ""
 
     def _headers(self, url: str, tok: str) -> tuple[dict, bool]:
-        """返回 (请求头, 是否用票据)。runner 路线优先票据，沙箱/兜底走静态 X-Token。"""
-        if url.endswith("/exec") and tok:
-            t = self._ticket(url, tok)
-            if t:
-                return {"Content-Type": "application/json", "X-Ticket": t}, True
+        """返回 (请求头, 是否用票据)。宿主 runner 优先票据，沙箱/兜底走静态 X-Token。
+        10-11 修（任务4档案 N1-4）：沙箱 runner 只服务 /exec，此前对沙箱域也先打
+        /ticket=每次容器域 execute 白吃一发 404——票据只对宿主 runner 路线铸。"""
+        try:
+            host_route = (os.environ.get("MIA_HOST_RUNNER_URL", "") or "").rstrip("/")
+            if url.endswith("/exec") and tok and host_route and url.rstrip("/") == host_route:
+                t = self._ticket(url, tok)
+                if t:
+                    return {"Content-Type": "application/json", "X-Ticket": t}, True
+        except Exception:
+            pass
         return {"Content-Type": "application/json", "X-Token": tok}, False
 
     def _call(self, cmd: str, timeout: int) -> _ExecResp:

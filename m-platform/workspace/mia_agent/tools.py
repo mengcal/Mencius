@@ -595,7 +595,20 @@ def n8n(action: str, workflow_id: str = "", body: str = "") -> str:
         with opener.open(req, timeout=30) as resp:
             out = resp.read(12000).decode("utf-8", "replace")
     except _ue.HTTPError as e:
-        return f"n8n 返回 {e.code}：{e.read(500).decode('utf-8', 'replace')}"
+        # M-05-1（10-11 米娅回执）：本版 n8n 公共 API 不支持 PATCH（405）——update 自动降级 PUT 重发
+        if act == "update" and e.code == 405:
+            try:
+                req_put = _ur.Request(url, data=data, method="PUT",
+                                      headers={"X-N8N-API-KEY": key, "Content-Type": "application/json"})
+                with opener.open(req_put, timeout=30) as resp:
+                    out = resp.read(12000).decode("utf-8", "replace")
+                method_map = dict(method_map, update="PUT(降级)")
+            except _ue.HTTPError as e2:
+                return f"n8n 返回 {e2.code}（PATCH 已试、PUT 降级也拒）：{e2.read(500).decode('utf-8', 'replace')}"
+            except Exception as e2:
+                return f"n8n 调用失败（PUT 降级）：{type(e2).__name__} {str(e2)[:150]}"
+        else:
+            return f"n8n 返回 {e.code}：{e.read(500).decode('utf-8', 'replace')}"
     except Exception as e:
         return f"n8n 调用失败：{type(e).__name__} {str(e)[:150]}（n8n 容器没起？喊爸爸）"
     # 唯一红线：API key 明文值不回显（列表/创建只回 id 和名字，防凭据经对话泄漏）

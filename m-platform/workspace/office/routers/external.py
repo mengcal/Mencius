@@ -301,10 +301,16 @@ async def external_callback(name: str, request: Request):
         # r61e Cora N6：未领取的单不可能有回执——"假 done 让任务静默消失"的
         # 验收欺骗链（丢失在上游、检查在下游）在此断掉。
         _audit("external_callback", False, name=name, why=f"not-claimed:{tid[:16]}")
+        # M-05-2（10-11 米娅回执）：拒因同步入 external 账本——派活方在
+        # list_external_results 里直接看到 rejected(原因)，不用去翻 n8n 执行日志。
+        _ap.external_store(name, {"task_id": tid, "done": False, "rejected": True,
+                                  "reason": "callback 被拒：该单未领取（先 claim 再回调）"}, task_id=tid)
         return {"ok": False, "error": "该单未领取（先 claim 再回调）"}
     if ctx["nonce"] and str(data.get("nonce") or "") != ctx["nonce"]:
         # r61e Lyra②：一次性 nonce=不依赖网络拓扑的回调身份（旧单无 nonce 向后兼容）
         _audit("external_callback", False, name=name, why=f"nonce-mismatch:{tid[:16]}")
+        _ap.external_store(name, {"task_id": tid, "done": False, "rejected": True,
+                                  "reason": "callback 被拒：nonce 不符"}, task_id=tid)  # M-05-2 同上
         return {"ok": False, "error": "nonce 不符"}
     _ap.external_store(name, data, task_id=tid)
     _audit("external_callback", True, name=name, done=bool(data.get("done")),
