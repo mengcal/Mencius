@@ -122,10 +122,19 @@ try:
         elif result.get("status") == "cancelled":
             # r40d（米娅 M1.1 开工撞雷：cancelled 双语义）——cancelled 是 **run 层**状态
             # （新消息打断整个 run），不代表任务未创建：start_async_task 的 Command update
-            # 在打断前已提交=任务实际存在，盲重发=双派。加自证字段让读侧先查实际态。
+            # 在打断前已提交=任务实际存在，盲重发=双派。
+            # M-05-4（10-11 米娅回执"自证字段"）：双语义的自证=中断前步数增量——
+            # 监测循环在 running 态持续记 _LAST_STEPS，中断时它就是"到底跑没跑"的物证。
+            # 局限如实带：计数为监测循环最后一次所见（同线程旧 run 的残留可能）。
+            _seen = _LAST_STEPS.get(str(thread_id))
+            if _seen is not None and _seen > 0:
+                _ev = (f"自证：本 run 中断前监测循环已见 {_seen} 次步骤增量（确实跑过一段，"
+                       "任务大概率已创建甚至部分执行）——先 check_async_task 查实际态再决定重发。")
+            else:
+                _ev = ("自证：本 run 中断前无步骤增量记录（大概率还没真正开工，重发风险低）"
+                       "——仍建议 check_async_task 复核一次（计数为监测侧最后所见，非官方状态）。")
             result["cancelled_run_note"] = ("cancelled 是 run 层状态（本 run 被新消息打断），"
-                                            "不代表任务未创建——先 check_async_task 查该任务实际态，"
-                                            "再决定是否重发（盲重发=双派）。")
+                                            + _ev)
         elif result.get("status") == "running":
             # r39t 静默信号（米娅验收单⑤）：Eve 洞1——超时+步数零增量才报疑似静默
             #（纯年龄会误伤正常慢步骤，误报多了米娅学会无视=设计白做）。
