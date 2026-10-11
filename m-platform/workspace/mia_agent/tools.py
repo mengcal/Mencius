@@ -18,6 +18,7 @@ import threading  # r40d：manage_departments 读-改-写互斥（4 并发 add_w
 from langchain_core.tools import tool as _tool  # 原 L175
 
 from mia_agent.store import _STORE  # edit_memory 的 PG 镜像用（原为同文件模块级全局，见原 L544）
+from mia_agent import dept_activity as _dept_activity  # W1（米娅 R5 愿望①）：导入即挂 check 观察钩子——部门"最近成功派活"账（链路与口径见该模块 docstring）
 
 
 def _BASE():
@@ -284,7 +285,7 @@ def _manage_departments_impl(action: str, department: str = "", name: str = "", 
     """米娅的人事权（R64，爸爸 2026-09-01 授予）：随时增删牛马、任命主管、给主管配牛马。
     改 departments_config.json + 清部门图缓存，下次派活自动按新编制执行（零重启）。
     action:
-      list              查看全部部门编制（主管/牛马/槽位+各角色当前模型）
+      list              查看全部部门编制（主管/牛马/槽位+各角色当前模型+各部门最近成功派活时间）
       models            查看全部角色挂载的模型（只读，r38 爸令配置可见性）
       catalog           查看各启用服务商的可用模型清单（r39b 权限，配模型前先对名）
       add_department    新建部门（department=部门名，如"客服部"；自动分配空槽位）
@@ -361,8 +362,13 @@ def _manage_departments_impl(action: str, department: str = "", name: str = "", 
             # 的条目派活会吃占位图），编制面与执行面口径拉平。
             _ready = bool(sup and (d.get("workers") or []))
             _tag = "可派活" if _ready else "⚠ 配置不全（缺 supervisor/workers，派活会吃占位图）"
+            # W1（米娅 R5 愿望①"判断部门是否真活着不用再手动派探针"）：每部门带
+            # "最近成功派活"列——口径见 dept_activity docstring（官方 run success 且无
+            # 假成功警示的最近一次派出时刻；"从未"=本账启用以来该槽位无成功记录）。
+            _last = _dept_activity.fmt_last(d.get("slot"))
             out.append(f"【{d.get('name')}】槽位 {d.get('slot')} · {_tag} · 主管 {sup.get('name', '未任命')}"
-                       f"[{_m(sup.get('role', 'boss'))}] · 牛马：{ws or '无'}")
+                       f"[{_m(sup.get('role', 'boss'))}] · 牛马：{ws or '无'}"
+                       f" · 最近成功派活：{_last}")
         return "当前编制（含模型）：\n" + "\n".join(out) if out else "还没有任何部门。用 add_department 新建。"
     if action == "catalog":
         # r39b（爸 09-29 判例"权限问题就给米娅权限"）：列全部启用服务商的可用模型清单——
