@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""settings_schema.py — M 平台配置总表（单一配置源首版，09-17 深夜，知夏）
+"""settings_schema.py — M 平台配置总表（单一配置源首版，09-17 深夜，Celia）
 
 蓝本=OWUI backend/open_webui/env.py：全部配置键在一个文件登记（路径/默认值/类型/所属设置页/说明）。
 规矩（Lesson 68+hy4 三挑刺）：
@@ -61,9 +61,9 @@ SCHEMA = {
     "scribe.extractThreshold":     {"default": 600, "type": "int", "ui": "管理", "note": "累积字数触发事实抽取"},
     "scribe.agingDays":            {"default": 30, "type": "int", "ui": "管理", "note": "笔记 aging 巡检阈值（天）"},
     # —— 外部岗/审批（批⑤新收口） ——
-    "approvals.claimTimeout":      {"default": 1800, "type": "int", "ui": "牛马矩阵", "note": "外部岗领取超时秒（09-17 深夜知夏拍板归类）"},
+    "approvals.claimTimeout":      {"default": 1800, "type": "int", "ui": "牛马矩阵", "note": "外部岗领取超时秒（09-17 深夜Celia拍板归类）"},
     # —— CodeBuddy 网关（批⑤新收口） ——
-    "codebuddy.defaultModel":      {"default": "Qwen/Qwen3.8-Flash-Next", "type": "str", "ui": "牛马矩阵", "note": "配置>env CODEBUDDY_MODEL>默认（09-17 深夜知夏拍板归类）"},
+    "codebuddy.defaultModel":      {"default": "Qwen/Qwen3.8-Flash-Next", "type": "str", "ui": "牛马矩阵", "note": "配置>env CODEBUDDY_MODEL>默认（09-17 深夜Celia拍板归类）"},
     "codebuddy.allowedModels":     {"default": "", "type": "str", "ui": "牛马矩阵", "note": "米娅按需换模型的白名单（逗号分隔）；defaultModel 恒在名单内；env 可整体压过"},
     # —— 围炉/圆桌座位（既有键登记入表） ——
     "hearth.A":                    {"default": {}, "type": "dict", "ui": "牛马矩阵", "note": "{provider,model} 双必填（09-17 fail-closed）"},

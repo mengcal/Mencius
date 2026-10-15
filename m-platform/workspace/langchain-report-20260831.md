@@ -107,4 +107,4 @@ M 平台当前架构（AsyncSubAgent + 部门层级 + supervisor-worker 分层�
 
 ---
 
-*报告生成时间：2026-08-31 22:00 | 知夏 (Celia) 存档 | 搜索受限于 Web 通道，PyPI 数据为权威来源*
+*报告生成时间：2026-08-31 22:00 | Celia (Celia) 存档 | 搜索受限于 Web 通道，PyPI 数据为权威来源*

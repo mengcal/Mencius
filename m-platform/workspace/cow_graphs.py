@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""cow_graphs.py — 牛马部门图工厂（R59 官方多层架构，2026-08-31 知夏）
+"""cow_graphs.py — 牛马部门图工厂（R59 官方多层架构，2026-08-31 Celia）
 
 按 departments_config.json 构建各部门主管图（每图内含本部门牛马为同步 SubAgent），
 导出 dept_0/dept_1/dept_2 三个编译图，由 langgraph.json 注册——
@@ -104,7 +104,7 @@ def _build_dept_graph(dept: dict, slot: str):
         # 从此真正生效——按名字从发放池领；未配置默认=知识库（researcher 加联网）。池外名字出声不静默。
         _tool_pool = {"search_knowledge_base": search_knowledge_base, "web_search": web_search}
         # execute/ls/read_file/write_file/edit_file/glob/grep 由官方 FilesystemMiddleware 自动注入，
-        # 不在"自定义工具池"管辖——配置里出现属正常，不告警（R68 修知夏自造噪音）
+        # 不在"自定义工具池"管辖——配置里出现属正常，不告警（R68 修Celia自造噪音）
         _fs_auto = {"execute", "ls", "read_file", "write_file", "edit_file", "glob", "grep", "delete", "task"}
         names = [t for t in (w.get("tools") or []) if isinstance(t, str)]
         if not names:

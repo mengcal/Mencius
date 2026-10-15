@@ -1,6 +1,6 @@
 # M 平台 · 代码 WIKI（家底账）
 
-> 2026-09-15 全码盘点生成（general-purpose 八区逐文件过目 + 知夏抽验四条重疑点属实）。范围=D:\m\workspace 全仓+guard+pkg+前端。只读盘点，未改一码。
+> 2026-09-15 全码盘点生成（general-purpose 八区逐文件过目 + Celia抽验四条重疑点属实）。范围=D:\m\workspace 全仓+guard+pkg+前端。只读盘点，未改一码。
 > **用法**：换会话后的第一读物；每次大改后由 Celia 派单增量更新本文件。行数为盘点当日值。
 
 ## r36–r37 大改账（09-27/28，爸令连发）
@@ -11,7 +11,7 @@
 | r36j-r36k | **工作区分区上线**：对话头部"容器/宿主机"下拉，workspace 走 run configurable → sandbox._route 选域；档位管问不问、域管在哪干，两轴正交；host_runner=宿主域正身后端（档位后门已废） | sandbox / useChat / ChatInterface / misc |
 | r36l/m | 英文残留六处清+下拉配色（inputC [color-scheme:dark] 一处修全站） | ChatInterface / ThreadList / page |
 | r36n | **模型参数实数化**（爸令别写默认放数字）：温度 1.0/输出 131072 显式传=显示值即生效值；九行未接线假参数连根拔 | models / settings_schema / GeneralTab→ModelsTab |
-| r36o/p | 正名联动（用户可见面"知夏"→Celia 清零）+ mail_service 库层自洽 + verify_r61 六件退役 + **mia_home 6.9MB 源码副本连根拔** | 多文件 |
+| r36o/p | 正名联动（用户可见面"Celia"→Celia 清零）+ mail_service 库层自洽 + verify_r61 六件退役 + **mia_home 6.9MB 源码副本连根拔** | 多文件 |
 | r36s/t | 每模型输出上限回归 **model_overrides 单源**（三层：代码显式>按模型>全局兜底 32768）；魔搭 qwen-flash 单独给满 131072（键名=网关别名 qwen-flash） | settings.json / providers |
 | r36u | 未知模型兜底拔除（爸：M 平台不存在未知模型）；ModelConfigRow 补上下文字段；牛马温度岗位级字段（米娅设爸看） | misc / ModelConfigRow / cow_graphs |
 | r36w/x | CB 六门槛修复：英文终清+配色根治+FUTURE_ROWS 退役+**对话 Ctrl+V 粘贴截图** | 多文件 / ChatInterface |

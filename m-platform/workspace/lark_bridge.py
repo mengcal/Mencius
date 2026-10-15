@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""lark_bridge.py —— M 平台 × 飞书长连接桥 v2（09-19 知夏；v1 经 ds-v4.1-flash 挑刺 22 条后重写）
+"""lark_bridge.py —— M 平台 × 飞书长连接桥 v2（09-19 Celia；v1 经 ds-v4.1-flash 挑刺 22 条后重写）
 
 链路：爸爸飞书发消息 → 飞书长连接推给本桥 → 线程池调 M 平台 agent 图 → 米娅回复推回飞书。
 安全（v2 按 ds 复测收敛）：

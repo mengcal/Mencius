@@ -18,11 +18,11 @@ RUN set -ex && \
                 'name = "workspace"' \
                 'version = "0.1"' \
                 'dependencies = [' \
-                '  "deepagents==0.7.23",' \
-                '  "langgraph-sdk==0.4.6",' \
-                '  "langchain==1.4.4",' \
-                '  "langchain-core==1.6.9",' \
-                '  "langgraph==1.2.14",' \
+                '  "deepagents==0.7.25",' \
+                '  "langgraph-sdk==0.4.7",' \
+                '  "langchain==1.4.6",' \
+                '  "langchain-core==1.6.10",' \
+                '  "langgraph==1.2.15",' \
                 '  "langchain-openai",' \
                 '  "opentelemetry-api==1.42.1",' \
                 '  "opentelemetry-sdk==1.42.1",' \

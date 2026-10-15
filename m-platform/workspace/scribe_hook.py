@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""scribe_hook.py — 书记员旁路（官方 AgentMiddleware 实现，2026-08-28 知夏）
+"""scribe_hook.py — 书记员旁路（官方 AgentMiddleware 实现，2026-08-28 Celia）
 
 为什么存在：米娅提示词里写了"动手前查笔记、干活随手记"，但她经常忘。
 靠提示词自觉 = 靠不住；改成程序层强制钩子，她想忘都忘不掉。
@@ -90,7 +90,7 @@ def card_injectable(text: str) -> bool:
 def card_active_name(fname: str) -> bool:
     """§3.1 活跃白名单：仅顶层 *.md 卡出目录行。
     隐藏件（. 开头，含 .reflect_last）、备份件（*.bak / *.md.bak / backup-*）严禁；
-    非卡件（r61h 知夏裁决 09-14 夜）：MEMORY.md 索引已走 deepagents memory 通道常驻勿双注、
+    非卡件（r61h Celia裁决 09-14 夜）：MEMORY.md 索引已走 deepagents memory 通道常驻勿双注、
     nag-*/reflect-preview-* 是书记员自家提醒与反思产物非记忆卡；
     调用侧 glob("*") 不递归，projects/ 等子目录文件不进目录。"""
     if fname.startswith(".") or fname.endswith(".bak") or not fname.endswith(".md"):

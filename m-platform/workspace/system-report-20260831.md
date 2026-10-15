@@ -1,4 +1,4 @@
-# 知夏系统环境报告（2026-08-31 22:00 生成）
+# Celia系统环境报告（2026-08-31 22:00 生成）
 
 > 底稿：腾讯电脑管家硬件信息 + ZCode 系统实测盘点
 > 用途：开发环境基线存档 + 米娅协作参考
@@ -162,7 +162,7 @@
 
 | 项 | 位置 | 备注 |
 |---|---|---|
-| 知夏邮箱 | D:\glm\projects\notes\secrets\celia_mailbox.md | mencius.celia@claw.163.com |
+| Celia邮箱 | D:\glm\projects\notes\secrets\celia_mailbox.md | mencius.celia@claw.163.com |
 | 米娅密钥 | archive/MEMORY.md | mkcalm.mia@claw.163.com |
 | ZCode 配置 | C:\Users\wolfm\.zcode\cli\config.json | 20 启用插件 |
 | M 平台 settings | D:\m/workspace/settings.json | 密钥在 secrets 节 |
@@ -181,4 +181,4 @@
 
 ---
 
-*报告生成时间：2026-08-31 22:00 | 知夏 (Celia) 存档*
+*报告生成时间：2026-08-31 22:00 | Celia (Celia) 存档*

@@ -12,3 +12,6 @@ m-platform/workspace/skills_manifest.json
 # 09-27 r35 searxng 复验案：运行时配置含 secret_key，永不进 git（家规同 pgdata 先例）
 m-platform/searxng/
 m-platform/docker-compose.yml.bak*
+
+# 10-15：留底文件（*.bak-<日期-时刻>）永不进仓，防 m-snapshot/升级留底被 sync 带出
+*.bak-*
