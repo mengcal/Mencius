@@ -86,6 +86,11 @@ export default function SubagentsTab() {
                         {cowModel && !cowModels.includes(cowModel) && <option value={cowModel}>{cowModel}（手动值）</option>}
                         {cowModels.map((m: string) => <option key={m} value={m}>{m}</option>)}
                       </select></div>
+                    <div className="w-28"><label className="mb-1 block text-sm text-muted-foreground">温度（可选，米娅设）</label>
+                      <input className={inputC} type="number" step="0.1" placeholder="（模型默认）"
+                        defaultValue={(draftRef.current[`agents.${k}.temperature`] ?? a.temperature ?? '') as string}
+                        onChange={(e) => set(`agents.${k}.temperature`, e.target.value)}>
+                      </input></div>
                     <div className="w-28"><label className="mb-1 block text-sm text-muted-foreground">思维档（岗位性质，非模型属性）</label>
                       <select className={inputC} defaultValue={(draftRef.current[`agents.${k}.thinking`] ?? a.thinking ?? '') as string}
                         onChange={(e) => set(`agents.${k}.thinking`, e.target.value)}>

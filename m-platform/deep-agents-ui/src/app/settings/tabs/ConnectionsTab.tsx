@@ -76,9 +76,22 @@ export default function ConnectionsTab() {
     await reload();
   };
   const deleteProvider = async (name: string) => {
-    if (!window.confirm(`确定删除服务商「${name}」？米娅和牛马将立刻无法使用它。`)) return;
+    // 关联岗位预告（含回退链）——岗悬空不拦截（爸爸 10-03 裁决：直接删再重配），只告知
+    const affected = Object.entries((S.agents as Record<string, any>) || {})
+      .filter(([, a]) => {
+        if (!a || typeof a !== 'object') return false;
+        if (a.provider === name) return true;
+        return (Array.isArray(a.fallbacks) ? a.fallbacks : []).some((fb: any) => fb?.provider === name);
+      })
+      .map(([k]) => k);
+    const hint = affected.length ? `注意：岗位 ${affected.join('、')} 仍引用它，删除后悬空待重配。` : '';
+    if (!window.confirm(`确定删除服务商「${name}」？米娅和牛马将立刻无法使用它。${hint}`)) return;
     const j = await postProviderAction('delete', { name });
-    if ((j as any)?.ok) { flash('已删除'); await reload(); }
+    if ((j as any)?.ok) {
+      const aff = (j as any)?.affected_agents?.length ? `（岗位 ${(j as any).affected_agents.join('、')} 待重配）` : '';
+      flash(`已删除${aff}`);
+      await reload();
+    }
     else { flash(`删除失败：${(j as any)?.error || '未知原因'}`); await reload(); }
   };
 
